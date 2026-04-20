@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>경매AI 권리분석</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <div class="brand">
+      <div class="brand-mark">⚖</div>
+      <div class="brand-text">
+        <h1>경매<span>AI</span></h1>
+        <p>권리분석</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <h2 class="hero-title">
+      사건번호만 입력하면<br>
+      <em>경매 물건 권리분석 끝</em>
+    </h2>
+    <p class="hero-sub">
+      대법원 법원경매정보에서 자동으로 데이터를 가져와<br>
+      말소기준권리·인수소멸·대항력·배당을 분석합니다.
+    </p>
+
+    <div class="search-box">
+      <div class="search-row">
+        <select id="jiwonNm">
+          <option>서울중앙지방법원</option>
+          <option>서울동부지방법원</option>
+          <option>서울서부지방법원</option>
+          <option>서울남부지방법원</option>
+          <option>서울북부지방법원</option>
+          <option>수원지방법원</option>
+          <option>인천지방법원</option>
+          <option>의정부지방법원</option>
+          <option selected>대전지방법원</option>
+          <option>천안지원</option>
+          <option>청주지방법원</option>
+          <option>부산지방법원</option>
+          <option>부산지방법원 동부지원</option>
+          <option>부산지방법원 서부지원</option>
+          <option>대구지방법원</option>
+          <option>울산지방법원</option>
+          <option>창원지방법원</option>
+          <option>광주지방법원</option>
+          <option>전주지방법원</option>
+          <option>춘천지방법원</option>
+          <option>제주지방법원</option>
+        </select>
+        <input id="saYear" type="text" value="2024" style="max-width:90px">
+        <span class="sep">타경</span>
+        <input id="saSer" type="text" placeholder="사건번호 (예: 10044)">
+        <button id="btnAnalyze" class="btn-primary">⚡ 분석 시작</button>
+      </div>
+      <div class="search-region">
+        <span>소액임차인 기준 지역:</span>
+        <select id="region">
+          <option value="seoul">서울특별시</option>
+          <option value="overcrowded">과밀억제권역·세종·용인·화성·김포</option>
+          <option value="metro">광역시·안산·광주·파주·이천·평택</option>
+          <option value="other" selected>그 외 지역</option>
+        </select>
+      </div>
+      <p class="search-hint">대법원 사이트에서 실시간으로 데이터를 가져오므로 10~30초 걸립니다.</p>
+    </div>
+  </div>
+</section>
+
+<section class="results-section container" id="resultsSection"></section>
+
+<footer class="site-footer">
+  <p>본 도구는 학습·참고용이며 법률 자문을 대체하지 않습니다.</p>
+  <p class="muted">분석 로직은 주택임대차보호법·민사집행법 일반원칙 기반. 실제 입찰 전 원본 서류 확인 필수.</p>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
