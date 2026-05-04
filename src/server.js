@@ -32,7 +32,7 @@ app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
     let patched = html;
-    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js'];
+    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js', '/molit-patch.js'];
     scripts.forEach((src) => {
       if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
     });
@@ -83,15 +83,75 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
+  const kakaoKey = process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '';
+  const molitKey = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
   res.json({
     ok: true,
-    kakaoJsKey: process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '',
-    hasKakaoMap: Boolean(process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY),
+    kakaoJsKey: kakaoKey,
+    hasKakaoMap: Boolean(kakaoKey),
+    hasMolit: Boolean(molitKey),
   });
 });
 
 app.get('/api/courts', (req, res) => {
   res.json({ ok: true, courts: listCourts() });
+});
+
+function xmlText(xml, tag) {
+  const m = String(xml || '').match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  return m ? m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
+}
+
+function parseAptTradeXml(xml) {
+  const items = [...String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/gi)].map((m) => m[1]);
+  return items.map((item) => ({
+    aptName: xmlText(item, 'aptNm') || xmlText(item, '아파트'),
+    dealAmount: xmlText(item, 'dealAmount') || xmlText(item, '거래금액'),
+    buildYear: xmlText(item, 'buildYear') || xmlText(item, '건축년도'),
+    dealYear: xmlText(item, 'dealYear') || xmlText(item, '년'),
+    dealMonth: xmlText(item, 'dealMonth') || xmlText(item, '월'),
+    dealDay: xmlText(item, 'dealDay') || xmlText(item, '일'),
+    area: xmlText(item, 'excluUseAr') || xmlText(item, '전용면적'),
+    floor: xmlText(item, 'floor') || xmlText(item, '층'),
+    dong: xmlText(item, 'umdNm') || xmlText(item, '법정동'),
+    roadName: xmlText(item, 'roadNm') || xmlText(item, '도로명'),
+    cancelDate: xmlText(item, 'cdealDay') || xmlText(item, '해제사유발생일'),
+  }));
+}
+
+app.get('/api/molit/apt-trades', async (req, res) => {
+  try {
+    const key = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
+    if (!key) return res.status(400).json({ error: 'MOLIT_API_KEY 환경변수가 필요합니다.' });
+
+    const lawdCd = String(req.query.lawdCd || '').trim();
+    const dealYmd = String(req.query.dealYmd || '').trim();
+    const aptName = String(req.query.aptName || '').trim();
+    if (!/^\d{5}$/.test(lawdCd)) return res.status(400).json({ error: '법정동코드 앞 5자리(LAWD_CD)를 입력해주세요.' });
+    if (!/^\d{6}$/.test(dealYmd)) return res.status(400).json({ error: '계약월(DEAL_YMD)은 YYYYMM 6자리로 입력해주세요.' });
+
+    const url = new URL('https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev');
+    url.searchParams.set('serviceKey', key);
+    url.searchParams.set('LAWD_CD', lawdCd);
+    url.searchParams.set('DEAL_YMD', dealYmd);
+    url.searchParams.set('pageNo', '1');
+    url.searchParams.set('numOfRows', '1000');
+
+    const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/xml,text/xml,*/*' } });
+    const xml = await apiRes.text();
+    if (!apiRes.ok) return res.status(502).json({ error: `국토부 API 응답 오류: ${apiRes.status}` });
+
+    let trades = parseAptTradeXml(xml);
+    if (aptName) {
+      const compact = aptName.replace(/\s+/g, '').toLowerCase();
+      trades = trades.filter((t) => String(t.aptName || '').replace(/\s+/g, '').toLowerCase().includes(compact));
+    }
+
+    return res.json({ ok: true, count: trades.length, trades: trades.slice(0, 100) });
+  } catch (e) {
+    console.error('[molit] exception:', e);
+    return res.status(500).json({ error: '실거래가 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
+  }
 });
 
 function validateFetchInput({ saYear, saSer, jiwonNm }) {
