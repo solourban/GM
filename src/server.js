@@ -32,15 +32,10 @@ app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
     let patched = html;
-    if (!patched.includes('/platform-patch.js')) {
-      patched = patched.replace('</body>', '<script src="/platform-patch.js"></script>\n</body>');
-    }
-    if (!patched.includes('/address-fix.js')) {
-      patched = patched.replace('</body>', '<script src="/address-fix.js"></script>\n</body>');
-    }
-    if (!patched.includes('/watchlist-patch.js')) {
-      patched = patched.replace('</body>', '<script src="/watchlist-patch.js"></script>\n</body>');
-    }
+    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js'];
+    scripts.forEach((src) => {
+      if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
+    });
     res.type('html').send(patched);
   });
 });
