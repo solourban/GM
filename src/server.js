@@ -32,7 +32,7 @@ app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
     let patched = html;
-    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js'];
+    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js'];
     scripts.forEach((src) => {
       if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
     });
@@ -43,7 +43,7 @@ app.get('/', (req, res, next) => {
 app.use(express.static(PUBLIC_DIR));
 
 const { analyzeCase } = require('./analyzer');
-const { fetchCase } = require('./crawler');
+const { fetchCase, listCourts } = require('./crawler');
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 30);
@@ -51,9 +51,7 @@ const apiHits = new Map();
 
 function clientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    return forwarded.split(',')[0].trim();
-  }
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
   return req.socket.remoteAddress || 'unknown';
 }
 
@@ -65,9 +63,7 @@ function rateLimit(req, res, next) {
   recent.push(now);
   apiHits.set(ip, recent);
 
-  if (recent.length > RATE_LIMIT_MAX) {
-    return res.status(429).json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' });
-  }
+  if (recent.length > RATE_LIMIT_MAX) return res.status(429).json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' });
   return next();
 }
 
@@ -84,6 +80,10 @@ app.use('/api', rateLimit);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, message: '경매AI v3 서버 정상' });
+});
+
+app.get('/api/courts', (req, res) => {
+  res.json({ ok: true, courts: listCourts() });
 });
 
 function validateFetchInput({ saYear, saSer, jiwonNm }) {
