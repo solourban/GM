@@ -31,9 +31,13 @@ app.use((req, res, next) => {
 app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
-    const patched = html.includes('/platform-patch.js')
-      ? html
-      : html.replace('</body>', '<script src="/platform-patch.js"></script>\n</body>');
+    let patched = html;
+    if (!patched.includes('/platform-patch.js')) {
+      patched = patched.replace('</body>', '<script src="/platform-patch.js"></script>\n</body>');
+    }
+    if (!patched.includes('/address-fix.js')) {
+      patched = patched.replace('</body>', '<script src="/address-fix.js"></script>\n</body>');
+    }
     res.type('html').send(patched);
   });
 });
@@ -95,15 +99,12 @@ function validateFetchInput({ saYear, saSer, jiwonNm }) {
   return null;
 }
 
-// 1단계: 사건번호로 기본정보 자동 수집
 app.post('/api/fetch', async (req, res) => {
   const startTime = Date.now();
   try {
     const { saYear, saSer, jiwonNm } = req.body;
     const inputError = validateFetchInput({ saYear, saSer, jiwonNm });
-    if (inputError) {
-      return res.status(400).json({ error: inputError });
-    }
+    if (inputError) return res.status(400).json({ error: inputError });
 
     const year = String(saYear).trim();
     const serial = String(saSer).trim();
@@ -127,16 +128,11 @@ app.post('/api/fetch', async (req, res) => {
   }
 });
 
-// 2단계: 사용자가 PDF 보고 입력한 정보 + 자동수집 데이터로 권리분석
 app.post('/api/analyze', async (req, res) => {
   try {
     const { raw, manual, region = 'other' } = req.body;
-    if (!raw || !manual) {
-      return res.status(400).json({ error: '필수 파라미터 누락 (raw, manual)' });
-    }
+    if (!raw || !manual) return res.status(400).json({ error: '필수 파라미터 누락 (raw, manual)' });
 
-    // manual 입력을 raw 구조에 merge
-    // manual = { malso: {date, type, holder, amount}, rights: [...], tenants: [...], specials: [...] }
     const merged = { ...raw };
     merged.rights = manual.rights || [];
     merged.tenants = (manual.tenants || []).map((t) => ({
@@ -146,7 +142,6 @@ app.post('/api/analyze', async (req, res) => {
       '보증금': t.deposit || '',
     }));
 
-    // 특약 (유치권/법정지상권/분묘기지권)이 있으면 rights에 추가
     if (Array.isArray(manual.specials)) {
       manual.specials.forEach((s) => {
         merged.rights.push({
@@ -158,7 +153,6 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
-    // 사용자가 지정한 말소기준권리는 분석 엔진에서 우선 선택되도록 표시한다.
     if (manual.malso && manual.malso.date) {
       merged.rights.unshift({
         '접수일자': manual.malso.date,
