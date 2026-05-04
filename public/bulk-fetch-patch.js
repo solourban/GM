@@ -17,18 +17,9 @@
     return String(value || '').replace(/\s+/g, ' ').replace(/^[,\s]+/, '').trim();
   }
 
-  function loadCases() {
-    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
-    catch { return []; }
-  }
-
-  function saveCases(items) {
-    localStorage.setItem(KEY, JSON.stringify(items));
-  }
-
-  function caseKey(item) {
-    return `${item.court || ''}|${item.caseNo || ''}`;
-  }
+  function loadCases() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+  function saveCases(items) { localStorage.setItem(KEY, JSON.stringify(items)); }
+  function caseKey(item) { return `${item.court || ''}|${item.caseNo || ''}`; }
 
   function addWatchItem(item) {
     const items = loadCases();
@@ -50,9 +41,8 @@
     const minBid = parseKrw(basic['최저매각가격'] || basic['최저가']);
     const safetyMargin = appraisal && minBid ? appraisal - minBid : 0;
     const marginRate = appraisal ? safetyMargin / appraisal : 0;
-    const risk = 'basic';
     const decision = !appraisal || !minBid ? '보류' : marginRate >= 0.25 ? '1차후보' : marginRate >= 0.1 ? '검토' : '보류';
-    const decisionClass = decision === '1차후보' ? 'good' : decision === '검토' ? 'warn' : 'warn';
+    const decisionClass = decision === '1차후보' ? 'good' : 'warn';
 
     return {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -67,12 +57,14 @@
       safetyMargin,
       marginRate,
       maxBid: minBid || 0,
-      risk,
+      risk: 'basic',
       daehang: (raw.tenants || []).length || 0,
       inheritCount: 0,
       decision,
       decisionClass,
       memo: '일괄조회 1차 저장 · 명세서 입력 전',
+      raw,
+      source: 'bulk-fetch',
     };
   }
 
@@ -89,11 +81,7 @@
   }
 
   function parseLine(line) {
-    const cleaned = String(line || '')
-      .replace(/타경/g, ' ')
-      .replace(/[,:/|]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const cleaned = String(line || '').replace(/타경/g, ' ').replace(/[,:/|]+/g, ' ').replace(/\s+/g, ' ').trim();
     if (!cleaned) return null;
     const parts = cleaned.split(' ');
     const yearIdx = parts.findIndex((p) => /^20\d{2}$/.test(p));
@@ -160,10 +148,7 @@
     log.style.display = 'none';
 
     const parsed = textarea.value.split('\n').map(parseLine).filter(Boolean);
-    if (!parsed.length) {
-      status.textContent = '붙여넣은 사건이 없습니다.';
-      return;
-    }
+    if (!parsed.length) { status.textContent = '붙여넣은 사건이 없습니다.'; return; }
 
     const valid = parsed.filter((x) => !x.error);
     const invalid = parsed.filter((x) => x.error);
@@ -177,11 +162,7 @@
       const item = valid[i];
       status.textContent = `${i + 1}/${valid.length} 조회 중: ${item.jiwonNm} ${item.saYear}타경${item.saSer}`;
       try {
-        const res = await fetch('/api/fetch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(item)
-        });
+        const res = await fetch('/api/fetch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(item) });
         const data = await res.json();
         if (!res.ok || !data.ok) {
           fail += 1;
