@@ -38,29 +38,33 @@ function formatMoney(n) {
   return (parts.join(' ') || '0') + '원';
 }
 
-function normalizeRights(raw) {
+function normalizeRights(raw = []) {
   return raw
     .map((r) => ({
-      date: normalizeDate(r['접수일자'] || r['접수일'] || r['접수'] || ''),
-      type: (r['권리종류'] || r['등기'] || '').trim(),
-      holder: (r['권리자'] || r['등기명의인'] || '').trim(),
-      amount: parseMoney(r['채권금액'] || r['채권최고액'] || r['금액'] || ''),
+      date: normalizeDate(r['접수일자'] || r['접수일'] || r['접수'] || r.date || ''),
+      type: (r['권리종류'] || r['등기'] || r.type || '').trim(),
+      holder: (r['권리자'] || r['등기명의인'] || r.holder || '').trim(),
+      amount: parseMoney(r['채권금액'] || r['채권최고액'] || r['금액'] || r.amount || ''),
+      _userMalso: Boolean(r._userMalso),
     }))
     .filter((r) => r.date || r.type);
 }
 
-function normalizeTenants(raw) {
+function normalizeTenants(raw = []) {
   return raw
     .map((t) => ({
-      name: (t['임차인'] || t['성명'] || '').trim(),
-      moveIn: normalizeDate(t['전입신고일자'] || t['전입일'] || t['전입'] || ''),
-      fixed: normalizeDate(t['확정일자'] || ''),
-      deposit: parseMoney(t['보증금'] || t['임차보증금'] || ''),
+      name: (t['임차인'] || t['성명'] || t.name || '').trim(),
+      moveIn: normalizeDate(t['전입신고일자'] || t['전입일'] || t['전입'] || t.moveIn || ''),
+      fixed: normalizeDate(t['확정일자'] || t.fixed || ''),
+      deposit: parseMoney(t['보증금'] || t['임차보증금'] || t.deposit || ''),
     }))
-    .filter((t) => t.moveIn);
+    .filter((t) => t.name || t.moveIn || t.fixed || t.deposit);
 }
 
 function findMalso(rights) {
+  const userSelected = rights.find((r) => r._userMalso);
+  if (userSelected) return userSelected;
+
   const candidates = rights.filter((r) => MALSO_KEYWORDS.some((k) => r.type.includes(k)));
   if (!candidates.length) return null;
   candidates.sort((a, b) => a.date.localeCompare(b.date));
@@ -73,20 +77,20 @@ function analyzeRights(rights, malso) {
     const out = { ...r };
     if (ALWAYS_INHERIT.some((k) => r.type.includes(k))) {
       out.status = '인수';
-      out.reason = `${r.type}은(는) 경매로 소멸되지 않는 특수권리`;
+      out.reason = `${r.type}은(는) 경매로 소멸되지 않을 수 있는 특수권리입니다. 원본 서류 확인이 필요합니다.`;
     } else if (!malso) {
       out.status = '?';
-      out.reason = '말소기준권리 없음';
-    } else if (r === malso) {
+      out.reason = '말소기준권리를 확정할 수 없습니다.';
+    } else if (r._userMalso || r === malso) {
       out.status = '소멸';
-      out.reason = '말소기준 본인 — 매각으로 소멸';
+      out.reason = '사용자가 입력한 말소기준권리입니다.';
       out.isMalso = true;
-    } else if (r.date < malso.date) {
+    } else if (r.date && malso.date && r.date < malso.date) {
       out.status = '인수';
-      out.reason = '말소기준보다 선순위 → 인수';
+      out.reason = '말소기준보다 선순위로 보입니다. 인수 여부 원본 확인이 필요합니다.';
     } else {
       out.status = '소멸';
-      out.reason = '말소기준 이후 → 소멸';
+      out.reason = '말소기준 이후 권리로 추정됩니다.';
     }
     return out;
   });
@@ -95,15 +99,18 @@ function analyzeRights(rights, malso) {
 function analyzeTenants(tenants, malso) {
   return tenants.map((t) => {
     const out = { ...t };
-    if (!malso) {
+    if (!t.moveIn) {
+      out.daehang = '확인필요';
+      out.reason = '전입신고일이 없어 대항력 판단이 불가능합니다.';
+    } else if (!malso) {
       out.daehang = '?';
-      out.reason = '말소기준 없음';
+      out.reason = '말소기준권리를 확정할 수 없습니다.';
     } else if (t.moveIn < malso.date) {
       out.daehang = '있음';
-      out.reason = `전입(${t.moveIn}) < 말소기준(${malso.date}) → 대항력 있음`;
+      out.reason = `전입(${t.moveIn}) < 말소기준(${malso.date}) → 대항력 있음으로 추정`;
     } else {
       out.daehang = '없음';
-      out.reason = `전입(${t.moveIn}) ≥ 말소기준(${malso.date}) → 대항력 없음`;
+      out.reason = `전입(${t.moveIn}) ≥ 말소기준(${malso.date}) → 대항력 없음으로 추정`;
     }
     return out;
   });
@@ -114,7 +121,7 @@ function simulateBaedang(bidPrice, rights, tenants, region) {
   const allocations = [];
 
   const cost = Math.round(bidPrice * 0.03);
-  allocations.push({ order: 1, label: '경매집행비용(추정 3%)', amount: cost });
+  allocations.push({ order: 1, label: '경매집행비용(임의 추정 3%)', amount: cost });
   remain -= cost;
   if (remain < 0) remain = 0;
 
@@ -149,7 +156,7 @@ function simulateBaedang(bidPrice, rights, tenants, region) {
       const remainDep = Math.max(0, t.deposit - (t._choi || 0));
       if (remainDep > 0) {
         const wuseon = t.fixed > t.moveIn ? t.fixed : t.moveIn;
-        priority.push({ kind: 'tenant', date: wuseon, label: `임차인 우선변제 (${t.name})`, amount: remainDep, ref: t });
+        priority.push({ kind: 'tenant', date: wuseon, label: `임차인 우선변제 (${t.name || '임차인'})`, amount: remainDep, ref: t });
       }
     }
   });
@@ -171,7 +178,7 @@ function calculateInherited(rights, tenants) {
   let total = 0;
   rights.forEach((r) => {
     if (r.status === '인수') {
-      const note = ALWAYS_INHERIT.some((k) => r.type.includes(k)) ? '특수권리' : '선순위 권리 인수';
+      const note = ALWAYS_INHERIT.some((k) => r.type.includes(k)) ? '특수권리 확인 필요' : '선순위 권리 인수 가능성';
       items.push({ label: `${r.type} (${r.holder})`, amount: r.amount, note });
       total += r.amount;
     }
@@ -181,7 +188,7 @@ function calculateInherited(rights, tenants) {
       const received = (t._choi || 0) + (t._baedang || 0);
       const unpaid = Math.max(0, t.deposit - received);
       if (unpaid > 0) {
-        items.push({ label: `대항력 임차인 미배당 (${t.name})`, amount: unpaid, note: '낙찰자 인수' });
+        items.push({ label: `대항력 임차인 미배당 추정 (${t.name || '임차인'})`, amount: unpaid, note: '낙찰자 인수 가능성' });
         total += unpaid;
       }
     }
@@ -193,6 +200,12 @@ function assessRisk(rights, tenants, inherited, minBid) {
   const flags = [];
   let level = 'ok';
 
+  const unknownTenants = tenants.filter((t) => t.daehang === '확인필요' || t.daehang === '?');
+  if (unknownTenants.length) {
+    flags.push({ sev: 'warn', msg: `대항력 판단 불가 임차인 ${unknownTenants.length}명` });
+    level = 'warn';
+  }
+
   const special = rights.filter((r) => ALWAYS_INHERIT.some((k) => r.type.includes(k)));
   if (special.length) {
     flags.push({ sev: 'danger', msg: `특수권리 ${special.length}건 (${special.map((r) => r.type).join(', ')})` });
@@ -201,22 +214,22 @@ function assessRisk(rights, tenants, inherited, minBid) {
 
   const daehang = tenants.filter((t) => t.daehang === '있음');
   if (daehang.length) {
-    flags.push({ sev: inherited.total > 0 ? 'danger' : 'warn', msg: `대항력 임차인 ${daehang.length}명` });
+    flags.push({ sev: inherited.total > 0 ? 'danger' : 'warn', msg: `대항력 있는 것으로 보이는 임차인 ${daehang.length}명` });
     if (level === 'ok') level = 'warn';
   }
 
   if (inherited.total > 0 && minBid) {
     const ratio = inherited.total / minBid;
     if (ratio >= 0.3) {
-      flags.push({ sev: 'danger', msg: `인수금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
+      flags.push({ sev: 'danger', msg: `인수 추정금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
       level = 'danger';
     } else if (ratio >= 0.05) {
-      flags.push({ sev: 'warn', msg: `인수금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
+      flags.push({ sev: 'warn', msg: `인수 추정금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
       if (level === 'ok') level = 'warn';
     }
   }
 
-  if (!flags.length) flags.push({ sev: 'ok', msg: '권리관계가 깨끗한 물건입니다' });
+  if (!flags.length) flags.push({ sev: 'ok', msg: '입력값 기준으로 큰 인수 위험은 보이지 않습니다. 원본 서류 재확인은 필요합니다.' });
   return { level, flags };
 }
 
@@ -232,34 +245,34 @@ function generateExplanation(rep) {
   if (rep.malso) {
     lines.push(
       `<p><b>1. 말소기준권리</b><br>` +
-      `${rep.malso.date}에 ${rep.malso.holder}가 설정한 <b>${rep.malso.type}</b>이 말소기준권리입니다. ` +
-      `이 날짜 이후의 권리는 경매로 소멸되고, 이전 권리는 인수 대상입니다.</p>`
+      `${rep.malso.date}에 ${rep.malso.holder}가 설정한 <b>${rep.malso.type}</b>을 말소기준권리로 보고 분석했습니다. ` +
+      `이 날짜 이후의 권리는 소멸되는 것으로 추정하고, 이전 권리는 인수 가능성이 있는 것으로 표시했습니다.</p>`
     );
   }
   const inheritList = rep.rights.filter((r) => r.status === '인수');
   if (inheritList.length) {
     lines.push(
-      `<p><b>2. 인수되는 권리</b><br>` +
-      `${inheritList.map((r) => r.type).join(', ')}는 낙찰자가 인수합니다. ` +
-      `총 인수금액 ${formatMoney(rep.inherited.total)}을 입찰가 외에 부담해야 합니다.</p>`
+      `<p><b>2. 인수 가능 권리</b><br>` +
+      `${inheritList.map((r) => r.type).join(', ')}는 낙찰자 인수 가능성이 있습니다. ` +
+      `입력값 기준 인수 추정금액은 ${formatMoney(rep.inherited.total)}입니다.</p>`
     );
   } else {
-    lines.push(`<p><b>2. 인수 권리 없음</b><br>낙찰자가 인수할 선순위 권리가 없습니다.</p>`);
+    lines.push(`<p><b>2. 인수 권리</b><br>입력값 기준으로는 낙찰자가 인수할 선순위 권리가 뚜렷하게 보이지 않습니다.</p>`);
   }
   if (rep.tenants.length) {
     const daehang = rep.tenants.filter((t) => t.daehang === '있음');
     if (daehang.length) {
       lines.push(
-        `<p><b>3. 대항력 있는 임차인</b><br>${daehang.length}명이 대항력 있음. 미배당 보증금은 낙찰자 인수.</p>`
+        `<p><b>3. 임차인</b><br>${daehang.length}명이 대항력 있는 임차인으로 추정됩니다. 미배당 보증금은 낙찰자 인수 가능성이 있습니다.</p>`
       );
     } else {
-      lines.push(`<p><b>3. 임차인 대항력 없음</b><br>모든 임차인 후순위.</p>`);
+      lines.push(`<p><b>3. 임차인</b><br>입력값 기준으로는 후순위 임차인으로 보입니다. 전입일·확정일자·배당요구 여부를 원본에서 재확인하세요.</p>`);
     }
   }
   const total = {
-    ok: '권리관계가 깔끔합니다. 시세 대비 입찰가 경쟁력이 핵심.',
-    warn: `인수금액 ${formatMoney(rep.inherited.total)} 반영한 실질 투자비로 판단하세요.`,
-    danger: '위험 요소 여러 개. 전문가 검토 필수.',
+    ok: '입력값 기준으로 큰 인수 위험은 보이지 않습니다. 다만 원본 서류와 등기부 확인은 필수입니다.',
+    warn: `인수 추정금액 ${formatMoney(rep.inherited.total)}을 실질 투자비에 반영해 판단하세요.`,
+    danger: '위험 요소가 있습니다. 실제 입찰 전 전문가 검토가 필요합니다.',
   }[rep.risk.level];
   lines.push(`<p><b>4. 총평 · ${rep.risk.level.toUpperCase()}</b><br>${total}</p>`);
   return lines.join('');
