@@ -1,9 +1,11 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
@@ -25,7 +27,18 @@ app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
 });
-app.use(express.static(path.join(__dirname, '..', 'public')));
+
+app.get('/', (req, res, next) => {
+  fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
+    if (err) return next(err);
+    const patched = html.includes('/platform-patch.js')
+      ? html
+      : html.replace('</body>', '<script src="/platform-patch.js"></script>\n</body>');
+    res.type('html').send(patched);
+  });
+});
+
+app.use(express.static(PUBLIC_DIR));
 
 const { analyzeCase } = require('./analyzer');
 const { fetchCase } = require('./crawler');
