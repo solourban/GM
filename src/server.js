@@ -38,6 +38,9 @@ app.get('/', (req, res, next) => {
     if (!patched.includes('/address-fix.js')) {
       patched = patched.replace('</body>', '<script src="/address-fix.js"></script>\n</body>');
     }
+    if (!patched.includes('/watchlist-patch.js')) {
+      patched = patched.replace('</body>', '<script src="/watchlist-patch.js"></script>\n</body>');
+    }
     res.type('html').send(patched);
   });
 });
