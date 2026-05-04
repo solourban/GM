@@ -1,19 +1,9 @@
 /**
  * 법원경매정보 크롤러 v3 — 직접 API 호출
- * ─────────────────────────────────────────
- * Puppeteer 없이 단순 fetch로 대법원 내부 API 3개를 직접 호출.
- * 브라우저 띄울 필요 없어서 훨씬 빠르고 안정적.
- *
- * 사용 API:
- *   POST /pgj/pgj15A/selectAuctnCsSrchRslt.on  — 사건내역
- *   POST /pgj/pgj15A/selectCsDtlDxdyDts.on     — 기일내역
- *   POST /pgj/pgj15A/selectDlvrOfdocDtsDtl.on  — 문건/송달내역
  */
 
 const BASE = 'https://www.courtauction.go.kr';
 
-// 법원 코드 (대법원 내부 사용하는 B000xxx 형식)
-// 실제로 selectCortOfcLst.on 에서 목록 받아올 수도 있지만, 자주 쓰는 것들만 하드코딩
 const COURT_CODES = {
   '서울중앙지방법원': 'B000210',
   '서울동부지방법원': 'B000211',
@@ -34,6 +24,7 @@ const COURT_CODES = {
   '강릉지원': 'B000261',
   '원주지원': 'B000262',
   '속초지원': 'B000263',
+  '영월지원': 'B000264',
   '대전지방법원': 'B000270',
   '홍성지원': 'B000271',
   '공주지원': 'B000272',
@@ -75,7 +66,30 @@ const COURT_CODES = {
   '제주지방법원': 'B000610',
 };
 
-// 공통 헤더 (브라우저처럼 보이게)
+const COURT_ALIASES = {
+  '서울중앙': '서울중앙지방법원',
+  '서울동부': '서울동부지방법원',
+  '서울서부': '서울서부지방법원',
+  '서울남부': '서울남부지방법원',
+  '서울북부': '서울북부지방법원',
+  '의정부': '의정부지방법원',
+  '인천': '인천지방법원',
+  '수원': '수원지방법원',
+  '춘천': '춘천지방법원',
+  '대전': '대전지방법원',
+  '청주': '청주지방법원',
+  '대구': '대구지방법원',
+  '대구서부': '대구서부지원',
+  '부산': '부산지방법원',
+  '부산동부': '부산지방법원 동부지원',
+  '부산서부': '부산지방법원 서부지원',
+  '울산': '울산지방법원',
+  '창원': '창원지방법원',
+  '광주': '광주지방법원',
+  '전주': '전주지방법원',
+  '제주': '제주지방법원',
+};
+
 const HEADERS = {
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'ko-KR,ko;q=0.9',
@@ -86,26 +100,57 @@ const HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
+function normalizeCourtName(name) {
+  const raw = String(name || '').trim();
+  if (COURT_CODES[raw]) return raw;
+  const compact = raw.replace(/\s+/g, '').replace(/지방법원$/g, '').replace(/지원$/g, '지원');
+  if (COURT_ALIASES[compact]) return COURT_ALIASES[compact];
+  if (COURT_CODES[`${raw}지방법원`]) return `${raw}지방법원`;
+  if (COURT_CODES[`${raw}지원`]) return `${raw}지원`;
+  const found = Object.keys(COURT_CODES).find((court) => court.includes(raw) || court.replace(/\s+/g, '').includes(compact));
+  return found || raw;
+}
+
+function buildFailureHints(reason, { courtName, csNo, cortOfcCd }) {
+  const hints = [
+    '법원명, 사건연도, 사건번호가 맞는지 먼저 확인하세요.',
+    '대법원 사이트에서 취하·정지·종국·매각완료 사건은 조회 구조가 다를 수 있습니다.',
+    '일부 사건은 물건번호 또는 내부 사건번호 매칭이 필요해 자동 조회가 실패할 수 있습니다.',
+    '대법원 경매정보 사이트 응답 지연/차단이면 잠시 후 다시 시도하세요.',
+  ];
+  return { reason, courtName, csNo, cortOfcCd, hints };
+}
+
 async function callApi(path, payload) {
   const url = `${BASE}${path}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    throw new Error(`API ${path} failed: ${res.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: HEADERS,
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
+    return res.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error(`API ${path} timeout`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 async function fetchCase(saYear, saSer, jiwonNm) {
-  const cortOfcCd = COURT_CODES[jiwonNm];
+  const courtName = normalizeCourtName(jiwonNm);
+  const cortOfcCd = COURT_CODES[courtName];
   const csNo = `${saYear}타경${saSer}`;
 
   const result = {
     caseNo: csNo,
-    court: jiwonNm,
+    court: courtName,
+    requestedCourt: jiwonNm,
     cortOfcCd,
     fetchedAt: new Date().toISOString(),
     status: 'ok',
@@ -121,13 +166,14 @@ async function fetchCase(saYear, saSer, jiwonNm) {
 
   if (!cortOfcCd) {
     result.status = 'error';
-    result.error = `알 수 없는 법원: ${jiwonNm}`;
+    result.error = `지원하지 않는 법원명입니다: ${jiwonNm}`;
+    result.diagnosis = buildFailureHints('court_not_supported', { courtName, csNo, cortOfcCd });
+    result.debug.steps.push(`법원 코드 없음: ${jiwonNm}`);
     return result;
   }
 
   try {
-    // ── API 1: 사건내역 ──
-    result.debug.steps.push(`[1/3] 사건내역 조회: ${jiwonNm} ${csNo}`);
+    result.debug.steps.push(`[1/3] 사건내역 조회: ${courtName} ${csNo}`);
     const searchData = await callApi('/pgj/pgj15A/selectAuctnCsSrchRslt.on', {
       dma_srchCsDtlInf: { cortOfcCd, csNo },
     });
@@ -136,12 +182,13 @@ async function fetchCase(saYear, saSer, jiwonNm) {
     if (searchData.status !== 200 || !searchData.data) {
       result.status = 'error';
       result.error = searchData.message || '사건을 찾을 수 없습니다';
+      result.diagnosis = buildFailureHints('case_not_found_or_empty', { courtName, csNo, cortOfcCd });
+      result.debug.steps.push(`사건내역 없음: status=${searchData.status}, message=${searchData.message || '-'}`);
       return result;
     }
 
     const d = searchData.data;
 
-    // 기본 정보 매핑
     if (d.dma_csBasInf) {
       const b = d.dma_csBasInf;
       result.basic = {
@@ -156,11 +203,9 @@ async function fetchCase(saYear, saSer, jiwonNm) {
         '담당계전화': b.jdbnTelno,
         '집행관실전화': b.execrCsTelno,
       };
-      // 내부 사용을 위한 원본 csNo
       result._internalCsNo = b.csNo;
     }
 
-    // 물건 목록
     if (Array.isArray(d.dlt_dspslGdsDspslObjctLst) && d.dlt_dspslGdsDspslObjctLst.length) {
       const obj = d.dlt_dspslGdsDspslObjctLst[0];
       result.basic['물건종별'] = getUsageName(obj.lclDspslGdsLstUsgCd, obj.mclDspslGdsLstUsgCd);
@@ -169,49 +214,30 @@ async function fetchCase(saYear, saSer, jiwonNm) {
       result.basic['최저매각가격'] = formatMoney(obj.fstPbancLwsDspslPrc);
       result.basic['매각기일'] = formatYmd(obj.dspslDxdyYmd);
       result.basic['입찰보증금률'] = obj.prchDposRate ? `${obj.prchDposRate}%` : '';
-      // 유찰 횟수 (매각기일 횟수 - 1)
       result.basic['유찰횟수'] = `${Math.max(0, (obj.dspslDxdyDnum || 1) - 1)}회`;
       result.objects = d.dlt_dspslGdsDspslObjctLst;
+    } else {
+      result.debug.steps.push('물건목록 없음: 사건은 있으나 물건 데이터가 비어 있음');
     }
 
-    // 소재지 배당요구종기
     if (Array.isArray(d.dlt_dstrtDemnLstprdDts) && d.dlt_dstrtDemnLstprdDts.length) {
       const dt = d.dlt_dstrtDemnLstprdDts[0];
-      if (dt.dstrtDemnLstprdYmd) {
-        result.basic['배당요구종기'] = formatYmd(dt.dstrtDemnLstprdYmd);
-      }
+      if (dt.dstrtDemnLstprdYmd) result.basic['배당요구종기'] = formatYmd(dt.dstrtDemnLstprdYmd);
     }
 
-    // 이해관계인 (임차인, 채권자 등)
     if (Array.isArray(d.dlt_rletCsIntrpsLst)) {
-      result.interested = d.dlt_rletCsIntrpsLst.map((p) => ({
-        type: p.auctnIntrpsDvsNm,
-        name: p.intrpsNm,
-        seq: p.intrpsSeq,
-      }));
-
-      // 임차인만 따로 추출 (이름만 있고 전입/확정/보증금은 별도 API 필요 — 현재는 이름만)
-      result.tenants = result.interested
-        .filter((p) => p.type === '임차인')
-        .map((p) => ({ '임차인': p.name }));
+      result.interested = d.dlt_rletCsIntrpsLst.map((p) => ({ type: p.auctnIntrpsDvsNm, name: p.intrpsNm, seq: p.intrpsSeq }));
+      result.tenants = result.interested.filter((p) => p.type === '임차인').map((p) => ({ '임차인': p.name }));
     }
 
-    // ── API 2: 기일내역 ──
     result.debug.steps.push(`[2/3] 기일내역 조회`);
     try {
       const dxdyData = await callApi('/pgj/pgj15A/selectCsDtlDxdyDts.on', {
         dma_srchDlvrOfdocDts: { cortOfcCd, csNo: result._internalCsNo || csNo, srchFlag: 'F' },
       });
       result.rawApis.schedule = dxdyData;
-
       if (dxdyData.data) {
-        // 기일 목록은 여러 구조가 있을 수 있어서 탐색
-        const lists = [
-          dxdyData.data.dlt_rletCsGdsDtsDxdyInf,
-          dxdyData.data.dlt_csDtlDxdyDts,
-          dxdyData.data.dlt_dxdyInf,
-        ].filter(Array.isArray);
-
+        const lists = [dxdyData.data.dlt_rletCsGdsDtsDxdyInf, dxdyData.data.dlt_csDtlDxdyDts, dxdyData.data.dlt_dxdyInf].filter(Array.isArray);
         for (const lst of lists) {
           lst.forEach((item) => {
             result.schedule.push([
@@ -229,7 +255,6 @@ async function fetchCase(saYear, saSer, jiwonNm) {
       result.debug.steps.push(`기일내역 조회 실패: ${e.message} (무시하고 계속)`);
     }
 
-    // ── API 3: 문건/송달내역 (선택적) ──
     result.debug.steps.push(`[3/3] 문건/송달내역 조회`);
     try {
       const delvData = await callApi('/pgj/pgj15A/selectDlvrOfdocDtsDtl.on', {
@@ -244,6 +269,7 @@ async function fetchCase(saYear, saSer, jiwonNm) {
   } catch (e) {
     result.status = 'error';
     result.error = e.message || String(e);
+    result.diagnosis = buildFailureHints('api_exception', { courtName, csNo, cortOfcCd });
     result.debug.steps.push(`EXCEPTION: ${e.message}`);
     console.error('[crawler] error:', e);
   }
@@ -251,7 +277,6 @@ async function fetchCase(saYear, saSer, jiwonNm) {
   return result;
 }
 
-// ── Helpers ──
 function formatYmd(ymd) {
   if (!ymd) return '';
   const s = String(ymd);
@@ -268,40 +293,19 @@ function formatMoney(n) {
 
 function getUsageName(lcl, mcl) {
   const codes = {
-    '20000': '부동산',
-    '20100': '주거용건물',
-    '20106': '다세대',
-    '20104': '아파트',
-    '20105': '연립주택',
-    '20200': '상업용건물',
-    '20300': '토지',
-    '20400': '자동차',
+    '20000': '부동산', '20100': '주거용건물', '20106': '다세대', '20104': '아파트', '20105': '연립주택', '20200': '상업용건물', '20300': '토지', '20400': '자동차',
   };
   return codes[mcl] || codes[lcl] || '부동산';
 }
 
 function getDxdyKndName(cd) {
-  const codes = {
-    '01': '매각기일',
-    '02': '매각결정기일',
-    '03': '심문기일',
-    '04': '낙찰허가결정',
-  };
+  const codes = { '01': '매각기일', '02': '매각결정기일', '03': '심문기일', '04': '낙찰허가결정' };
   return codes[cd] || cd || '';
 }
 
 function getDxdyRsltName(cd) {
-  const codes = {
-    '002': '유찰',
-    '003': '매각',
-    '004': '변경',
-    '005': '연기',
-    '006': '취하',
-    '007': '정지',
-    '008': '속행',
-    '009': '기각',
-  };
+  const codes = { '002': '유찰', '003': '매각', '004': '변경', '005': '연기', '006': '취하', '007': '정지', '008': '속행', '009': '기각' };
   return codes[cd] || cd || '';
 }
 
-module.exports = { fetchCase };
+module.exports = { fetchCase, COURT_CODES, normalizeCourtName };
