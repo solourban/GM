@@ -91,7 +91,7 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 .search-row input { flex: 1; min-width: 120px; }
 .search-row select option { background: var(--accent); color: #F6F5F1; }
 .search-row input::placeholder { color: rgba(246,245,241,0.5); }
-.search-row .sep { align-self: center; color: rgba(246,245,241,0.5); }
+.search-row .sep { align-self: center; color: var(--accent-ink); font-size: 18px; font-weight: 800; padding: 0 2px; }
 
 .btn-primary {
   background: var(--accent-ink);
@@ -118,7 +118,7 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   padding: 6px 10px; border-radius: 8px; font-size: 12.5px;
 }
 .search-region select option { background: var(--accent); }
-.search-hint { margin: 14px 0 0; font-size: 12px; color: rgba(246,245,241,0.5); text-align: center; }
+.search-hint { margin: 14px 0 0; font-size: 13px; font-weight: 600; color: rgba(246,245,241,0.88); text-align: center; }
 
 .results-section { padding: 40px 24px 60px; min-height: 200px; }
 .loading-card, .error-card {
@@ -166,7 +166,11 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   font-family: var(--font-serif);
   font-size: 24px; font-weight: 700;
   margin: 8px 0 4px;
+  line-height: 1.45;
+  word-break: keep-all;
 }
+.property-address-main { display: block; }
+.property-address-detail { display: block; margin-top: 4px; font-size: 18px; color: var(--ink-2); }
 .verdict p { margin: 0; color: var(--ink-2); }
 
 .verdict-stats {
