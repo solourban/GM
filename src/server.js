@@ -32,7 +32,7 @@ app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
     let patched = html;
-    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js'];
+    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js'];
     scripts.forEach((src) => {
       if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
     });
@@ -80,6 +80,14 @@ app.use('/api', rateLimit);
 
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, message: '경매AI v3 서버 정상' });
+});
+
+app.get('/api/config', (req, res) => {
+  res.json({
+    ok: true,
+    kakaoJsKey: process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '',
+    hasKakaoMap: Boolean(process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY),
+  });
 });
 
 app.get('/api/courts', (req, res) => {
