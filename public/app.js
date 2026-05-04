@@ -12,8 +12,28 @@ function formatMoney(n) {
   return (parts.join(' ') || '0') + '원';
 }
 
+function parseKrw(v) {
+  if (v == null) return 0;
+  const digits = String(v).replace(/[^0-9]/g, '');
+  return digits ? Number(digits) : 0;
+}
+
 function escapeHtml(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderAddressTitle(value) {
+  const address = String(value || '').trim();
+  if (!address) return '';
+  const match = address.match(/^(.*?(?:로|길)\s*\d+(?:-\d+)?)(.*)$/);
+  if (!match || !match[2].trim()) return escapeHtml(address);
+  return `<span class="property-address-main">${escapeHtml(match[1].trim())}</span><span class="property-address-detail">${escapeHtml(match[2].trim())}</span>`;
+}
+
+function sumDaehangTenantDeposit(report) {
+  return (report.tenants || [])
+    .filter(t => t.daehang === '있음')
+    .reduce((sum, t) => sum + (Number(t.deposit) || 0), 0);
 }
 
 // ── Step 1: 기본정보 가져오기 ──
@@ -23,7 +43,8 @@ document.getElementById('btnFetch').onclick = async () => {
   const jiwonNm = document.getElementById('jiwonNm').value;
   const rs = document.getElementById('resultsSection');
 
-  if (!saSer) { alert('사건번호를 입력하세요'); return; }
+  if (!/^\d{4}$/.test(saYear)) { alert('사건연도는 4자리 숫자로 입력하세요'); return; }
+  if (!/^\d+$/.test(saSer)) { alert('사건번호는 숫자만 입력하세요'); return; }
 
   rs.innerHTML = `
     <div class="loading-card">
@@ -63,7 +84,7 @@ function renderStep1(raw, elapsed) {
   rs.innerHTML = `
     <div class="verdict ok" style="margin-bottom:20px">
       <span class="verdict-badge">✓ Step 1 완료 · 기본정보 수집</span>
-      <h3>${escapeHtml(basic['소재지'] || raw.caseNo)}</h3>
+      <h3>${renderAddressTitle(basic['소재지'] || raw.caseNo)}</h3>
       <p>대법원 법원경매정보에서 ${elapsed}만에 수집 완료</p>
       <div class="verdict-stats">
         <div class="stat"><div class="k">감정가</div><div class="v">${basic['감정평가액'] || '-'}</div></div>
@@ -110,7 +131,6 @@ function renderStep1(raw, elapsed) {
       </p>
     </div>
 
-    <!-- 말소기준권리 입력 -->
     <div class="subcard input-card">
       <h4>⚖ 최선순위 설정 (말소기준권리)</h4>
       <p class="muted">매각물건명세서 상단에 "최선순위 설정"으로 적힌 값</p>
@@ -131,7 +151,6 @@ function renderStep1(raw, elapsed) {
       </div>
     </div>
 
-    <!-- 등기부 권리 목록 -->
     <div class="subcard input-card">
       <h4>📜 등기부 기타 권리 (선택)</h4>
       <p class="muted">말소기준 외 다른 근저당·가압류·압류·가등기 등 (없으면 비워두기)</p>
@@ -139,7 +158,6 @@ function renderStep1(raw, elapsed) {
       <button type="button" class="btn-add" onclick="addRight()">+ 권리 추가</button>
     </div>
 
-    <!-- 임차인 -->
     <div class="subcard input-card">
       <h4>🏠 임차인 정보</h4>
       <p class="muted">매각물건명세서 하단 "조사된 임차내역"에서 확인</p>
@@ -152,7 +170,6 @@ function renderStep1(raw, elapsed) {
       ` : ''}
     </div>
 
-    <!-- 특수권리 -->
     <div class="subcard input-card">
       <h4>🚨 특수권리 (선택)</h4>
       <p class="muted">매각물건명세서 "비고"란의 유치권·법정지상권·분묘기지권 등</p>
@@ -160,7 +177,6 @@ function renderStep1(raw, elapsed) {
       <button type="button" class="btn-add" onclick="addSpecial()">+ 특수권리 추가</button>
     </div>
 
-    <!-- 지역 -->
     <div class="subcard input-card">
       <h4>📍 소액임차인 기준 지역</h4>
       <select id="region" style="max-width:420px; width:100%">
@@ -176,14 +192,12 @@ function renderStep1(raw, elapsed) {
     </div>
   `;
 
-  // 초기값: 자동 조회된 임차인들 기본 행으로 채우기
-  tenantCandidates.forEach((t, i) => addTenant(t.name));
+  tenantCandidates.forEach((t) => addTenant(t.name));
 }
 
 // ── 동적 행 추가 ──
 window.addRight = function() {
   const list = document.getElementById('rightsList');
-  const idx = list.children.length;
   const div = document.createElement('div');
   div.className = 'input-row';
   div.innerHTML = `
@@ -239,7 +253,6 @@ window.addSpecial = function() {
   list.appendChild(div);
 };
 
-// ── 폼에서 값 읽기 ──
 function readRows(listId) {
   const rows = document.getElementById(listId).children;
   const result = [];
@@ -248,7 +261,6 @@ function readRows(listId) {
     r.querySelectorAll('[data-k]').forEach(el => {
       obj[el.dataset.k] = el.value.trim();
     });
-    // 비어있지 않은 행만 포함
     if (Object.values(obj).some(v => v)) result.push(obj);
   }
   return result;
@@ -304,14 +316,74 @@ window.runAnalysis = async function() {
   }
 };
 
+function renderExitSimulator(report) {
+  const bidPrice = report.baedang?.bidPrice || parseKrw(report.basic?.['최저매각가격']) || parseKrw(report.basic?.['감정평가액']);
+  const appraisal = parseKrw(report.basic?.['감정평가액']);
+  const tenantDeposit = sumDaehangTenantDeposit(report) || report.inherited?.total || 0;
+  const defaultSale = Math.max(appraisal, bidPrice + tenantDeposit);
+
+  return `
+    <div class="subcard input-card exit-card">
+      <h4>📈 엑시트·실질수익 시뮬레이션</h4>
+      <p class="muted">대항력 임차인을 안고 되팔거나, 기존 임차인에게 바로 매도하는 경우의 돈 흐름을 계산합니다.</p>
+      <div class="input-row exit-input-row">
+        <label>낙찰가 <input type="number" id="exitBid" value="${bidPrice}" oninput="updateExitSimulator()"></label>
+        <label>인수 보증금 <input type="number" id="exitDeposit" value="${tenantDeposit}" oninput="updateExitSimulator()"></label>
+        <label>예상 매도가 <input type="number" id="exitSale" value="${defaultSale}" oninput="updateExitSimulator()"></label>
+        <label>취득·기타비용 % <input type="number" id="exitAcquireRate" value="5.6" step="0.1" oninput="updateExitSimulator()"></label>
+        <label>매도비용 % <input type="number" id="exitSellRate" value="0.8" step="0.1" oninput="updateExitSimulator()"></label>
+        <label>양도세율 % <input type="number" id="exitTaxRate" value="77" step="1" oninput="updateExitSimulator()"></label>
+      </div>
+      <div id="exitResult" class="exit-result"></div>
+      <div class="note warn-note">간이 계산입니다. 실제 세금, 필요경비 인정 범위, 대출, 계약갱신청구권, 명도 조건은 별도 확인이 필요합니다.</div>
+    </div>
+  `;
+}
+
+window.updateExitSimulator = function() {
+  const result = document.getElementById('exitResult');
+  if (!result) return;
+
+  const bid = parseKrw(document.getElementById('exitBid')?.value);
+  const deposit = parseKrw(document.getElementById('exitDeposit')?.value);
+  const sale = parseKrw(document.getElementById('exitSale')?.value);
+  const acquireRate = Number(document.getElementById('exitAcquireRate')?.value || 0) / 100;
+  const sellRate = Number(document.getElementById('exitSellRate')?.value || 0) / 100;
+  const taxRate = Number(document.getElementById('exitTaxRate')?.value || 0) / 100;
+
+  const acquisitionCost = Math.round(bid * acquireRate);
+  const saleCost = Math.round(sale * sellRate);
+  const economicCost = bid + deposit + acquisitionCost;
+  const taxableGainApprox = Math.max(0, sale - economicCost - saleCost);
+  const taxApprox = Math.round(taxableGainApprox * taxRate);
+  const netProfit = sale - economicCost - saleCost - taxApprox;
+  const cashFromBuyer = Math.max(0, sale - deposit);
+  const initialCashNeeded = bid + acquisitionCost;
+  const breakEvenSale = economicCost + saleCost;
+
+  result.innerHTML = `
+    <div class="verdict-stats exit-stats">
+      <div class="stat"><div class="k">경제적 총매수원가</div><div class="v">${formatMoney(economicCost)}</div></div>
+      <div class="stat"><div class="k">매수자가 추가 지급할 현금</div><div class="v">${formatMoney(cashFromBuyer)}</div></div>
+      <div class="stat"><div class="k">초기 필요 현금</div><div class="v">${formatMoney(initialCashNeeded)}</div></div>
+      <div class="stat"><div class="k">세금 추정</div><div class="v ${taxApprox > 0 ? 'danger' : ''}">${formatMoney(taxApprox)}</div></div>
+      <div class="stat"><div class="k">최종 순수익 추정</div><div class="v ${netProfit > 0 ? 'ok' : 'danger'}">${formatMoney(netProfit)}</div></div>
+      <div class="stat"><div class="k">세전 손익분기 매도가</div><div class="v">${formatMoney(breakEvenSale)}</div></div>
+    </div>
+    <div class="note">
+      구조: 예상 매도가 ${formatMoney(sale)} - 낙찰가 ${formatMoney(bid)} - 인수 보증금 ${formatMoney(deposit)} - 비용 ${formatMoney(acquisitionCost + saleCost)} - 세금 추정 ${formatMoney(taxApprox)} = 최종 순수익 ${formatMoney(netProfit)}
+    </div>
+  `;
+};
+
 // ── 최종 리포트 ──
 function renderReport(report) {
   const rs = document.getElementById('resultsSection');
   const verdictLabel = { ok: '양호', warn: '주의', danger: '위험' }[report.risk.level];
   const verdictDesc = {
-    ok: '권리관계가 깨끗한 물건입니다.',
+    ok: '입력값 기준으로 큰 인수 위험은 뚜렷하게 보이지 않습니다.',
     warn: '주의해야 할 요소가 있습니다. 실질 투자비를 재계산하세요.',
-    danger: '입찰 전 반드시 전문가 검토가 필요합니다.',
+    danger: '입찰 전 반드시 원본 서류와 전문가 검토가 필요합니다.',
   }[report.risk.level];
 
   const daehang = report.tenants.filter(t => t.daehang === '있음').length;
@@ -325,7 +397,7 @@ function renderReport(report) {
 
     <div class="verdict ${report.risk.level}">
       <span class="verdict-badge">${report.risk.level === 'ok' ? '✓' : '⚠'} 종합 · ${verdictLabel}</span>
-      <h3>${escapeHtml(report.basic['소재지'] || report.case)}</h3>
+      <h3>${renderAddressTitle(report.basic['소재지'] || report.case)}</h3>
       <p>${verdictDesc}</p>
       <div class="verdict-stats">
         <div class="stat"><div class="k">인수 권리</div><div class="v ${inheritCount > 0 ? 'danger' : ''}">${inheritCount}건</div></div>
@@ -339,7 +411,7 @@ function renderReport(report) {
       <div class="subcard">
         <h4>⚖ 말소기준권리</h4>
         <p><b>${escapeHtml(report.malso.type)}</b> · ${escapeHtml(report.malso.holder)} · 접수 ${escapeHtml(report.malso.date)} · ${formatMoney(report.malso.amount)}</p>
-        <div class="note">이 날짜(<b>${escapeHtml(report.malso.date)}</b>) 이후에 설정된 권리는 매각으로 소멸됩니다.</div>
+        <div class="note">이 날짜(<b>${escapeHtml(report.malso.date)}</b>) 이후의 권리는 소멸되는 것으로 추정합니다. 원본 서류 확인은 필요합니다.</div>
       </div>
     ` : ''}
 
@@ -372,7 +444,7 @@ function renderReport(report) {
             ${report.tenants.map(t => `
               <tr>
                 <td>${escapeHtml(t.name)}</td>
-                <td>${escapeHtml(t.moveIn)}</td>
+                <td>${escapeHtml(t.moveIn || '-')}</td>
                 <td>${escapeHtml(t.fixed || '-')}</td>
                 <td style="text-align:right">${formatMoney(t.deposit)}</td>
                 <td style="text-align:center"><span class="tag ${t.daehang === '있음' ? 'inherit' : 'extinct'}">${escapeHtml(t.daehang)}</span></td>
@@ -403,9 +475,11 @@ function renderReport(report) {
       </table>
     </div>
 
+    ${renderExitSimulator(report)}
+
     ${report.bidRec ? `
       <div class="bid-rec">
-        <h4>🤖 AI 예상 입찰가 구간</h4>
+        <h4>🤖 예상 입찰가 구간</h4>
         <div class="range">${formatMoney(report.bidRec.lower)} <span class="sep">—</span> ${formatMoney(report.bidRec.upper)}</div>
         <p>기준 시세 ${formatMoney(report.bidRec.base)} · 인수금액 ${formatMoney(report.inherited.total)} · 부대비용 5.6% 반영</p>
       </div>
@@ -417,6 +491,6 @@ function renderReport(report) {
     </div>
   `;
 
-  // 스크롤 맨 위로
+  updateExitSimulator();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
