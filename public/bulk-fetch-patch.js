@@ -13,6 +13,11 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  function parseFailCount(value) {
+    const n = Number(String(value || '').replace(/[^0-9]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
   function shortAddress(value) {
     return String(value || '').replace(/\s+/g, ' ').replace(/^[,\s]+/, '').trim();
   }
@@ -35,14 +40,58 @@
     saveCases(items.slice(0, 150));
   }
 
+  function isResidential(type) {
+    return /아파트|다세대|연립|주거|오피스텔|단독|다가구/.test(String(type || ''));
+  }
+
+  function scoreBulkCandidate({ appraisal, minBid, marginRate, failCount, tenantCount, usage, scheduleCount }) {
+    if (!appraisal || !minBid) {
+      return { decision: '보류', cls: 'warn', memo: '감정가/최저가 확인 필요', score: 0 };
+    }
+
+    const bidRate = minBid / appraisal;
+    let score = 0;
+    const reasons = [];
+
+    if (bidRate <= 0.55) { score += 34; reasons.push('최저가율 55% 이하'); }
+    else if (bidRate <= 0.70) { score += 24; reasons.push('최저가율 70% 이하'); }
+    else if (bidRate <= 0.85) { score += 12; reasons.push('최저가율 85% 이하'); }
+    else { score -= 8; reasons.push('할인폭 작음'); }
+
+    if (failCount >= 3) { score += 18; reasons.push('유찰 3회 이상'); }
+    else if (failCount >= 2) { score += 12; reasons.push('유찰 2회 이상'); }
+    else if (failCount === 0) { score -= 6; reasons.push('신건/유찰 적음'); }
+
+    if (isResidential(usage)) { score += 10; reasons.push('주거형 물건'); }
+    else if (usage) { score -= 4; reasons.push('비주거/용도 확인'); }
+
+    if (tenantCount === 0) { score += 8; reasons.push('임차인 자동조회 없음'); }
+    else if (tenantCount === 1) { score -= 6; reasons.push('임차인 1명'); }
+    else { score -= 16; reasons.push(`임차인 ${tenantCount}명`); }
+
+    if (!scheduleCount) { score -= 8; reasons.push('기일정보 확인 필요'); }
+    if (marginRate <= 0.05) score -= 10;
+
+    let decision = '보류';
+    let cls = 'warn';
+    if (score >= 48) { decision = '1차후보'; cls = 'good'; }
+    else if (score >= 28) { decision = '검토'; cls = 'warn'; }
+    else if (bidRate >= 0.92 || score < 8) { decision = '보류'; cls = 'warn'; }
+
+    return { decision, cls, memo: reasons.slice(0, 4).join(' · '), score };
+  }
+
   function summarizeRaw(raw, fallbackCourt) {
     const basic = raw.basic || {};
     const appraisal = parseKrw(basic['감정평가액'] || basic['감정가']);
     const minBid = parseKrw(basic['최저매각가격'] || basic['최저가']);
     const safetyMargin = appraisal && minBid ? appraisal - minBid : 0;
     const marginRate = appraisal ? safetyMargin / appraisal : 0;
-    const decision = !appraisal || !minBid ? '보류' : marginRate >= 0.25 ? '1차후보' : marginRate >= 0.1 ? '검토' : '보류';
-    const decisionClass = decision === '1차후보' ? 'good' : 'warn';
+    const failCountNumber = parseFailCount(basic['유찰횟수']);
+    const tenantCount = (raw.tenants || []).length || 0;
+    const usage = basic['물건종별'] || '';
+    const scheduleCount = Array.isArray(raw.schedule) ? raw.schedule.length : 0;
+    const scored = scoreBulkCandidate({ appraisal, minBid, marginRate, failCount: failCountNumber, tenantCount, usage, scheduleCount });
 
     return {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -58,11 +107,12 @@
       marginRate,
       maxBid: minBid || 0,
       risk: 'basic',
-      daehang: (raw.tenants || []).length || 0,
+      daehang: tenantCount,
       inheritCount: 0,
-      decision,
-      decisionClass,
-      memo: '일괄조회 1차 저장 · 명세서 입력 전',
+      decision: scored.decision,
+      decisionClass: scored.cls,
+      memo: `일괄 1차 · ${scored.memo}`,
+      bulkScore: scored.score,
       raw,
       source: 'bulk-fetch',
     };
@@ -119,7 +169,7 @@
     box.insertAdjacentHTML('afterend', `
       <div class="bulk-card">
         <h3>📥 여러 사건번호 일괄 조회</h3>
-        <p>여러 줄로 붙여넣으면 기본정보를 순서대로 조회해서 관심사건 비교표에 저장합니다. 1차 조회라 인수금액은 명세서 입력 전 0원으로 저장됩니다.</p>
+        <p>여러 줄로 붙여넣으면 기본정보를 순서대로 조회해서 관심사건 비교표에 저장합니다. 판정은 할인폭·유찰·용도·임차인 여부를 보는 1차 필터입니다.</p>
         <textarea id="bulkCases" placeholder="서울중앙 2024 110754\n수원 2024 12345\n천안 2024 67890"></textarea>
         <div class="bulk-actions">
           <button onclick="runBulkFetch()">일괄 조회해서 저장</button>
@@ -169,9 +219,10 @@
           appendLog(`실패: ${item.raw} → ${data.error || '조회 실패'}`);
           continue;
         }
-        addWatchItem(summarizeRaw(data.raw, item.jiwonNm));
+        const summarized = summarizeRaw(data.raw, item.jiwonNm);
+        addWatchItem(summarized);
         ok += 1;
-        appendLog(`저장: ${data.raw.court || item.jiwonNm} ${data.raw.caseNo}`);
+        appendLog(`저장: ${data.raw.court || item.jiwonNm} ${data.raw.caseNo} → ${summarized.decision} (${summarized.memo})`);
       } catch (e) {
         fail += 1;
         appendLog(`실패: ${item.raw} → ${e.message}`);
