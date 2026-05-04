@@ -20,6 +20,7 @@ const COURT_CODES = {
   '안양지원': 'B000255',
   '고양지원': 'B000256',
   '부천지원': 'B000257',
+  '남양주지원': 'B000258',
   '춘천지방법원': 'B000260',
   '강릉지원': 'B000261',
   '원주지원': 'B000262',
@@ -146,7 +147,6 @@ async function fetchCase(saYear, saSer, jiwonNm) {
   const courtName = normalizeCourtName(jiwonNm);
   const cortOfcCd = COURT_CODES[courtName];
   const csNo = `${saYear}타경${saSer}`;
-
   const result = { caseNo: csNo, court: courtName, requestedCourt: jiwonNm, cortOfcCd, fetchedAt: new Date().toISOString(), status: 'ok', basic: {}, rights: [], tenants: [], schedule: [], interested: [], objects: [], rawApis: {}, debug: { steps: [] } };
 
   if (!cortOfcCd) {
@@ -171,7 +171,6 @@ async function fetchCase(saYear, saSer, jiwonNm) {
     }
 
     const d = searchData.data;
-
     if (d.dma_csBasInf) {
       const b = d.dma_csBasInf;
       result.basic = {
@@ -245,7 +244,6 @@ async function fetchCase(saYear, saSer, jiwonNm) {
     result.debug.steps.push(`EXCEPTION: ${e.message}`);
     console.error('[crawler] error:', e);
   }
-
   return result;
 }
 
