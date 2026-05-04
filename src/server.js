@@ -32,7 +32,7 @@ app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
     let patched = html;
-    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js'];
+    const scripts = ['/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js'];
     scripts.forEach((src) => {
       if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
     });
@@ -115,6 +115,7 @@ app.post('/api/fetch', async (req, res) => {
     if (raw.status !== 'ok') {
       return res.status(502).json({
         error: raw.error || '법원경매정보 조회에 실패했습니다.',
+        diagnosis: raw.diagnosis || null,
         debug: raw.debug,
         elapsed: `${elapsed}s`,
       });
