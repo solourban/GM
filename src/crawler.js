@@ -66,29 +66,33 @@ const COURT_CODES = {
   '제주지방법원': 'B000610',
 };
 
-const COURT_ALIASES = {
-  '서울중앙': '서울중앙지방법원',
-  '서울동부': '서울동부지방법원',
-  '서울서부': '서울서부지방법원',
-  '서울남부': '서울남부지방법원',
-  '서울북부': '서울북부지방법원',
-  '의정부': '의정부지방법원',
-  '인천': '인천지방법원',
-  '수원': '수원지방법원',
-  '춘천': '춘천지방법원',
-  '대전': '대전지방법원',
-  '청주': '청주지방법원',
-  '대구': '대구지방법원',
-  '대구서부': '대구서부지원',
-  '부산': '부산지방법원',
-  '부산동부': '부산지방법원 동부지원',
-  '부산서부': '부산지방법원 서부지원',
-  '울산': '울산지방법원',
-  '창원': '창원지방법원',
-  '광주': '광주지방법원',
-  '전주': '전주지방법원',
-  '제주': '제주지방법원',
-};
+function compactCourtKey(name) {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/지방법원/g, '')
+    .replace(/법원/g, '')
+    .replace(/지원/g, '지원');
+}
+
+const COURT_ALIASES = Object.fromEntries([
+  ['서울중앙', '서울중앙지방법원'], ['중앙', '서울중앙지방법원'], ['서울중앙지법', '서울중앙지방법원'],
+  ['서울동부', '서울동부지방법원'], ['동부', '서울동부지방법원'], ['서울동부지법', '서울동부지방법원'],
+  ['서울서부', '서울서부지방법원'], ['서부', '서울서부지방법원'], ['서울서부지법', '서울서부지방법원'],
+  ['서울남부', '서울남부지방법원'], ['남부', '서울남부지방법원'], ['서울남부지법', '서울남부지방법원'],
+  ['서울북부', '서울북부지방법원'], ['북부', '서울북부지방법원'], ['서울북부지법', '서울북부지방법원'],
+  ['의정부', '의정부지방법원'], ['인천', '인천지방법원'], ['수원', '수원지방법원'], ['춘천', '춘천지방법원'],
+  ['대전', '대전지방법원'], ['청주', '청주지방법원'], ['대구', '대구지방법원'], ['부산', '부산지방법원'],
+  ['울산', '울산지방법원'], ['창원', '창원지방법원'], ['광주', '광주지방법원'], ['전주', '전주지방법원'], ['제주', '제주지방법원'],
+  ['대구서부', '대구서부지원'], ['대구서부지원', '대구서부지원'],
+  ['부산동부', '부산지방법원 동부지원'], ['부산동부지원', '부산지방법원 동부지원'], ['동부지원', '부산지방법원 동부지원'],
+  ['부산서부', '부산지방법원 서부지원'], ['부산서부지원', '부산지방법원 서부지원'], ['서부지원', '부산지방법원 서부지원'],
+  ...Object.keys(COURT_CODES).flatMap((court) => {
+    const compact = compactCourtKey(court);
+    const short = compact.replace(/지원$/, '');
+    return [[court, court], [compact, court], [short, court]];
+  }),
+]);
 
 const HEADERS = {
   'Accept': 'application/json, text/plain, */*',
@@ -103,11 +107,12 @@ const HEADERS = {
 function normalizeCourtName(name) {
   const raw = String(name || '').trim();
   if (COURT_CODES[raw]) return raw;
-  const compact = raw.replace(/\s+/g, '').replace(/지방법원$/g, '').replace(/지원$/g, '지원');
+  const compact = compactCourtKey(raw);
+  if (COURT_ALIASES[raw]) return COURT_ALIASES[raw];
   if (COURT_ALIASES[compact]) return COURT_ALIASES[compact];
   if (COURT_CODES[`${raw}지방법원`]) return `${raw}지방법원`;
   if (COURT_CODES[`${raw}지원`]) return `${raw}지원`;
-  const found = Object.keys(COURT_CODES).find((court) => court.includes(raw) || court.replace(/\s+/g, '').includes(compact));
+  const found = Object.keys(COURT_CODES).find((court) => court.includes(raw) || compactCourtKey(court).includes(compact));
   return found || raw;
 }
 
@@ -126,12 +131,7 @@ async function callApi(path, payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: HEADERS,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+    const res = await fetch(url, { method: 'POST', headers: HEADERS, body: JSON.stringify(payload), signal: controller.signal });
     if (!res.ok) throw new Error(`API ${path} failed: ${res.status}`);
     return res.json();
   } catch (e) {
@@ -147,22 +147,7 @@ async function fetchCase(saYear, saSer, jiwonNm) {
   const cortOfcCd = COURT_CODES[courtName];
   const csNo = `${saYear}타경${saSer}`;
 
-  const result = {
-    caseNo: csNo,
-    court: courtName,
-    requestedCourt: jiwonNm,
-    cortOfcCd,
-    fetchedAt: new Date().toISOString(),
-    status: 'ok',
-    basic: {},
-    rights: [],
-    tenants: [],
-    schedule: [],
-    interested: [],
-    objects: [],
-    rawApis: {},
-    debug: { steps: [] },
-  };
+  const result = { caseNo: csNo, court: courtName, requestedCourt: jiwonNm, cortOfcCd, fetchedAt: new Date().toISOString(), status: 'ok', basic: {}, rights: [], tenants: [], schedule: [], interested: [], objects: [], rawApis: {}, debug: { steps: [] } };
 
   if (!cortOfcCd) {
     result.status = 'error';
@@ -174,9 +159,7 @@ async function fetchCase(saYear, saSer, jiwonNm) {
 
   try {
     result.debug.steps.push(`[1/3] 사건내역 조회: ${courtName} ${csNo}`);
-    const searchData = await callApi('/pgj/pgj15A/selectAuctnCsSrchRslt.on', {
-      dma_srchCsDtlInf: { cortOfcCd, csNo },
-    });
+    const searchData = await callApi('/pgj/pgj15A/selectAuctnCsSrchRslt.on', { dma_srchCsDtlInf: { cortOfcCd, csNo } });
     result.rawApis.search = searchData;
 
     if (searchData.status !== 200 || !searchData.data) {
@@ -232,22 +215,13 @@ async function fetchCase(saYear, saSer, jiwonNm) {
 
     result.debug.steps.push(`[2/3] 기일내역 조회`);
     try {
-      const dxdyData = await callApi('/pgj/pgj15A/selectCsDtlDxdyDts.on', {
-        dma_srchDlvrOfdocDts: { cortOfcCd, csNo: result._internalCsNo || csNo, srchFlag: 'F' },
-      });
+      const dxdyData = await callApi('/pgj/pgj15A/selectCsDtlDxdyDts.on', { dma_srchDlvrOfdocDts: { cortOfcCd, csNo: result._internalCsNo || csNo, srchFlag: 'F' } });
       result.rawApis.schedule = dxdyData;
       if (dxdyData.data) {
         const lists = [dxdyData.data.dlt_rletCsGdsDtsDxdyInf, dxdyData.data.dlt_csDtlDxdyDts, dxdyData.data.dlt_dxdyInf].filter(Array.isArray);
         for (const lst of lists) {
           lst.forEach((item) => {
-            result.schedule.push([
-              formatYmd(item.dxdyYmd),
-              item.dxdyHm ? `${item.dxdyHm.substring(0, 2)}:${item.dxdyHm.substring(2)}` : '',
-              item.dxdyPlcNm || '',
-              getDxdyKndName(item.auctnDxdyKndCd),
-              getDxdyRsltName(item.auctnDxdyRsltCd),
-              formatMoney(item.fstPbancLwsDspslPrc || item.lwsDspslPrc),
-            ]);
+            result.schedule.push([formatYmd(item.dxdyYmd), item.dxdyHm ? `${item.dxdyHm.substring(0, 2)}:${item.dxdyHm.substring(2)}` : '', item.dxdyPlcNm || '', getDxdyKndName(item.auctnDxdyKndCd), getDxdyRsltName(item.auctnDxdyRsltCd), formatMoney(item.fstPbancLwsDspslPrc || item.lwsDspslPrc)]);
           });
         }
       }
@@ -257,9 +231,7 @@ async function fetchCase(saYear, saSer, jiwonNm) {
 
     result.debug.steps.push(`[3/3] 문건/송달내역 조회`);
     try {
-      const delvData = await callApi('/pgj/pgj15A/selectDlvrOfdocDtsDtl.on', {
-        dma_srchDlvrOfdocDts: { cortOfcCd, csNo: result._internalCsNo || csNo, srchFlag: 'F' },
-      });
+      const delvData = await callApi('/pgj/pgj15A/selectDlvrOfdocDtsDtl.on', { dma_srchDlvrOfdocDts: { cortOfcCd, csNo: result._internalCsNo || csNo, srchFlag: 'F' } });
       result.rawApis.delivery = delvData;
     } catch (e) {
       result.debug.steps.push(`송달내역 조회 실패: ${e.message} (무시)`);
@@ -292,9 +264,7 @@ function formatMoney(n) {
 }
 
 function getUsageName(lcl, mcl) {
-  const codes = {
-    '20000': '부동산', '20100': '주거용건물', '20106': '다세대', '20104': '아파트', '20105': '연립주택', '20200': '상업용건물', '20300': '토지', '20400': '자동차',
-  };
+  const codes = { '20000': '부동산', '20100': '주거용건물', '20106': '다세대', '20104': '아파트', '20105': '연립주택', '20200': '상업용건물', '20300': '토지', '20400': '자동차' };
   return codes[mcl] || codes[lcl] || '부동산';
 }
 
@@ -308,4 +278,8 @@ function getDxdyRsltName(cd) {
   return codes[cd] || cd || '';
 }
 
-module.exports = { fetchCase, COURT_CODES, normalizeCourtName };
+function listCourts() {
+  return Object.entries(COURT_CODES).map(([name, code]) => ({ name, code }));
+}
+
+module.exports = { fetchCase, COURT_CODES, normalizeCourtName, listCourts };
