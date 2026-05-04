@@ -27,10 +27,7 @@
   }
 
   function shortAddress(value) {
-    return String(value || '')
-      .replace(/\s+/g, ' ')
-      .replace(/^[,\s]+/, '')
-      .trim();
+    return String(value || '').replace(/\s+/g, ' ').replace(/^[,\s]+/, '').trim();
   }
 
   function injectStyles() {
@@ -40,11 +37,12 @@
     style.textContent = `
       .watch-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
       .watch-actions input { flex:1; min-width:220px; background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:11px 12px; }
-      .watch-btn { border:none; border-radius:10px; padding:11px 15px; font-weight:800; cursor:pointer; background:var(--accent); color:var(--accent-ink); }
+      .watch-btn { border:none; border-radius:10px; padding:10px 12px; font-weight:800; cursor:pointer; background:var(--accent); color:var(--accent-ink); white-space:nowrap; }
       .watch-btn.secondary { background:var(--bg); color:var(--ink-2); border:1px solid var(--line); }
       .watch-btn.danger { background:var(--danger-bg); color:var(--danger); }
+      .watch-btn.compact { padding:7px 9px; font-size:12px; }
       .watchlist-table-wrap { overflow-x:auto; margin-top:12px; }
-      .watchlist-table { width:100%; border-collapse:collapse; font-size:13px; min-width:920px; }
+      .watchlist-table { width:100%; border-collapse:collapse; font-size:13px; min-width:1040px; }
       .watchlist-table th { text-align:left; color:var(--ink-3); border-bottom:1px solid var(--line); padding:10px 8px; font-size:12px; white-space:nowrap; }
       .watchlist-table td { border-bottom:1px solid var(--line); padding:11px 8px; vertical-align:middle; }
       .watchlist-table .addr { max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -59,18 +57,9 @@
     document.head.appendChild(style);
   }
 
-  function loadCases() {
-    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
-    catch { return []; }
-  }
-
-  function saveCases(items) {
-    localStorage.setItem(KEY, JSON.stringify(items));
-  }
-
-  function caseKey(item) {
-    return `${item.court || ''}|${item.caseNo || ''}`;
-  }
+  function loadCases() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; } }
+  function saveCases(items) { localStorage.setItem(KEY, JSON.stringify(items)); }
+  function caseKey(item) { return `${item.court || ''}|${item.caseNo || ''}`; }
 
   function scoreDecision({ risk, inherited, minBid, safetyMargin, marginRate }) {
     if (risk === 'danger') return { label: '보류', cls: 'danger' };
@@ -113,6 +102,9 @@
       decision: decision.label,
       decisionClass: decision.cls,
       memo: '',
+      raw: report.raw || null,
+      report,
+      source: 'analysis-report',
     };
   }
 
@@ -123,11 +115,13 @@
     if (idx >= 0) {
       item.id = items[idx].id;
       item.memo = items[idx].memo || item.memo;
+      item.raw = item.raw || items[idx].raw || null;
+      item.report = item.report || items[idx].report || null;
       items[idx] = { ...items[idx], ...item, savedAt: new Date().toISOString() };
     } else {
       items.unshift(item);
     }
-    saveCases(items.slice(0, 100));
+    saveCases(items.slice(0, 150));
   }
 
   function deleteCase(id) {
@@ -146,13 +140,13 @@
     const mode = document.getElementById('watchSort')?.value || 'candidate';
     const copy = [...items];
     if (mode === 'candidate') {
-      const rank = { '입찰후보': 0, '경계': 1, '보류': 2, '패스': 3 };
+      const rank = { '입찰후보': 0, '1차후보': 0, '경계': 1, '검토': 1, '보류': 2, '패스': 3 };
       copy.sort((a, b) => (rank[a.decision] ?? 9) - (rank[b.decision] ?? 9) || b.safetyMargin - a.safetyMargin);
     }
     if (mode === 'margin') copy.sort((a, b) => b.safetyMargin - a.safetyMargin);
     if (mode === 'maxBid') copy.sort((a, b) => b.maxBid - a.maxBid);
     if (mode === 'risk') {
-      const rank = { ok: 0, warn: 1, danger: 2 };
+      const rank = { ok: 0, basic: 1, warn: 2, danger: 3 };
       copy.sort((a, b) => (rank[a.risk] ?? 9) - (rank[b.risk] ?? 9));
     }
     if (mode === 'recent') copy.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
@@ -164,7 +158,6 @@
     if (!rs || rs.querySelector('.watch-save-card')) return;
     const firstVerdict = rs.querySelector('.verdict');
     if (!firstVerdict) return;
-
     firstVerdict.insertAdjacentHTML('afterend', `
       <div class="subcard input-card watch-save-card">
         <h4>📌 관심사건 저장</h4>
@@ -175,7 +168,6 @@
           <button class="watch-btn secondary" onclick="renderWatchlist()">저장목록 보기</button>
         </div>
       </div>`);
-
     window.__watchCurrentReport = report;
   }
 
@@ -190,41 +182,34 @@
     const html = `
       <div class="subcard watchlist-card">
         <h4>📂 관심 사건 비교표</h4>
-        <p class="muted">저장한 사건을 돈 되는 후보부터 빠르게 비교합니다. 우선은 브라우저 localStorage에만 저장됩니다.</p>
+        <p class="muted">저장한 사건을 돈 되는 후보부터 빠르게 비교합니다. [상세분석]을 누르면 저장된 기본정보로 Step 1을 다시 엽니다.</p>
         <div class="watch-toolbar">
           <div class="watch-small">총 ${items.length}건 저장됨</div>
           <label class="watch-small">정렬
             <select id="watchSort" onchange="renderWatchlist()">
-              <option value="candidate">후보 판정순</option>
-              <option value="margin">안전마진순</option>
-              <option value="maxBid">최대입찰가순</option>
-              <option value="risk">위험 낮은순</option>
-              <option value="recent">최근 저장순</option>
+              <option value="candidate">후보 판정순</option><option value="margin">안전마진순</option><option value="maxBid">최대입찰가순</option><option value="risk">위험 낮은순</option><option value="recent">최근 저장순</option>
             </select>
           </label>
         </div>
         <div class="watchlist-table-wrap">
           <table class="watchlist-table">
-            <thead>
-              <tr>
-                <th>판정</th><th>사건번호</th><th>주소</th><th>감정가</th><th>최저가</th><th>유찰</th><th>인수금액</th><th>안전마진</th><th>최대입찰가</th><th>리스크</th><th>메모</th><th></th>
-              </tr>
-            </thead>
+            <thead><tr><th>판정</th><th>사건번호</th><th>주소</th><th>감정가</th><th>최저가</th><th>유찰</th><th>인수금액</th><th>안전마진</th><th>최대입찰가</th><th>리스크</th><th>메모</th><th>작업</th></tr></thead>
             <tbody>
               ${items.map((x) => `
                 <tr>
                   <td><span class="watch-pill ${esc(x.decisionClass)}">${esc(x.decision)}</span></td>
                   <td>${esc(x.court)}<br><b>${esc(x.caseNo)}</b></td>
                   <td class="addr" title="${esc(x.address)}">${esc(x.address || '-')}</td>
-                  <td>${krw(x.appraisal)}</td>
-                  <td>${krw(x.minBid)}</td>
-                  <td>${esc(x.failCount || '-')}</td>
+                  <td>${krw(x.appraisal)}</td><td>${krw(x.minBid)}</td><td>${esc(x.failCount || '-')}</td>
                   <td class="${x.inherited ? 'danger' : ''}">${krw(x.inherited)}</td>
                   <td class="${x.safetyMargin > 0 ? 'ok' : 'danger'}">${krw(x.safetyMargin)}<br><span class="watch-small">${((x.marginRate || 0) * 100).toFixed(1)}%</span></td>
                   <td><b>${krw(x.maxBid)}</b></td>
                   <td>${esc(x.risk)}<br><span class="watch-small">대항 ${x.daehang || 0} / 인수권리 ${x.inheritCount || 0}</span></td>
                   <td><input style="width:170px" value="${esc(x.memo || '')}" oninput="updateWatchMemo('${esc(x.id)}', this.value)" placeholder="메모"></td>
-                  <td><button class="watch-btn danger" onclick="deleteWatchCase('${esc(x.id)}')">삭제</button></td>
+                  <td>
+                    <button class="watch-btn compact" onclick="openWatchCase('${esc(x.id)}')">상세분석</button>
+                    <button class="watch-btn compact danger" onclick="deleteWatchCase('${esc(x.id)}')">삭제</button>
+                  </td>
                 </tr>`).join('')}
             </tbody>
           </table>
@@ -234,16 +219,38 @@
     const saveCard = rs.querySelector('.watch-save-card');
     if (saveCard) saveCard.insertAdjacentHTML('afterend', html);
     else rs.insertAdjacentHTML('afterbegin', html);
-
-    const select = document.getElementById('watchSort');
-    if (select) select.value = document.getElementById('watchSort')?.value || 'candidate';
   }
+
+  window.openWatchCase = function(id) {
+    const item = loadCases().find((x) => x.id === id);
+    if (!item) return alert('저장된 사건을 찾을 수 없습니다.');
+    if (item.raw && typeof window.renderStep1 === 'function') {
+      window.currentRaw = item.raw;
+      window.renderStep1(item.raw, '저장됨');
+      document.getElementById('resultsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const match = String(item.caseNo || '').match(/(20\d{2})타경(\d+)/);
+    if (match) {
+      const courtSelect = document.getElementById('jiwonNm');
+      const yearInput = document.getElementById('saYear');
+      const serInput = document.getElementById('saSer');
+      if (courtSelect && item.court) courtSelect.value = item.court;
+      if (yearInput) yearInput.value = match[1];
+      if (serInput) serInput.value = match[2];
+      document.querySelector('.search-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      alert('이 사건은 raw 기본정보가 저장되어 있지 않아 검색창에 값을 채웠습니다. 기본정보 가져오기를 눌러 다시 조회하세요.');
+      return;
+    }
+    alert('상세분석을 열 수 없습니다. 사건번호 형식을 확인하세요.');
+  };
 
   window.saveCurrentWatchCase = function() {
     const report = window.__watchCurrentReport || window.__lastAuctionReport;
     if (!report) return;
     const item = summarizeReport(report);
     item.memo = document.getElementById('watchMemo')?.value || '';
+    if (window.currentRaw) item.raw = window.currentRaw;
     upsertCase(item);
     renderWatchlist();
   };
@@ -251,6 +258,7 @@
   window.renderWatchlist = renderWatchlist;
   window.deleteWatchCase = deleteCase;
   window.updateWatchMemo = updateMemo;
+  window.__gmWatchlist = { loadCases, saveCases, upsertCase };
 
   function injectAfterReport(report) {
     injectStyles();
