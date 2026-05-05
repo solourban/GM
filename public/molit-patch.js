@@ -1,4 +1,12 @@
 (() => {
+  const SEOUL_LAWD_CODES = {
+    '종로구': '11110', '중구': '11140', '용산구': '11170', '성동구': '11200', '광진구': '11215',
+    '동대문구': '11230', '중랑구': '11260', '성북구': '11290', '강북구': '11305', '도봉구': '11320',
+    '노원구': '11350', '은평구': '11380', '서대문구': '11410', '마포구': '11440', '양천구': '11470',
+    '강서구': '11500', '구로구': '11530', '금천구': '11545', '영등포구': '11560', '동작구': '11590',
+    '관악구': '11620', '서초구': '11650', '강남구': '11680', '송파구': '11710', '강동구': '11740',
+  };
+
   function esc(value) {
     return String(value || '').replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -21,6 +29,29 @@
     return parts.join(' ') + '원';
   }
 
+  function getAddress(raw) {
+    return raw?.basic?.['소재지'] || raw?.basic?.['주소'] || '';
+  }
+
+  function guessLawdCd(raw) {
+    const address = getAddress(raw);
+    for (const [district, code] of Object.entries(SEOUL_LAWD_CODES)) {
+      if (String(address).includes(`서울`) && String(address).includes(district)) {
+        return { code, label: `서울특별시 ${district}` };
+      }
+    }
+    return { code: '', label: '' };
+  }
+
+  function guessAptName(raw) {
+    const address = getAddress(raw);
+    const m = String(address).match(/\(([^,()]+),\s*([^()]+)\)/);
+    if (m?.[2]) return m[2].trim();
+    const lastParen = String(address).match(/\(([^()]+)\)/);
+    if (lastParen?.[1]?.includes(',')) return lastParen[1].split(',').pop().trim();
+    return '';
+  }
+
   function injectStyles() {
     if (document.getElementById('molitPatchStyles')) return;
     const style = document.createElement('style');
@@ -41,6 +72,8 @@
       .molit-summary .box { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; }
       .molit-summary .k { color:var(--ink-3); font-size:12px; }
       .molit-summary .v { font-family:var(--font-serif); font-size:18px; font-weight:900; margin-top:3px; }
+      .molit-autofill { margin-top:10px; font-size:12.5px; color:var(--ink-3); }
+      .molit-autofill b { color:var(--accent); }
     `;
     document.head.appendChild(style);
   }
@@ -50,28 +83,24 @@
       .find((h) => h.textContent.includes('입지분석'))?.closest('.step1-extra-card');
   }
 
-  function guessAptName(raw) {
-    const address = raw?.basic?.['소재지'] || '';
-    const m = String(address).match(/\(([^,()]+),\s*([^()]+)\)/);
-    if (m?.[2]) return m[2].trim();
-    return '';
-  }
-
   function enhanceMolitCard(raw) {
     injectStyles();
     const card = findLocationCard();
     if (!card || card.dataset.molitEnhanced === '1') return;
     card.dataset.molitEnhanced = '1';
-    const apt = guessAptName(raw || window.currentRaw || {});
+    const source = raw || window.currentRaw || {};
+    const apt = guessAptName(source);
+    const lawd = guessLawdCd(source);
     const now = new Date();
     const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     card.insertAdjacentHTML('beforeend', `
       <div class="molit-card">
         <h4>🏢 국토부 아파트 실거래가 수동 조회</h4>
-        <p class="muted">1차 구조입니다. 법정동코드 앞 5자리와 계약월을 직접 입력해 실거래가를 가져옵니다. 자동 주소 매칭은 다음 단계에서 붙입니다.</p>
+        <p class="muted">서울은 주소에서 구를 추정해 법정동코드 앞 5자리를 자동 입력합니다. 그 외 지역은 직접 입력하세요.</p>
+        ${lawd.code ? `<div class="molit-autofill">자동 추정: <b>${esc(lawd.label)}</b> → LAWD_CD <b>${esc(lawd.code)}</b></div>` : `<div class="molit-autofill">자동 추정 실패: 현재는 서울 25개 구만 자동 입력됩니다.</div>`}
         <div class="molit-form">
-          <label>법정동코드 5자리 <input id="molitLawdCd" placeholder="예: 11680"></label>
+          <label>법정동코드 5자리 <input id="molitLawdCd" value="${esc(lawd.code)}" placeholder="예: 11680"></label>
           <label>계약월 YYYYMM <input id="molitDealYmd" value="${ymd}" placeholder="예: 202501"></label>
           <label>아파트명 필터 <input id="molitAptName" value="${esc(apt)}" placeholder="예: 래미안"></label>
         </div>
