@@ -87,7 +87,8 @@
       '/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js',
       '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js',
       '/molit-patch.js', '/molit-scenario-patch.js', '/capital-patch.js', '/cashflow-patch.js',
-      '/stability-patch.js', '/diagnostics-patch.js'
+      '/stability-patch.js', '/diagnostics-patch.js', '/exit-plan-patch.js', '/bid-checklist-patch.js',
+      '/final-summary-patch.js'
     ];
     return expected.map((src) => ({ src, loaded: srcs.some((s) => s.includes(src)) }));
   }
@@ -103,11 +104,16 @@
       ['자금 가능성 계산', typeof window.updateCapitalCheck === 'function'],
       ['현금흐름 계산', typeof window.updateCashflow === 'function'],
       ['지도 초기화', typeof window.initAuctionMap === 'function'],
+      ['엑시트 전략 계산', typeof window.updateExitPlan === 'function'],
+      ['입찰 체크리스트', typeof window.updateBidChecklist === 'function'],
     ];
   }
 
   function countStorageItems() {
-    const keys = ['gm_watchlist_v1', 'gm_capital_profile_v1', 'gm_cashflow_profile_v1', 'gm_molit_scenario_prices_v1'];
+    const keys = [
+      'gm_watchlist_v1', 'gm_capital_profile_v1', 'gm_cashflow_profile_v1', 'gm_molit_scenario_prices_v1',
+      'gm_exit_plan_profile_v1', 'gm_bid_checklist_v1'
+    ];
     return keys.map((key) => {
       let value = '';
       try { value = localStorage.getItem(key) || ''; } catch {}
