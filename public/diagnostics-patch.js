@@ -84,11 +84,11 @@
   function detectLoadedScripts() {
     const srcs = [...document.scripts].map((s) => s.getAttribute('src') || '').filter(Boolean);
     const expected = [
-      '/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/stepflow-patch.js',
-      '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js',
-      '/molit-patch.js', '/molit-scenario-patch.js', '/capital-patch.js', '/cashflow-patch.js',
-      '/stability-patch.js', '/diagnostics-patch.js', '/exit-plan-patch.js', '/bid-checklist-patch.js',
-      '/final-summary-patch.js'
+      '/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/watchlist-enhance-patch.js',
+      '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js',
+      '/map-patch.js', '/molit-patch.js', '/molit-scenario-patch.js', '/capital-patch.js',
+      '/cashflow-patch.js', '/stability-patch.js', '/diagnostics-patch.js', '/exit-plan-patch.js',
+      '/bid-checklist-patch.js', '/final-summary-patch.js', '/api-guide-patch.js'
     ];
     return expected.map((src) => ({ src, loaded: srcs.some((s) => s.includes(src)) }));
   }
@@ -106,6 +106,7 @@
       ['지도 초기화', typeof window.initAuctionMap === 'function'],
       ['엑시트 전략 계산', typeof window.updateExitPlan === 'function'],
       ['입찰 체크리스트', typeof window.updateBidChecklist === 'function'],
+      ['API 가이드 새로고침', typeof window.refreshApiGuide === 'function'],
     ];
   }
 
