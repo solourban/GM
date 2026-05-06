@@ -87,7 +87,8 @@
   function detectLoadedScripts() {
     const srcs = [...document.scripts].map((s) => s.getAttribute('src') || '').filter(Boolean);
     const expected = [
-      '/gm-core-patch.js', '/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/watchlist-enhance-patch.js',
+      '/gm-core-patch.js', '/patch-registry-patch.js', '/platform-patch.js', '/address-fix.js',
+      '/watchlist-patch.js', '/watchlist-enhance-patch.js', '/today-dashboard-patch.js',
       '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js',
       '/map-patch.js', '/molit-patch.js', '/molit-scenario-patch.js', '/capital-patch.js',
       '/cashflow-patch.js', '/stability-patch.js', '/diagnostics-patch.js', '/exit-plan-patch.js',
@@ -101,6 +102,7 @@
       ['GM 코어', Boolean(window.GM?.core?.version)],
       ['일괄조회 함수', typeof window.runBulkFetch === 'function'],
       ['관심사건 목록 함수', typeof window.renderWatchlist === 'function'],
+      ['오늘 후보 대시보드', typeof window.renderTodayDashboard === 'function'],
       ['상세분석 다시 열기', typeof window.openWatchCase === 'function'],
       ['시세 시나리오 계산', typeof window.updateMarketScenarios === 'function'],
       ['실거래가 조회', typeof window.lookupMolitTrades === 'function'],
