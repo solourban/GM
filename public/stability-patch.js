@@ -8,7 +8,12 @@
     '.step2-toggle-card',
     '#kakaoMapBox',
     '.molit-card',
-    '.bulk-card'
+    '.bulk-card',
+    '.bulk-report-card',
+    '.final-summary-card',
+    '.api-guide-card',
+    '.exit-plan-card',
+    '.bid-check-card'
   ];
 
   function injectStyles() {
@@ -30,16 +35,17 @@
       .timeline-table th, .timeline-table td { word-break: keep-all; }
       input, textarea, select, button { box-sizing: border-box; max-width: 100%; }
       .watchlist-table input { min-width: 140px; }
-      .capital-form input, .cashflow-form input, .molit-form input, .scenario-table input { font-size: 14px; }
+      .capital-form input, .cashflow-form input, .molit-form input, .scenario-table input, .exit-plan-form input { font-size: 14px; }
       @media (max-width: 720px) {
         .container, main, section { max-width: 100%; }
         .verdict, .subcard, .input-card, .platform-card { padding: 16px !important; }
         .score-circle { width: 78px; height: 78px; font-size: 23px; }
         .scenario-table, .cashflow-table, .timeline-table { min-width: 680px; }
         .watchlist-table { min-width: 980px; }
+        .watchlist-table.enhanced { min-width: 1320px; }
         .molit-table { min-width: 720px; }
-        .watch-actions, .bulk-actions, .molit-actions { align-items: stretch; }
-        .watch-actions button, .bulk-actions button, .molit-actions button { width: 100%; }
+        .watch-actions, .bulk-actions, .molit-actions, .api-guide-actions, .bid-check-toolbar { align-items: stretch; }
+        .watch-actions button, .bulk-actions button, .molit-actions button, .api-guide-actions button, .bid-check-toolbar button { width: 100%; }
         .property-address-detail { font-size: 16px !important; }
       }
     `;
