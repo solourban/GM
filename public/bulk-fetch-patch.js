@@ -13,6 +13,19 @@
     return Number.isFinite(n) ? n : 0;
   }
 
+  function krw(n) {
+    const num = Number(n || 0);
+    if (!num) return '-';
+    const sign = num < 0 ? '-' : '';
+    const abs = Math.abs(Math.round(num));
+    const eok = Math.floor(abs / 100000000);
+    const man = Math.floor((abs % 100000000) / 10000);
+    const parts = [];
+    if (eok) parts.push(`${eok}억`);
+    if (man) parts.push(`${man.toLocaleString('ko-KR')}만`);
+    return sign + (parts.join(' ') || '0') + '원';
+  }
+
   function parseFailCount(value) {
     const n = Number(String(value || '').replace(/[^0-9]/g, ''));
     return Number.isFinite(n) ? n : 0;
@@ -158,6 +171,24 @@
       .bulk-actions .ghost { background:rgba(246,245,241,.1); color:#F6F5F1; border:1px solid rgba(246,245,241,.18); }
       .bulk-status { margin-top:12px; color:rgba(246,245,241,.8); font-size:13px; }
       .bulk-log { margin-top:10px; background:rgba(0,0,0,.18); border-radius:10px; padding:10px; max-height:170px; overflow:auto; font-size:12px; color:#F4E9C7; white-space:pre-wrap; }
+      .bulk-report-card { margin:0 0 14px; border:1px solid var(--line); background:#fff; border-radius:18px; padding:18px; }
+      .bulk-report-head { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+      .bulk-report-head h4 { margin:0; font-family:var(--font-serif); font-size:20px; }
+      .bulk-report-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:12px; }
+      .bulk-report-kpi { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; }
+      .bulk-report-kpi .k { color:var(--ink-3); font-size:12px; }
+      .bulk-report-kpi .v { font-family:var(--font-serif); font-size:20px; font-weight:900; margin-top:3px; }
+      .bulk-top-list { display:grid; gap:8px; margin-top:12px; }
+      .bulk-top-item { border:1px solid var(--line); border-radius:12px; padding:11px; display:grid; grid-template-columns:72px 1fr auto; gap:10px; align-items:center; }
+      .bulk-top-score { font-family:var(--font-serif); font-size:22px; font-weight:900; text-align:center; }
+      .bulk-top-title { font-weight:900; overflow-wrap:anywhere; }
+      .bulk-top-meta { color:var(--ink-3); font-size:12px; margin-top:3px; overflow-wrap:anywhere; }
+      .bulk-pill { display:inline-block; border-radius:999px; padding:4px 9px; font-size:11px; font-weight:900; white-space:nowrap; }
+      .bulk-pill.good { background:var(--ok-bg); color:var(--ok); }
+      .bulk-pill.warn { background:var(--warn-bg); color:var(--warn); }
+      .bulk-pill.danger { background:var(--danger-bg); color:var(--danger); }
+      .bulk-fail-list { margin:10px 0 0; padding-left:18px; color:var(--ink-3); font-size:12.5px; line-height:1.6; }
+      @media (max-width:720px) { .bulk-top-item { grid-template-columns:1fr; } .bulk-top-score { text-align:left; } }
     `;
     document.head.appendChild(style);
   }
@@ -189,6 +220,65 @@
     log.scrollTop = log.scrollHeight;
   }
 
+  function renderBulkReport({ total, ok, fail, invalid, results, failures }) {
+    const rs = document.getElementById('resultsSection');
+    if (!rs) return;
+    const counts = results.reduce((acc, x) => {
+      acc[x.decision] = (acc[x.decision] || 0) + 1;
+      return acc;
+    }, {});
+    const top = [...results].sort((a, b) => (b.bulkScore || 0) - (a.bulkScore || 0) || (b.safetyMargin || 0) - (a.safetyMargin || 0)).slice(0, 5);
+    const best = top[0];
+    const verdict = !ok ? { label: '조회 필요', cls: 'warn' }
+      : (counts['1차후보'] || 0) ? { label: '후보 있음', cls: 'good' }
+      : (counts['검토'] || 0) ? { label: '검토 위주', cls: 'warn' }
+      : { label: '보류 위주', cls: 'warn' };
+
+    const html = `
+      <div class="subcard bulk-report-card">
+        <div class="bulk-report-head">
+          <div>
+            <h4>📊 일괄조회 결과 리포트</h4>
+            <p class="muted">붙여넣은 사건을 1차 필터로 걸러낸 결과입니다. 상위 후보는 상세분석에서 원본 서류 기준으로 다시 확인해야 합니다.</p>
+          </div>
+          <span class="bulk-pill ${verdict.cls}">${verdict.label}</span>
+        </div>
+        <div class="bulk-report-kpis">
+          <div class="bulk-report-kpi"><div class="k">총 입력</div><div class="v">${total}건</div></div>
+          <div class="bulk-report-kpi"><div class="k">저장 성공</div><div class="v ok">${ok}건</div></div>
+          <div class="bulk-report-kpi"><div class="k">실패/형식오류</div><div class="v ${fail ? 'danger' : ''}">${fail}건</div></div>
+          <div class="bulk-report-kpi"><div class="k">1차후보</div><div class="v ok">${counts['1차후보'] || 0}건</div></div>
+          <div class="bulk-report-kpi"><div class="k">검토</div><div class="v">${counts['검토'] || 0}건</div></div>
+          <div class="bulk-report-kpi"><div class="k">보류</div><div class="v">${counts['보류'] || 0}건</div></div>
+        </div>
+        ${best ? `<div class="note" style="margin-top:12px"><b>최우선 확인 후보:</b> ${esc(best.court)} ${esc(best.caseNo)} · ${esc(best.address || '-')} · 점수 ${best.bulkScore || 0}점 · 안전마진 ${krw(best.safetyMargin)}</div>` : ''}
+        ${top.length ? `
+          <div class="bulk-top-list">
+            ${top.map((x, idx) => `
+              <div class="bulk-top-item">
+                <div class="bulk-top-score">#${idx + 1}</div>
+                <div>
+                  <div class="bulk-top-title">${esc(x.court)} ${esc(x.caseNo)}</div>
+                  <div class="bulk-top-meta">${esc(x.address || '-')}</div>
+                  <div class="bulk-top-meta">최저가 ${krw(x.minBid)} · 감정가 ${krw(x.appraisal)} · 안전마진 ${krw(x.safetyMargin)} · ${esc(x.memo || '')}</div>
+                </div>
+                <span class="bulk-pill ${esc(x.decisionClass || 'warn')}">${esc(x.decision || '보류')} · ${x.bulkScore || 0}점</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div class="note warn-note" style="margin-top:12px">저장된 후보가 없습니다. 법원명/사건번호 형식이나 조회 실패 원인을 확인하세요.</div>'}
+        ${failures.length ? `
+          <details style="margin-top:12px">
+            <summary style="cursor:pointer;font-weight:900;color:var(--ink-3)">실패/형식 오류 ${failures.length}건 보기</summary>
+            <ul class="bulk-fail-list">${failures.map((x) => `<li>${esc(x.raw)} → ${esc(x.reason)}</li>`).join('')}</ul>
+          </details>
+        ` : ''}
+      </div>
+    `;
+    rs.querySelector('.bulk-report-card')?.remove();
+    rs.insertAdjacentHTML('afterbegin', html);
+  }
+
   window.runBulkFetch = async function() {
     const textarea = document.getElementById('bulkCases');
     const status = document.getElementById('bulkStatus');
@@ -202,6 +292,8 @@
 
     const valid = parsed.filter((x) => !x.error);
     const invalid = parsed.filter((x) => x.error);
+    const results = [];
+    const failures = invalid.map((x) => ({ raw: x.raw, reason: x.error }));
     invalid.forEach((x) => appendLog(`형식 실패: ${x.raw} (${x.error})`));
 
     status.textContent = `총 ${parsed.length}건 중 ${valid.length}건 조회 시작...`;
@@ -216,25 +308,31 @@
         const data = await res.json();
         if (!res.ok || !data.ok) {
           fail += 1;
-          appendLog(`실패: ${item.raw} → ${data.error || '조회 실패'}`);
+          const reason = data.error || '조회 실패';
+          failures.push({ raw: item.raw, reason });
+          appendLog(`실패: ${item.raw} → ${reason}`);
           continue;
         }
         const summarized = summarizeRaw(data.raw, item.jiwonNm);
         addWatchItem(summarized);
+        results.push(summarized);
         ok += 1;
         appendLog(`저장: ${data.raw.court || item.jiwonNm} ${data.raw.caseNo} → ${summarized.decision} (${summarized.memo})`);
       } catch (e) {
         fail += 1;
+        failures.push({ raw: item.raw, reason: e.message });
         appendLog(`실패: ${item.raw} → ${e.message}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
 
-    status.textContent = `일괄 조회 완료: 저장 ${ok}건, 실패 ${fail + invalid.length}건`;
+    const totalFail = fail + invalid.length;
+    status.textContent = `일괄 조회 완료: 저장 ${ok}건, 실패 ${totalFail}건`;
     if (typeof window.renderWatchlist === 'function') {
       const rs = document.getElementById('resultsSection');
       if (rs && !rs.innerHTML.trim()) rs.innerHTML = '<div class="subcard"><h4>📂 관심 사건 비교표</h4><p class="muted">일괄 조회 결과입니다.</p></div>';
       window.renderWatchlist();
+      renderBulkReport({ total: parsed.length, ok, fail: totalFail, invalid: invalid.length, results, failures });
       document.getElementById('resultsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
