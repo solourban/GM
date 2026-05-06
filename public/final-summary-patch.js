@@ -96,7 +96,7 @@
   function getExitStatus() {
     const text = document.getElementById('exitPlanVerdict')?.textContent || '';
     if (!text) return '미확인';
-    const m = text.match(/추천 방향은\s*([^입]+?)입니다/);
+    const m = text.match(/추천 방향은\s*(.*?)입니다/);
     return m?.[1]?.trim() || '확인됨';
   }
 
@@ -236,8 +236,13 @@
   const observer = new MutationObserver(scheduleRender);
   document.addEventListener('DOMContentLoaded', () => {
     injectStyles();
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['value', 'checked', 'class'] });
+    document.addEventListener('input', scheduleRender, true);
+    document.addEventListener('change', scheduleRender, true);
+    document.addEventListener('click', (e) => {
+      if (e.target?.matches?.('[id^="bidCheck_"], .molit-apply-box button, .bid-check-toolbar button')) scheduleRender();
+    }, true);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['checked', 'class'] });
     scheduleRender();
   });
-  if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['value', 'checked', 'class'] });
+  if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['checked', 'class'] });
 })();
