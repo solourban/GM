@@ -10,6 +10,7 @@
     '.molit-card',
     '.bulk-card',
     '.bulk-report-card',
+    '.today-dashboard-card',
     '.final-summary-card',
     '.api-guide-card',
     '.exit-plan-card',
@@ -44,8 +45,8 @@
         .watchlist-table { min-width: 980px; }
         .watchlist-table.enhanced { min-width: 1320px; }
         .molit-table { min-width: 720px; }
-        .watch-actions, .bulk-actions, .molit-actions, .api-guide-actions, .bid-check-toolbar { align-items: stretch; }
-        .watch-actions button, .bulk-actions button, .molit-actions button, .api-guide-actions button, .bid-check-toolbar button { width: 100%; }
+        .watch-actions, .bulk-actions, .molit-actions, .api-guide-actions, .bid-check-toolbar, .today-dashboard-actions { align-items: stretch; }
+        .watch-actions button, .bulk-actions button, .molit-actions button, .api-guide-actions button, .bid-check-toolbar button, .today-dashboard-actions button { width: 100%; }
         .property-address-detail { font-size: 16px !important; }
       }
     `;
@@ -81,6 +82,7 @@
       stability: true,
       updatedAt: new Date().toISOString(),
     };
+    window.GM?.patches?.register?.('stability', { version: 'v2' });
   }
 
   function stabilize() {
