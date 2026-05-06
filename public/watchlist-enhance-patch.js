@@ -99,8 +99,11 @@
     return { label: '보류', cls: 'danger' };
   }
 
-  function sortCases(items) {
-    const mode = document.getElementById('watchSort')?.value || 'candidate';
+  function getSortMode() {
+    return window.__watchSortMode || document.getElementById('watchSort')?.value || 'final';
+  }
+
+  function sortCases(items, mode = getSortMode()) {
     const copy = [...items];
     if (mode === 'final') copy.sort((a, b) => finalScore(b) - finalScore(a));
     else if (mode === 'candidate') {
@@ -148,8 +151,9 @@
     injectStyles();
     const rs = document.getElementById('resultsSection');
     if (!rs) return;
+    const selectedMode = getSortMode();
     rs.querySelector('.watchlist-card')?.remove();
-    const items = sortCases(loadCases());
+    const items = sortCases(loadCases(), selectedMode);
     if (!items.length) return;
 
     const summary = items.reduce((acc, x) => {
@@ -167,13 +171,13 @@
         <div class="watch-toolbar">
           <div class="watch-small">총 ${items.length}건 · 상위후보 ${summary.top}건 · 검토 ${summary.review}건 · 보류 ${summary.hold}건</div>
           <label class="watch-small">정렬
-            <select id="watchSort" onchange="renderWatchlist()">
-              <option value="final">최종점수순</option>
-              <option value="candidate">후보 판정순</option>
-              <option value="margin">안전마진순</option>
-              <option value="maxBid">최대입찰가순</option>
-              <option value="risk">위험 낮은순</option>
-              <option value="recent">최근 저장순</option>
+            <select id="watchSort" onchange="window.__watchSortMode=this.value; renderWatchlist()">
+              <option value="final" ${selectedMode === 'final' ? 'selected' : ''}>최종점수순</option>
+              <option value="candidate" ${selectedMode === 'candidate' ? 'selected' : ''}>후보 판정순</option>
+              <option value="margin" ${selectedMode === 'margin' ? 'selected' : ''}>안전마진순</option>
+              <option value="maxBid" ${selectedMode === 'maxBid' ? 'selected' : ''}>최대입찰가순</option>
+              <option value="risk" ${selectedMode === 'risk' ? 'selected' : ''}>위험 낮은순</option>
+              <option value="recent" ${selectedMode === 'recent' ? 'selected' : ''}>최근 저장순</option>
             </select>
           </label>
         </div>
@@ -218,8 +222,6 @@
     const saveCard = rs.querySelector('.watch-save-card');
     if (saveCard) saveCard.insertAdjacentHTML('afterend', html);
     else rs.insertAdjacentHTML('afterbegin', html);
-    const sort = document.getElementById('watchSort');
-    if (sort) sort.value = document.getElementById('watchSort')?.value || 'final';
   }
 
   function install() {
