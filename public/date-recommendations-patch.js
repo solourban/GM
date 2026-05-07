@@ -5,6 +5,36 @@
     }[c]));
   }
 
+  function stripHtml(value) {
+    return String(value || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function cleanCaseNo(value) {
+    const m = stripHtml(value).match(/(20\d{2})\s*타경\s*(\d{1,10})/);
+    return m ? `${m[1]}타경${m[2]}` : '';
+  }
+
+  function courtStem(value) {
+    return stripHtml(value)
+      .replace(/지방법원|지원|법원|본원|대한민국|서울특별시|경기도|충청남도|충청북도|전라남도|전라북도|경상남도|경상북도|강원도|특별자치도|특별자치시/g, '')
+      .replace(/\s+/g, '')
+      .trim();
+  }
+
+  function validClientItem(item, requestedCourt) {
+    const caseNo = cleanCaseNo(item.caseNo);
+    if (!caseNo) return false;
+    const req = courtStem(requestedCourt || '');
+    const got = courtStem(item.court || '');
+    if (req && got && !req.includes(got) && !got.includes(req)) return false;
+    return true;
+  }
+
   function krw(n) {
     const num = Number(n || 0);
     if (!num) return '-';
@@ -58,6 +88,7 @@
       .date-rec-score-note { margin-top:7px; color:var(--ink-3); font-size:11.5px; line-height:1.45; }
       .date-rec-item button { background:var(--accent); color:var(--accent-ink); border:none; border-radius:10px; padding:10px 12px; font-weight:900; cursor:pointer; }
       .date-rec-debug { margin-top:10px; white-space:pre-wrap; overflow-wrap:anywhere; background:rgba(0,0,0,.2); color:#F4E9C7; border-radius:12px; padding:10px; font-size:11px; display:none; }
+      .date-rec-warn { margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.28); color:#fde68a; font-size:12.5px; line-height:1.55; }
       @media (max-width:720px) { .date-rec-item { grid-template-columns:1fr; } .date-rec-scorebox { text-align:left; } .date-rec-actions button, .date-rec-item button { width:100%; } }
     `;
     document.head.appendChild(style);
@@ -100,7 +131,7 @@
         <pre id="dateRecDebug" class="date-rec-debug"></pre>
       </div>
     `);
-    window.GM?.patches?.register?.('date-recommendations-ui', { version: 'v2-score-labels' });
+    window.GM?.patches?.register?.('date-recommendations-ui', { version: 'v3-validated-results' });
   }
 
   function scoreBreakdownText(item) {
@@ -111,6 +142,8 @@
 
   function resultItem(item, idx) {
     const cls = item.decision === '상위후보' ? 'good' : item.decision === '검토' ? 'warn' : 'basic';
+    const caseNo = cleanCaseNo(item.caseNo);
+    const court = stripHtml(item.court || '-');
     return `
       <div class="date-rec-item">
         <div class="date-rec-scorebox">
@@ -120,14 +153,14 @@
           <span class="date-rec-pill ${cls}" style="margin-top:7px">#${idx + 1} ${esc(item.decision || '보류')}</span>
         </div>
         <div>
-          <div class="date-rec-title">${esc(item.court || '-')} ${esc(item.caseNo || '사건번호 확인필요')}</div>
-          <div class="date-rec-meta">${esc(item.address || '주소 정보 없음')}</div>
-          <div class="date-rec-meta">매각기일 ${esc(item.saleDate || '-')} · ${esc(item.usage || '-')} · 유찰 ${esc(item.failCount ?? '-')}회</div>
+          <div class="date-rec-title">${esc(court)} ${esc(caseNo || '사건번호 확인필요')}</div>
+          <div class="date-rec-meta">${esc(stripHtml(item.address || '주소 정보 없음'))}</div>
+          <div class="date-rec-meta">매각기일 ${esc(stripHtml(item.saleDate || '-'))} · ${esc(stripHtml(item.usage || '-'))} · 유찰 ${esc(item.failCount ?? '-')}회</div>
           <div class="date-rec-meta">감정가 ${krw(item.appraisal)} · 최저가 ${krw(item.minBid)} · 안전마진 ${krw(item.margin)} · 최저가율 ${item.bidRate ? Math.round(item.bidRate * 100) : '-'}%</div>
           <div class="date-rec-score-note">점수근거: ${esc(scoreBreakdownText(item))}</div>
           <div class="date-rec-pills">${(item.reasons || []).slice(0, 4).map((r) => `<span class="date-rec-pill basic">${esc(r)}</span>`).join('')}</div>
         </div>
-        <button onclick="copyDateRecCase('${esc(item.court || '')}', '${esc(item.caseNo || '')}')">사건 복사</button>
+        <button onclick="copyDateRecCase('${esc(court)}', '${esc(caseNo)}')">사건 복사</button>
       </div>
     `;
   }
@@ -136,8 +169,9 @@
     const status = document.getElementById('dateRecStatus');
     const list = document.getElementById('dateRecList');
     const debug = document.getElementById('dateRecDebug');
+    const requestedCourt = document.getElementById('dateRecCourt')?.value || '서울중앙';
     const qs = new URLSearchParams({
-      court: document.getElementById('dateRecCourt')?.value || '서울중앙',
+      court: requestedCourt,
       start: document.getElementById('dateRecStart')?.value || '',
       end: document.getElementById('dateRecEnd')?.value || '',
       usage: document.getElementById('dateRecUsage')?.value || 'all',
@@ -151,12 +185,18 @@
       const res = await fetch(`/api/recommendations/by-date?${qs.toString()}`, { cache: 'no-store' });
       const data = await res.json();
       debug.textContent = JSON.stringify(data, null, 2);
-      if (!res.ok || !data.ok) {
-        status.innerHTML = `목록 조회 실패: ${esc(data.error || '알 수 없는 오류')}<br>진단 원문을 열어 어떤 대법원 목록 API 후보가 실패했는지 확인하세요.`;
+      if (!res.ok || !data.ok || data.verified === false) {
+        status.innerHTML = `목록 조회 실패: ${esc(data.error || '검증 가능한 매각기일 목록이 없습니다.')}<br>진단 원문을 열어 대법원 목록 API 응답을 확인하세요.`;
         return;
       }
-      status.textContent = `${data.court} · ${data.start}~${data.end} · 추천 후보 ${data.count}건`;
-      list.innerHTML = (data.items || []).map(resultItem).join('') || '<div class="date-rec-status">조건에 맞는 후보가 없습니다.</div>';
+      const safeItems = (data.items || []).filter((item) => validClientItem(item, requestedCourt));
+      const rejected = (data.items || []).length - safeItems.length;
+      status.textContent = `${data.court} · ${data.start}~${data.end} · 검증 후보 ${safeItems.length}건${rejected ? ` · 제외 ${rejected}건` : ''}`;
+      if (!safeItems.length) {
+        list.innerHTML = '<div class="date-rec-warn">검증 가능한 후보가 없습니다. 법원명이 섞였거나 사건번호 형식이 불명확한 결과는 노출하지 않았습니다. 진단 원문을 확인하세요.</div>';
+        return;
+      }
+      list.innerHTML = safeItems.map(resultItem).join('');
     } catch (e) {
       status.textContent = `조회 중 오류: ${e.message}`;
     }
@@ -169,7 +209,9 @@
   };
 
   window.copyDateRecCase = async function(court, caseNo) {
-    const text = `${court} ${caseNo}`.trim();
+    const clean = cleanCaseNo(caseNo);
+    if (!clean) return alert('검증된 사건번호가 없어 복사할 수 없습니다.');
+    const text = `${stripHtml(court)} ${clean}`.trim();
     try {
       await navigator.clipboard.writeText(text);
       alert('사건번호를 복사했습니다. 단건 조회 또는 일괄조회에 붙여넣으세요.');
