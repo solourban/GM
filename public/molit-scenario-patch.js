@@ -24,15 +24,21 @@
     style.textContent = `
       .molit-apply-box { margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
       .molit-apply-box button { background:var(--accent); color:var(--accent-ink); border:none; border-radius:10px; padding:11px 14px; font-weight:900; cursor:pointer; }
+      .molit-apply-box button[disabled] { opacity:.5; cursor:not-allowed; }
       .molit-apply-box span { color:var(--ink-3); font-size:12.5px; }
     `;
     document.head.appendChild(style);
   }
 
+  function getMatchQuality() {
+    const marker = document.querySelector('#molitResult [data-molit-match]');
+    return marker?.getAttribute('data-molit-match') || 'none';
+  }
+
   function getTradeAmountsFromTable() {
     const rows = [...document.querySelectorAll('#molitResult .molit-table tbody tr')];
     return rows
-      .map((row) => parseAmountToWon(row.children?.[4]?.textContent || ''))
+      .map((row) => parseAmountToWon(row.children?.[5]?.textContent || row.children?.[4]?.textContent || ''))
       .filter((n) => n > 0);
   }
 
@@ -42,7 +48,7 @@
     const min = Math.min(...amounts);
     const max = Math.max(...amounts);
     const avg = Math.round(amounts.reduce((a, b) => a + b, 0) / amounts.length / 10000) * 10000;
-    return { conservative: min, neutral: avg, aggressive: max, count: amounts.length, savedAt: new Date().toISOString() };
+    return { conservative: min, neutral: avg, aggressive: max, count: amounts.length, matchQuality: getMatchQuality(), savedAt: new Date().toISOString() };
   }
 
   function saveScenario(scenario) {
@@ -78,11 +84,12 @@
     if (!result || result.querySelector('.molit-apply-box')) return;
     const scenario = calcScenarioFromTrades();
     if (!scenario) return;
+    const weak = scenario.matchQuality !== 'strong';
 
     result.insertAdjacentHTML('afterbegin', `
       <div class="molit-apply-box">
-        <button type="button" onclick="applyMolitToScenario()">시세 3단 시나리오에 반영</button>
-        <span>보수 ${formatWon(scenario.conservative)} · 중립 ${formatWon(scenario.neutral)} · 공격 ${formatWon(scenario.aggressive)}</span>
+        <button type="button" ${weak ? 'disabled title="정확한 건물명 필터가 아니면 자동반영하지 않습니다."' : ''} onclick="applyMolitToScenario()">시세 3단 시나리오에 반영</button>
+        <span>${weak ? '주변/유사 거래라 자동반영 불가 · ' : ''}보수 ${formatWon(scenario.conservative)} · 중립 ${formatWon(scenario.neutral)} · 공격 ${formatWon(scenario.aggressive)}</span>
       </div>
     `);
   }
@@ -90,6 +97,9 @@
   window.applyMolitToScenario = function() {
     const scenario = calcScenarioFromTrades() || loadScenario();
     if (!scenario) return alert('반영할 실거래가 결과가 없습니다. 먼저 실거래가를 조회하세요.');
+    if (scenario.matchQuality && scenario.matchQuality !== 'strong') {
+      return alert('건물명 매칭이 약한 주변 거래입니다. 정확한 건물명으로 다시 조회한 뒤 반영하세요.');
+    }
     saveScenario(scenario);
 
     const applied = fillScenarioInputs(scenario);
@@ -103,6 +113,7 @@
   function tryAutoApplyStoredScenario() {
     const scenario = loadScenario();
     if (!scenario) return;
+    if (scenario.matchQuality && scenario.matchQuality !== 'strong') return;
     fillScenarioInputs(scenario);
   }
 
@@ -118,7 +129,5 @@
     tryAutoApplyStoredScenario();
   });
 
-  if (document.body) {
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
+  if (document.body) observer.observe(document.body, { childList: true, subtree: true });
 })();
