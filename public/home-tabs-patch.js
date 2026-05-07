@@ -89,7 +89,7 @@
 
   window.switchHomeTab = function(tab) {
     moveCards();
-    const currentActive = document.querySelector(`[data-home-tab="${tab}"`)?.classList.contains('active');
+    const currentActive = document.querySelector(`[data-home-tab="${tab}"]`)?.classList.contains('active');
     const nextTab = currentActive ? '' : tab;
     saveTab(nextTab);
     document.querySelectorAll('[data-home-tab]').forEach((btn) => btn.classList.toggle('active', btn.dataset.homeTab === nextTab));
