@@ -11,8 +11,10 @@
     style.id = 'stepflowPatchStyles';
     style.textContent = `
       .brand { cursor:pointer; }
-      .results-section { scroll-margin-top: 24px; }
-      .step-nav { display:flex; gap:8px; flex-wrap:wrap; margin: 0 0 18px; }
+      .results-section { scroll-margin-top: 24px; min-height:0 !important; padding-top:0; }
+      .results-section:empty { display:none; }
+      .results-section.has-results { display:block; padding-top:32px; }
+      .step-nav { display:flex; gap:8px; flex-wrap:wrap; margin: 0 0 18px; position:sticky; top:0; z-index:20; background:var(--bg); padding:10px 0; }
       .step-chip { border:1px solid var(--line); background:#fff; color:var(--ink-2); border-radius:999px; padding:8px 12px; font-size:12px; font-weight:800; cursor:pointer; }
       .step-chip.active { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
       .step1-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:14px; }
@@ -119,17 +121,18 @@
       <div class="step-nav">
         <button type="button" class="step-chip active" data-step-chip="1" onclick="showStepMode('step1')">1 기본정보·현황</button>
         <button type="button" class="step-chip" data-step-chip="2" onclick="showStepMode('step2')">2 명세서 입력</button>
-        <button type="button" class="step-chip" data-step-chip="3" onclick="document.querySelector('.btn-analyze')?.scrollIntoView({behavior:'smooth', block:'center'})">3 권리분석 실행</button>
+        <button type="button" class="step-chip" data-step-chip="3" onclick="showStepMode('step2', true)">3 권리분석 실행</button>
       </div>`);
   }
 
-  window.showStepMode = function(mode) {
+  window.showStepMode = function(mode, goAnalyze = false) {
     document.body.classList.toggle('step-mode-step1', mode === 'step1');
     document.body.classList.toggle('step-mode-step2', mode === 'step2');
     document.querySelectorAll('[data-step-chip]').forEach((chip) => {
-      chip.classList.toggle('active', chip.dataset.stepChip === (mode === 'step2' ? '2' : '1'));
+      chip.classList.toggle('active', chip.dataset.stepChip === (mode === 'step2' ? (goAnalyze ? '3' : '2') : '1'));
     });
-    document.getElementById('resultsSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const target = goAnalyze ? document.querySelector('.btn-analyze') : (mode === 'step2' ? document.querySelector('.step2-divider, .input-card') : document.getElementById('resultsSection'));
+    setTimeout(() => target?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   };
 
   function insertStep2Toggle() {
@@ -148,6 +151,7 @@
   function markCards() {
     const rs = document.getElementById('resultsSection');
     if (!rs) return;
+    rs.classList.add('has-results');
     rs.querySelector('.verdict')?.classList.add('step1-verdict');
     [...rs.querySelectorAll('.subcard h4')].forEach((h) => {
       const card = h.closest('.subcard');
@@ -161,6 +165,7 @@
     injectStyles();
     const rs = document.getElementById('resultsSection');
     if (!rs || rs.querySelector('.step1-extra-card')) return;
+    rs.classList.add('has-results');
     addStepNavigation();
     markCards();
 
@@ -180,6 +185,8 @@
       const original = window.renderStep1;
       window.renderStep1 = function patchedRenderStep1(raw, elapsed) {
         document.body.classList.remove('step-mode-step1', 'step-mode-step2');
+        const rs = document.getElementById('resultsSection');
+        rs?.classList.add('has-results');
         original(raw, elapsed);
         enrichStep1(raw);
       };
@@ -188,6 +195,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     injectStyles();
+    const rs = document.getElementById('resultsSection');
+    if (rs && !rs.innerHTML.trim()) rs.classList.remove('has-results');
     document.querySelector('.brand')?.addEventListener('click', () => { location.href = '/'; });
   });
 })();
