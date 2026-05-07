@@ -3,7 +3,7 @@
   const style = document.createElement('style');
   style.id = 'landingPolishPatchStyles';
   style.textContent = `
-    :root { --font-serif: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    :root { --font-serif: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --tool-card-width: 920px; }
     .site-header { background: rgba(246,245,241,.96); border-bottom: 1px solid var(--line); padding: 0; }
     .header-inner { min-height: 82px; display:flex; align-items:center; }
     .brand { display:inline-flex; align-items:center; gap:14px; text-decoration:none; color:inherit; }
@@ -19,7 +19,9 @@
     .hero-title em { color:var(--accent-ink); font-style:normal; }
     .hero-sub { max-width:640px; font-size:17px; line-height:1.72; letter-spacing:-.03em; color:rgba(246,245,241,.74); word-break:keep-all; }
 
-    .search-box { background:#fff; color:var(--ink); border:1px solid rgba(229,228,222,.92); border-radius:22px; padding:22px; max-width:920px; box-shadow:0 18px 48px rgba(0,0,0,.18); }
+    .search-box { background:#fff; color:var(--ink); border:1px solid rgba(229,228,222,.92); border-radius:22px; padding:22px; max-width:var(--tool-card-width); width:100%; margin-left:auto; margin-right:auto; box-shadow:0 18px 48px rgba(0,0,0,.18); }
+    .bulk-card, .date-rec-card, .date-recs-card, .today-dashboard-card { max-width:var(--tool-card-width) !important; width:100%; margin-left:auto !important; margin-right:auto !important; }
+    .home-tab-panel { max-width:calc(var(--tool-card-width) + 48px) !important; }
     .search-title { display:flex; gap:12px; align-items:flex-start; margin-bottom:18px; }
     .search-title b { display:block; font-size:20px; font-weight:850; letter-spacing:-.04em; }
     .search-title p { margin:4px 0 0; color:var(--ink-3); font-size:13px; line-height:1.45; }
@@ -56,5 +58,5 @@
     @media (max-width:420px) { .hero-title { font-size:30px; } .search-row { grid-template-columns:1fr; } .year-field { grid-column:1/-1; } }
   `;
   document.head.appendChild(style);
-  window.GM?.patches?.register?.('landing-polish', { version: 'v1' });
+  window.GM?.patches?.register?.('landing-polish', { version: 'v2-width-labels' });
 })();
