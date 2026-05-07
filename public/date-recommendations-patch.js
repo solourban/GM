@@ -27,10 +27,12 @@
     const style = document.createElement('style');
     style.id = 'dateRecommendationsStyles';
     style.textContent = `
-      .date-rec-card { margin:18px 0; border:1px solid rgba(246,245,241,.18); border-radius:20px; padding:18px; background:rgba(246,245,241,.08); color:#F6F5F1; }
+      .date-rec-card { margin:18px auto; border:1px solid rgba(246,245,241,.18); border-radius:20px; padding:18px; background:rgba(246,245,241,.08); color:#F6F5F1; max-width:920px; width:100%; }
       .date-rec-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
       .date-rec-head h3 { margin:0 0 6px; color:var(--accent-ink); font-family:var(--font-serif); font-size:21px; }
       .date-rec-head p { margin:0; color:rgba(246,245,241,.68); font-size:13px; line-height:1.55; }
+      .date-score-help { margin-top:10px; padding:10px 12px; border-radius:12px; border:1px solid rgba(244,233,199,.22); background:rgba(244,233,199,.08); color:rgba(246,245,241,.82); font-size:12.5px; line-height:1.55; }
+      .date-score-help b { color:var(--accent-ink); }
       .date-rec-form { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; margin-top:14px; }
       .date-rec-form label { display:flex; flex-direction:column; gap:5px; color:rgba(246,245,241,.68); font-size:12px; font-weight:800; }
       .date-rec-form input, .date-rec-form select { background:rgba(246,245,241,.12); border:1px solid rgba(246,245,241,.2); color:#F6F5F1; border-radius:11px; padding:10px 11px; }
@@ -40,8 +42,11 @@
       .date-rec-actions button.secondary { background:rgba(246,245,241,.1); color:#F6F5F1; border:1px solid rgba(246,245,241,.2); }
       .date-rec-status { margin-top:10px; color:rgba(246,245,241,.72); font-size:13px; line-height:1.55; }
       .date-rec-list { display:grid; gap:10px; margin-top:14px; }
-      .date-rec-item { display:grid; grid-template-columns:76px 1fr auto; gap:12px; align-items:center; background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:15px; padding:13px; }
-      .date-rec-score { text-align:center; font-family:var(--font-serif); font-size:26px; font-weight:900; }
+      .date-rec-item { display:grid; grid-template-columns:102px 1fr auto; gap:12px; align-items:center; background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:15px; padding:13px; }
+      .date-rec-scorebox { text-align:center; }
+      .date-rec-scorelabel { color:var(--ink-3); font-size:11px; font-weight:850; line-height:1.1; }
+      .date-rec-score { font-family:var(--font-serif); font-size:27px; font-weight:900; line-height:1.05; margin-top:4px; }
+      .date-rec-scoreunit { color:var(--ink-3); font-size:11px; font-weight:800; margin-top:2px; }
       .date-rec-title { font-weight:900; overflow-wrap:anywhere; }
       .date-rec-meta { color:var(--ink-3); font-size:12.5px; line-height:1.55; margin-top:3px; overflow-wrap:anywhere; }
       .date-rec-pills { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
@@ -50,9 +55,10 @@
       .date-rec-pill.warn { background:var(--warn-bg); color:var(--warn); }
       .date-rec-pill.danger { background:var(--danger-bg); color:var(--danger); }
       .date-rec-pill.basic { background:var(--bg); color:var(--ink-3); border:1px solid var(--line); }
+      .date-rec-score-note { margin-top:7px; color:var(--ink-3); font-size:11.5px; line-height:1.45; }
       .date-rec-item button { background:var(--accent); color:var(--accent-ink); border:none; border-radius:10px; padding:10px 12px; font-weight:900; cursor:pointer; }
       .date-rec-debug { margin-top:10px; white-space:pre-wrap; overflow-wrap:anywhere; background:rgba(0,0,0,.2); color:#F4E9C7; border-radius:12px; padding:10px; font-size:11px; display:none; }
-      @media (max-width:720px) { .date-rec-item { grid-template-columns:1fr; } .date-rec-score { text-align:left; } .date-rec-actions button, .date-rec-item button { width:100%; } }
+      @media (max-width:720px) { .date-rec-item { grid-template-columns:1fr; } .date-rec-scorebox { text-align:left; } .date-rec-actions button, .date-rec-item button { width:100%; } }
     `;
     document.head.appendChild(style);
   }
@@ -72,6 +78,10 @@
           <div>
             <h3>📅 매각기일 기준 추천 후보</h3>
             <p>저장 전에도 법원·날짜 기준으로 오늘/이번 주 볼 만한 후보를 찾기 위한 실험 기능입니다. 대법원 목록 API 연결 상태를 함께 진단합니다.</p>
+            <div class="date-score-help">
+              <b>추천점수는 권리분석 전 1차 점수입니다.</b><br>
+              감정가 대비 최저가율, 유찰횟수, 물건 용도만 반영합니다. 등기·임차인·인수권리·시세·자금은 사건 상세조회 후 별도로 확인해야 합니다.
+            </div>
           </div>
         </div>
         <div class="date-rec-form">
@@ -90,19 +100,31 @@
         <pre id="dateRecDebug" class="date-rec-debug"></pre>
       </div>
     `);
-    window.GM?.patches?.register?.('date-recommendations-ui', { version: 'v1' });
+    window.GM?.patches?.register?.('date-recommendations-ui', { version: 'v2-score-labels' });
+  }
+
+  function scoreBreakdownText(item) {
+    const reasons = item.reasons || [];
+    if (reasons.length) return reasons.slice(0, 4).join(' · ');
+    return '최저가율·유찰횟수·용도 기준';
   }
 
   function resultItem(item, idx) {
     const cls = item.decision === '상위후보' ? 'good' : item.decision === '검토' ? 'warn' : 'basic';
     return `
       <div class="date-rec-item">
-        <div><div class="date-rec-score ${cls === 'good' ? 'ok' : ''}">${item.score || 0}</div><span class="date-rec-pill ${cls}">#${idx + 1} ${esc(item.decision || '보류')}</span></div>
+        <div class="date-rec-scorebox">
+          <div class="date-rec-scorelabel">추천점수</div>
+          <div class="date-rec-score ${cls === 'good' ? 'ok' : ''}">${item.score || 0}</div>
+          <div class="date-rec-scoreunit">점 / 100</div>
+          <span class="date-rec-pill ${cls}" style="margin-top:7px">#${idx + 1} ${esc(item.decision || '보류')}</span>
+        </div>
         <div>
           <div class="date-rec-title">${esc(item.court || '-')} ${esc(item.caseNo || '사건번호 확인필요')}</div>
           <div class="date-rec-meta">${esc(item.address || '주소 정보 없음')}</div>
           <div class="date-rec-meta">매각기일 ${esc(item.saleDate || '-')} · ${esc(item.usage || '-')} · 유찰 ${esc(item.failCount ?? '-')}회</div>
           <div class="date-rec-meta">감정가 ${krw(item.appraisal)} · 최저가 ${krw(item.minBid)} · 안전마진 ${krw(item.margin)} · 최저가율 ${item.bidRate ? Math.round(item.bidRate * 100) : '-'}%</div>
+          <div class="date-rec-score-note">점수근거: ${esc(scoreBreakdownText(item))}</div>
           <div class="date-rec-pills">${(item.reasons || []).slice(0, 4).map((r) => `<span class="date-rec-pill basic">${esc(r)}</span>`).join('')}</div>
         </div>
         <button onclick="copyDateRecCase('${esc(item.court || '')}', '${esc(item.caseNo || '')}')">사건 복사</button>
