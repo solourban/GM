@@ -121,52 +121,143 @@ function xmlText(xml, tag) {
   return m ? m[1].replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').trim() : '';
 }
 
-function parseAptTradeXml(xml) {
+function pickXml(item, tags) {
+  for (const tag of tags) {
+    const value = xmlText(item, tag);
+    if (value) return value;
+  }
+  return '';
+}
+
+const MOLIT_TYPES = {
+  apt: {
+    label: '아파트',
+    url: 'https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev',
+    nameTags: ['aptNm', '아파트', '단지'],
+  },
+  offi: {
+    label: '오피스텔',
+    url: 'https://apis.data.go.kr/1613000/RTMSDataSvcOffiTrade/getRTMSDataSvcOffiTrade',
+    nameTags: ['offiNm', '오피스텔', '단지'],
+  },
+  rh: {
+    label: '연립다세대',
+    url: 'https://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade',
+    nameTags: ['mhouseNm', 'houseNm', '연립다세대', '단지'],
+  },
+};
+
+function parseTradeXml(xml, tradeType = 'apt') {
+  const typeInfo = MOLIT_TYPES[tradeType] || MOLIT_TYPES.apt;
   const items = [...String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/gi)].map((m) => m[1]);
   return items.map((item) => ({
-    aptName: xmlText(item, 'aptNm') || xmlText(item, '아파트'),
-    dealAmount: xmlText(item, 'dealAmount') || xmlText(item, '거래금액'),
-    buildYear: xmlText(item, 'buildYear') || xmlText(item, '건축년도'),
-    dealYear: xmlText(item, 'dealYear') || xmlText(item, '년'),
-    dealMonth: xmlText(item, 'dealMonth') || xmlText(item, '월'),
-    dealDay: xmlText(item, 'dealDay') || xmlText(item, '일'),
-    area: xmlText(item, 'excluUseAr') || xmlText(item, '전용면적'),
-    floor: xmlText(item, 'floor') || xmlText(item, '층'),
-    dong: xmlText(item, 'umdNm') || xmlText(item, '법정동'),
-    roadName: xmlText(item, 'roadNm') || xmlText(item, '도로명'),
-    cancelDate: xmlText(item, 'cdealDay') || xmlText(item, '해제사유발생일'),
+    tradeType,
+    tradeTypeLabel: typeInfo.label,
+    aptName: pickXml(item, typeInfo.nameTags) || pickXml(item, ['aptNm', 'offiNm', 'mhouseNm', 'houseNm', '아파트', '오피스텔', '연립다세대', '단지']),
+    dealAmount: pickXml(item, ['dealAmount', '거래금액']),
+    buildYear: pickXml(item, ['buildYear', '건축년도']),
+    dealYear: pickXml(item, ['dealYear', '년']),
+    dealMonth: pickXml(item, ['dealMonth', '월']),
+    dealDay: pickXml(item, ['dealDay', '일']),
+    area: pickXml(item, ['excluUseAr', '전용면적']),
+    floor: pickXml(item, ['floor', '층']),
+    dong: pickXml(item, ['umdNm', '법정동']),
+    roadName: pickXml(item, ['roadNm', '도로명']),
+    cancelDate: pickXml(item, ['cdealDay', '해제사유발생일']),
   }));
 }
 
+function compactName(value) {
+  return String(value || '').replace(/\s+/g, '').replace(/[()\[\]{}·,._\-]/g, '').toLowerCase();
+}
+
+function filterTradesByName(trades, aptName) {
+  const query = compactName(aptName);
+  if (!query) return { trades, matchQuality: 'none', filterApplied: false };
+  const filtered = trades.filter((t) => compactName(t.aptName).includes(query) || query.includes(compactName(t.aptName)));
+  const matchQuality = query.length >= 4 ? 'strong' : 'weak';
+  return { trades: filtered, matchQuality, filterApplied: true };
+}
+
+async function fetchMolitType({ key, lawdCd, dealYmd, aptName, tradeType }) {
+  const typeInfo = MOLIT_TYPES[tradeType] || MOLIT_TYPES.apt;
+  const url = new URL(typeInfo.url);
+  url.searchParams.set('serviceKey', key);
+  url.searchParams.set('LAWD_CD', lawdCd);
+  url.searchParams.set('DEAL_YMD', dealYmd);
+  url.searchParams.set('pageNo', '1');
+  url.searchParams.set('numOfRows', '1000');
+
+  const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/xml,text/xml,*/*' } });
+  const xml = await apiRes.text();
+  if (!apiRes.ok) throw new Error(`${typeInfo.label} API 응답 오류: ${apiRes.status}`);
+  const parsed = parseTradeXml(xml, tradeType);
+  const filtered = filterTradesByName(parsed, aptName);
+  return { type: tradeType, label: typeInfo.label, rawCount: parsed.length, ...filtered };
+}
+
+async function lookupMolitTrades({ lawdCd, dealYmd, aptName, tradeType }) {
+  const key = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
+  if (!key) return { status: 400, body: { error: 'MOLIT_API_KEY 환경변수가 필요합니다.' } };
+  if (!/^\d{5}$/.test(lawdCd)) return { status: 400, body: { error: '법정동코드 앞 5자리(LAWD_CD)를 입력해주세요.' } };
+  if (!/^\d{6}$/.test(dealYmd)) return { status: 400, body: { error: '계약월(DEAL_YMD)은 YYYYMM 6자리로 입력해주세요.' } };
+
+  const types = tradeType && tradeType !== 'auto' ? [tradeType] : ['apt', 'offi', 'rh'];
+  const results = [];
+  const errors = [];
+  for (const type of types) {
+    try {
+      results.push(await fetchMolitType({ key, lawdCd, dealYmd, aptName, tradeType: type }));
+    } catch (e) {
+      errors.push({ type, error: e.message || String(e) });
+    }
+  }
+
+  const trades = results.flatMap((r) => r.trades);
+  const rawCount = results.reduce((sum, r) => sum + Number(r.rawCount || 0), 0);
+  const filterApplied = Boolean(aptName);
+  const matchQuality = filterApplied
+    ? (compactName(aptName).length >= 4 ? 'strong' : 'weak')
+    : 'none';
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      count: trades.length,
+      rawCount,
+      filterApplied,
+      matchQuality,
+      tradeTypes: results.map((r) => ({ type: r.type, label: r.label, rawCount: r.rawCount, filteredCount: r.trades.length })),
+      errors,
+      trades: trades.slice(0, 150),
+    },
+  };
+}
+
+app.get('/api/molit/trades', async (req, res) => {
+  try {
+    const result = await lookupMolitTrades({
+      lawdCd: String(req.query.lawdCd || '').trim(),
+      dealYmd: String(req.query.dealYmd || '').trim(),
+      aptName: String(req.query.aptName || '').trim(),
+      tradeType: String(req.query.tradeType || 'auto').trim(),
+    });
+    return res.status(result.status).json(result.body);
+  } catch (e) {
+    console.error('[molit/trades] exception:', e);
+    return res.status(500).json({ error: '실거래가 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
+  }
+});
+
 app.get('/api/molit/apt-trades', async (req, res) => {
   try {
-    const key = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
-    if (!key) return res.status(400).json({ error: 'MOLIT_API_KEY 환경변수가 필요합니다.' });
-
-    const lawdCd = String(req.query.lawdCd || '').trim();
-    const dealYmd = String(req.query.dealYmd || '').trim();
-    const aptName = String(req.query.aptName || '').trim();
-    if (!/^\d{5}$/.test(lawdCd)) return res.status(400).json({ error: '법정동코드 앞 5자리(LAWD_CD)를 입력해주세요.' });
-    if (!/^\d{6}$/.test(dealYmd)) return res.status(400).json({ error: '계약월(DEAL_YMD)은 YYYYMM 6자리로 입력해주세요.' });
-
-    const url = new URL('https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev');
-    url.searchParams.set('serviceKey', key);
-    url.searchParams.set('LAWD_CD', lawdCd);
-    url.searchParams.set('DEAL_YMD', dealYmd);
-    url.searchParams.set('pageNo', '1');
-    url.searchParams.set('numOfRows', '1000');
-
-    const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/xml,text/xml,*/*' } });
-    const xml = await apiRes.text();
-    if (!apiRes.ok) return res.status(502).json({ error: `국토부 API 응답 오류: ${apiRes.status}` });
-
-    let trades = parseAptTradeXml(xml);
-    if (aptName) {
-      const compact = aptName.replace(/\s+/g, '').toLowerCase();
-      trades = trades.filter((t) => String(t.aptName || '').replace(/\s+/g, '').toLowerCase().includes(compact));
-    }
-
-    return res.json({ ok: true, count: trades.length, trades: trades.slice(0, 100) });
+    const result = await lookupMolitTrades({
+      lawdCd: String(req.query.lawdCd || '').trim(),
+      dealYmd: String(req.query.dealYmd || '').trim(),
+      aptName: String(req.query.aptName || '').trim(),
+      tradeType: 'apt',
+    });
+    return res.status(result.status).json(result.body);
   } catch (e) {
     console.error('[molit] exception:', e);
     return res.status(500).json({ error: '실거래가 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
