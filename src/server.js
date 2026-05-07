@@ -32,7 +32,7 @@ app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
     let patched = html;
-    const scripts = ['/gm-core-patch.js', '/patch-registry-patch.js', '/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/watchlist-enhance-patch.js', '/today-dashboard-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js', '/molit-patch.js', '/molit-scenario-patch.js', '/capital-patch.js', '/cashflow-patch.js', '/stability-patch.js', '/diagnostics-patch.js', '/exit-plan-patch.js', '/bid-checklist-patch.js', '/final-summary-patch.js', '/api-guide-patch.js'];
+    const scripts = ['/gm-core-patch.js', '/patch-registry-patch.js', '/platform-patch.js', '/address-fix.js', '/watchlist-patch.js', '/watchlist-enhance-patch.js', '/today-dashboard-patch.js', '/date-recommendations-patch.js', '/stepflow-patch.js', '/fetch-error-patch.js', '/court-list-patch.js', '/bulk-fetch-patch.js', '/map-patch.js', '/molit-patch.js', '/molit-scenario-patch.js', '/capital-patch.js', '/cashflow-patch.js', '/stability-patch.js', '/diagnostics-patch.js', '/exit-plan-patch.js', '/bid-checklist-patch.js', '/final-summary-patch.js', '/api-guide-patch.js'];
     scripts.forEach((src) => {
       if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
     });
@@ -44,6 +44,7 @@ app.use(express.static(PUBLIC_DIR));
 
 const { analyzeCase } = require('./analyzer');
 const { fetchCase, listCourts } = require('./crawler');
+const { findAuctionsByDate } = require('./dateRecommendations');
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 30);
@@ -95,6 +96,24 @@ app.get('/api/config', (req, res) => {
 
 app.get('/api/courts', (req, res) => {
   res.json({ ok: true, courts: listCourts() });
+});
+
+app.get('/api/recommendations/by-date', async (req, res) => {
+  try {
+    const result = await findAuctionsByDate({
+      court: req.query.court || '서울중앙',
+      start: req.query.start || '',
+      end: req.query.end || '',
+      usage: req.query.usage || 'all',
+      maxBidRate: req.query.maxBidRate || 1,
+      limit: req.query.limit || 20,
+    });
+    const status = result.ok ? 200 : 502;
+    return res.status(status).json(result);
+  } catch (e) {
+    console.error('[recommendations/by-date] exception:', e);
+    return res.status(500).json({ ok: false, error: '매각기일 추천 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
+  }
 });
 
 function xmlText(xml, tag) {
