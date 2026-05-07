@@ -10,61 +10,82 @@
 <body>
 
 <header class="site-header">
-  <div class="container">
-    <div class="brand">
-      <div class="brand-mark">⌂</div>
+  <div class="container header-inner">
+    <a class="brand" href="/" aria-label="낙찰노트 홈">
+      <div class="brand-mark" aria-hidden="true">⌂</div>
       <div class="brand-text">
-        <h1>낙찰<span>노트</span></h1>
+        <h1>낙찰노트</h1>
         <p>입찰 검토 도구</p>
       </div>
-    </div>
+    </a>
   </div>
 </header>
 
 <section class="hero">
-  <div class="container">
-    <h2 class="hero-title">
-      오늘 볼 경매 후보를 빠르게 추리고<br>
-      <em>입찰 전 위험을 계산합니다</em>
-    </h2>
-    <p class="hero-sub">
-      사건번호 조회부터 권리관계·시세·자금·현금흐름까지 한 번에 점검하고,<br>
-      입찰 가능 여부를 단계별로 정리합니다.
-    </p>
+  <div class="container hero-inner">
+    <div class="hero-copy">
+      <div class="hero-eyebrow">입찰 전, 위험을 먼저 확인하세요</div>
+      <h2 class="hero-title">
+        오늘 볼 물건부터 고르고,<br>
+        <em>입찰 전 위험까지 한 번에 확인</em>
+      </h2>
+      <p class="hero-sub">
+        사건 조회, 권리분석, 시세 확인, 자금 검토까지<br>
+        입찰 전에 필요한 내용을 한 화면에서 정리합니다.
+      </p>
+    </div>
 
     <div class="search-box">
-      <div class="search-row">
-        <select id="jiwonNm">
-          <option>서울중앙지방법원</option>
-          <option>서울동부지방법원</option>
-          <option>서울서부지방법원</option>
-          <option>서울남부지방법원</option>
-          <option>서울북부지방법원</option>
-          <option>수원지방법원</option>
-          <option>성남지원</option><option>여주지원</option><option>평택지원</option>
-          <option>안산지원</option><option>안양지원</option><option>고양지원</option><option>부천지원</option>
-          <option>인천지방법원</option>
-          <option>의정부지방법원</option>
-          <option>대전지방법원</option>
-          <option>천안지원</option>
-          <option>청주지방법원</option>
-          <option>부산지방법원</option>
-          <option>부산지방법원 동부지원</option>
-          <option>부산지방법원 서부지원</option>
-          <option>대구지방법원</option>
-          <option>울산지방법원</option>
-          <option>창원지방법원</option>
-          <option>광주지방법원</option>
-          <option>전주지방법원</option>
-          <option>춘천지방법원</option>
-          <option>제주지방법원</option>
-        </select>
-        <input id="saYear" type="text" value="2024" style="max-width:90px">
-        <span class="sep">타경</span>
-        <input id="saSer" type="text" placeholder="사건번호 (예: 110754)">
-        <button id="btnFetch" class="btn-primary">⚡ 기본정보 가져오기</button>
+      <div class="search-title">
+        <span class="search-icon">⌕</span>
+        <div>
+          <b>사건 검색</b>
+          <p>법원과 사건번호를 입력하면 기본정보부터 불러옵니다.</p>
+        </div>
       </div>
-      <p class="search-hint">Step 1 — 대법원에서 기본정보를 가져옵니다.</p>
+      <div class="search-row">
+        <label class="field court-field">
+          <span>법원</span>
+          <select id="jiwonNm">
+            <option>서울중앙지방법원</option>
+            <option>서울동부지방법원</option>
+            <option>서울서부지방법원</option>
+            <option>서울남부지방법원</option>
+            <option>서울북부지방법원</option>
+            <option>수원지방법원</option>
+            <option>성남지원</option><option>여주지원</option><option>평택지원</option>
+            <option>안산지원</option><option>안양지원</option><option>고양지원</option><option>부천지원</option>
+            <option>인천지방법원</option>
+            <option>의정부지방법원</option>
+            <option>대전지방법원</option>
+            <option>천안지원</option>
+            <option>청주지방법원</option>
+            <option>부산지방법원</option>
+            <option>부산지방법원 동부지원</option>
+            <option>부산지방법원 서부지원</option>
+            <option>대구지방법원</option>
+            <option>울산지방법원</option>
+            <option>창원지방법원</option>
+            <option>광주지방법원</option>
+            <option>전주지방법원</option>
+            <option>춘천지방법원</option>
+            <option>제주지방법원</option>
+          </select>
+        </label>
+        <label class="field year-field">
+          <span>연도</span>
+          <input id="saYear" type="text" value="2024" inputmode="numeric">
+        </label>
+        <label class="field case-field">
+          <span>사건번호</span>
+          <div class="case-input-wrap">
+            <span class="sep">타경</span>
+            <input id="saSer" type="text" placeholder="예: 110754" inputmode="numeric">
+          </div>
+        </label>
+        <button id="btnFetch" class="btn-primary">기본정보 가져오기</button>
+      </div>
+      <p class="search-hint">Step 1 — 대법원 경매정보에서 사건 기본정보를 수집합니다.</p>
     </div>
   </div>
 </section>
