@@ -11,10 +11,13 @@ const HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
+function onlyDigits(value) {
+  return String(value || '').replace(/[^0-9]/g, '');
+}
+
 function compactDate(value) {
-  const s = String(value || '').replace(/[^0-9]/g, '');
-  if (/^\d{8}$/.test(s)) return s;
-  return '';
+  const s = onlyDigits(value);
+  return /^\d{8}$/.test(s) ? s : '';
 }
 
 function todayYmd() {
@@ -28,15 +31,10 @@ function addDaysYmd(days) {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function formatYmd(s) {
-  const ymd = compactDate(s);
-  if (!ymd) return String(s || '');
-  return `${ymd.slice(0, 4)}.${ymd.slice(4, 6)}.${ymd.slice(6, 8)}`;
-}
-
-function moneyNumber(value) {
-  const n = Number(String(value || '').replace(/[^0-9.-]/g, ''));
-  return Number.isFinite(n) ? n : 0;
+function formatYmd(value) {
+  const s = compactDate(value);
+  if (!s) return String(value || '');
+  return `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
 }
 
 function stripHtml(value) {
@@ -46,42 +44,60 @@ function stripHtml(value) {
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function cleanText(value) {
-  return stripHtml(value).replace(/\s+/g, ' ').trim();
+function moneyNumber(value) {
+  const n = Number(String(value || '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function pick(obj, keys) {
+  for (const key of keys) {
+    if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== '') return obj[key];
+  }
+  return '';
+}
+
+function caseNoFrom(...values) {
+  const s = values.map(stripHtml).filter(Boolean).join(' ');
+  const m = s.match(/(20\d{2})\s*타경\s*(\d{1,10})/);
+  return m ? `${m[1]}타경${m[2]}` : '';
 }
 
 function courtStem(value) {
-  return cleanText(value)
-    .replace(/지방법원|지원|법원|본원|대한민국|서울특별시|경기도|충청남도|충청북도|전라남도|전라북도|경상남도|경상북도|강원도|특별자치도|특별자치시/g, '')
+  return stripHtml(value)
+    .replace(/지방법원|지원|법원|본원|대한민국|특별시|광역시|특별자치도|특별자치시|경기도|강원도|충청남도|충청북도|전라남도|전라북도|경상남도|경상북도/g, '')
     .replace(/\s+/g, '')
     .trim();
 }
 
-function extractCaseNo(...values) {
-  const joined = values.map(cleanText).filter(Boolean).join(' ');
-  const m = joined.match(/(20\d{2})\s*타경\s*(\d{1,10})/);
-  return m ? `${m[1]}타경${m[2]}` : '';
+function courtMatches(requestedCourt, resultCourt, rawCaseText) {
+  const req = courtStem(requestedCourt);
+  const got = courtStem(resultCourt);
+  const raw = courtStem(String(rawCaseText || '').replace(/20\d{2}\s*타경[\s\S]*/g, ''));
+  if (got && req && !got.includes(req) && !req.includes(got)) return false;
+  if (raw && raw.length >= 2 && req && !raw.includes(req) && !req.includes(raw)) return false;
+  return true;
 }
 
-async function callApi(path, payload) {
-  const url = `${BASE}${path}`;
+async function postCourt(path, payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${BASE}${path}`, {
       method: 'POST',
       headers: HEADERS,
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
     const text = await res.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch { data = { rawText: text.slice(0, 1200) }; }
+    let json = null;
+    try { json = JSON.parse(text); } catch (_) {}
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return data;
+    return { status: res.status, text, json };
   } catch (e) {
     if (e.name === 'AbortError') throw new Error(`${path} timeout`);
     throw e;
@@ -93,83 +109,12 @@ async function callApi(path, payload) {
 function findArrays(value, path = 'root', out = []) {
   if (!value || typeof value !== 'object') return out;
   if (Array.isArray(value)) {
-    if (value.length && value.some((x) => x && typeof x === 'object')) out.push({ path, items: value });
+    if (value.some((x) => x && typeof x === 'object')) out.push({ path, items: value });
     value.forEach((v, i) => findArrays(v, `${path}[${i}]`, out));
     return out;
   }
-  Object.entries(value).forEach(([k, v]) => findArrays(v, `${path}.${k}`, out));
+  Object.entries(value).forEach(([key, val]) => findArrays(val, `${path}.${key}`, out));
   return out;
-}
-
-function pickFirst(obj, keys) {
-  for (const key of keys) {
-    if (obj && obj[key] != null && obj[key] !== '') return obj[key];
-  }
-  return '';
-}
-
-function buildAddress(item) {
-  const direct = pickFirst(item, ['bgPlaceRdAllAddr', 'userSt', 'st', 'addr', 'bldgNm', '소재지']);
-  if (direct) return cleanText(direct);
-  return cleanText([
-    item.hjguSido,
-    item.hjguDong,
-    item.daepyoLotno,
-    item.buldNm,
-    item.buldList,
-  ].filter(Boolean).join(' '));
-}
-
-function parseBidRate(item, appraisal, minBid) {
-  const rawRate = pickFirst(item, ['notifyMinmaePriceRate1', 'lwsDspslPrcRate', '최저가율']);
-  const rateNum = moneyNumber(rawRate);
-  if (rateNum > 0) return rateNum > 1 ? rateNum / 100 : rateNum;
-  return appraisal && minBid ? minBid / appraisal : 1;
-}
-
-function normalizeItem(item, courtName) {
-  const rawCase = pickFirst(item, ['printCsNo', 'userCsNo', 'csNo', 'userCsNoVal', '사건번호']);
-  const caseNo = extractCaseNo(rawCase, item.csNo, item.userCsNo, item.printCsNo);
-  const address = buildAddress(item);
-  const usage = cleanText(pickFirst(item, ['dspslUsgNm', 'lclDspslGdsLstUsgNm', 'mclDspslGdsLstUsgNm', 'gdsUsgNm', '물건종별', 'usgNm']));
-  const appraisal = moneyNumber(pickFirst(item, ['gamevalAmt', 'aeeEvlAmt', 'aprsAmt', '감정평가액', '감정가']));
-  const minBid = moneyNumber(pickFirst(item, ['notifyMinmaePrice1', 'fstPbancLwsDspslPrc', 'lwsDspslPrc', '최저매각가격', '최저가']));
-  const saleDate = cleanText(pickFirst(item, ['maeGiil', 'dspslDxdyYmd', 'dxdyYmd', '매각기일']));
-  const failCountRaw = pickFirst(item, ['yuchalCnt', 'dspslDxdyDnum', 'fbCnt', '유찰횟수']);
-  const failCount = Number.isFinite(Number(failCountRaw)) ? Math.max(0, Number(failCountRaw)) : moneyNumber(failCountRaw);
-  const margin = appraisal && minBid ? appraisal - minBid : 0;
-  const bidRate = parseBidRate(item, appraisal, minBid);
-  const rawCourt = cleanText(pickFirst(item, ['jibunCortNm', 'cortOfcNm', 'courtNm', 'cortNm']));
-  const dept = cleanText(pickFirst(item, ['jpDeptNm', 'cortAuctnJdbnNm', 'jdbnNm']));
-  const note = cleanText(pickFirst(item, ['mulBigo', 'bigo', '비고']));
-  const requestedStem = courtStem(courtName);
-  const resultStem = courtStem(rawCourt);
-  const rawCaseCourtStem = courtStem(String(rawCase || '').replace(/20\d{2}\s*타경[\s\S]*/g, ''));
-  const courtMismatch = Boolean(resultStem && requestedStem && !resultStem.includes(requestedStem) && !requestedStem.includes(resultStem));
-  const caseCourtMismatch = Boolean(rawCaseCourtStem && requestedStem && rawCaseCourtStem.length >= 2 && !rawCaseCourtStem.includes(requestedStem) && !requestedStem.includes(rawCaseCourtStem));
-  const score = scoreCandidate({ appraisal, minBid, bidRate, usage, failCount });
-
-  return {
-    court: courtName,
-    rawCourt,
-    caseNo,
-    address,
-    usage,
-    appraisal,
-    minBid,
-    saleDate: /^\d{8}$/.test(String(saleDate)) ? formatYmd(saleDate) : saleDate,
-    failCount,
-    margin,
-    bidRate,
-    dept,
-    note,
-    invalid: !caseNo || courtMismatch || caseCourtMismatch,
-    invalidReason: !caseNo ? '사건번호 인식 실패' : courtMismatch ? `요청 법원(${courtName})과 결과 법원(${rawCourt}) 불일치` : caseCourtMismatch ? `사건번호 원문 법원 불일치` : '',
-    score: score.score,
-    decision: score.decision,
-    reasons: score.reasons,
-    raw: item,
-  };
 }
 
 function scoreCandidate({ appraisal, minBid, bidRate, usage, failCount }) {
@@ -192,36 +137,108 @@ function scoreCandidate({ appraisal, minBid, bidRate, usage, failCount }) {
   else if (/다세대|연립|주거|오피스텔|단독|다가구/.test(usage)) { score += 10; reasons.push('주거형'); }
   else if (usage) { score -= 4; reasons.push('용도 추가확인'); }
 
-  let decision = '보류';
-  if (score >= 52) decision = '상위후보';
-  else if (score >= 30) decision = '검토';
-  return { score: Math.max(0, Math.min(100, Math.round(score))), decision, reasons };
+  const finalScore = Math.max(0, Math.min(100, Math.round(score)));
+  return { score: finalScore, decision: finalScore >= 52 ? '상위후보' : finalScore >= 30 ? '검토' : '보류', reasons };
 }
 
-function extractItems(data, courtName) {
-  const normalizeList = (arr) => arr
-    .map((item) => normalizeItem(item, courtName))
-    .filter((item) => item.caseNo || item.address || item.appraisal || item.minBid);
+function addressFromObject(item) {
+  const direct = pick(item, ['bgPlaceRdAllAddr', 'userSt', 'st', 'addr', 'bldgNm', '소재지']);
+  if (direct) return stripHtml(direct);
+  return stripHtml([item.hjguSido, item.hjguDong, item.daepyoLotno, item.buldNm, item.buldList].filter(Boolean).join(' '));
+}
 
-  const direct = data?.data?.dlt_srchResult;
-  if (Array.isArray(direct)) {
-    const normalized = normalizeList(direct);
-    const valid = normalized.filter((item) => !item.invalid);
-    if (valid.length) return { items: valid, sourcePath: 'data.dlt_srchResult', rejected: normalized.filter((x) => x.invalid).slice(0, 5).map((x) => x.invalidReason) };
+function objectToItem(item, requestedCourt) {
+  const rawCase = pick(item, ['printCsNo', 'userCsNo', 'csNo', 'userCsNoVal', '사건번호']);
+  const caseNo = caseNoFrom(rawCase, item.csNo, item.userCsNo, item.printCsNo);
+  const rawCourt = stripHtml(pick(item, ['jibunCortNm', 'cortOfcNm', 'courtNm', 'cortNm']));
+  const usage = stripHtml(pick(item, ['dspslUsgNm', 'lclDspslGdsLstUsgNm', 'mclDspslGdsLstUsgNm', 'gdsUsgNm', '물건종별', 'usgNm']));
+  const appraisal = moneyNumber(pick(item, ['gamevalAmt', 'aeeEvlAmt', 'aprsAmt', '감정평가액', '감정가']));
+  const minBid = moneyNumber(pick(item, ['notifyMinmaePrice1', 'fstPbancLwsDspslPrc', 'lwsDspslPrc', '최저매각가격', '최저가']));
+  const rateRaw = moneyNumber(pick(item, ['notifyMinmaePriceRate1', 'lwsDspslPrcRate', '최저가율']));
+  const bidRate = rateRaw ? (rateRaw > 1 ? rateRaw / 100 : rateRaw) : (appraisal && minBid ? minBid / appraisal : 1);
+  const failRaw = pick(item, ['yuchalCnt', 'dspslDxdyDnum', 'fbCnt', '유찰횟수']);
+  const failCount = Number.isFinite(Number(failRaw)) ? Number(failRaw) : moneyNumber(failRaw);
+  const saleDateRaw = stripHtml(pick(item, ['maeGiil', 'dspslDxdyYmd', 'dxdyYmd', '매각기일']));
+  const score = scoreCandidate({ appraisal, minBid, bidRate, usage, failCount });
+  const invalid = !caseNo || !courtMatches(requestedCourt, rawCourt, rawCase);
+  return {
+    court: requestedCourt,
+    rawCourt,
+    caseNo,
+    address: addressFromObject(item),
+    usage,
+    appraisal,
+    minBid,
+    saleDate: /^\d{8}$/.test(saleDateRaw) ? formatYmd(saleDateRaw) : saleDateRaw,
+    failCount,
+    margin: appraisal && minBid ? appraisal - minBid : 0,
+    bidRate,
+    score: score.score,
+    decision: score.decision,
+    reasons: score.reasons,
+    invalid,
+    invalidReason: !caseNo ? '사건번호 인식 실패' : '요청 법원과 결과 법원 불일치',
+  };
+}
+
+function parseHtmlItems(text, requestedCourt) {
+  const raw = String(text || '');
+  const visible = stripHtml(raw);
+  if (!/(20\d{2})\s*타경/.test(visible)) return [];
+
+  const rows = raw.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  const chunks = rows.length ? rows : visible.split(/(?=20\d{2}\s*타경)/g);
+  const out = [];
+
+  for (const chunk of chunks) {
+    const s = stripHtml(chunk);
+    const caseNo = caseNoFrom(s);
+    if (!caseNo) continue;
+    if (!courtMatches(requestedCourt, '', s)) continue;
+
+    const amounts = [...s.matchAll(/([0-9,]{5,})\s*원/g)].map((m) => moneyNumber(m[1]));
+    const appraisal = amounts[0] || 0;
+    const minBid = amounts[1] || amounts[0] || 0;
+    const rate = (s.match(/(\d{1,3})\s*%/) || [])[1];
+    const bidRate = rate ? Number(rate) / 100 : (appraisal && minBid ? minBid / appraisal : 1);
+    const fail = Number((s.match(/유찰\s*(\d+)/) || [])[1] || 0);
+    const usage = (s.match(/아파트|다세대|연립|오피스텔|단독|다가구|상가|토지/) || [''])[0];
+    const date = (s.match(/20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}|20\d{6}/) || [''])[0];
+    const address = s.replace(/[\s\S]*?20\d{2}\s*타경\s*\d{1,10}/, '').replace(/감정가[\s\S]*/g, '').slice(0, 90).trim();
+    const score = scoreCandidate({ appraisal, minBid, bidRate, usage, failCount: fail });
+    out.push({ court: requestedCourt, caseNo, address, usage, appraisal, minBid, saleDate: date ? formatYmd(date) : '', failCount: fail, margin: appraisal && minBid ? appraisal - minBid : 0, bidRate, score: score.score, decision: score.decision, reasons: score.reasons, source: 'html' });
   }
 
-  const arrays = findArrays(data);
-  const candidates = arrays
-    .map((entry) => ({ ...entry, score: entry.items.length }))
-    .filter((entry) => entry.items.length)
-    .sort((a, b) => b.items.length - a.items.length);
+  return out;
+}
 
-  for (const entry of candidates) {
-    const normalized = normalizeList(entry.items);
-    const valid = normalized.filter((item) => !item.invalid);
-    if (valid.length) return { items: valid, sourcePath: entry.path, rejected: normalized.filter((x) => x.invalid).slice(0, 5).map((x) => x.invalidReason) };
+function extractItems(response, requestedCourt) {
+  const items = [];
+  const rejected = [];
+
+  const direct = response.json?.data?.dlt_srchResult;
+  if (Array.isArray(direct)) items.push(...direct.map((x) => objectToItem(x, requestedCourt)));
+
+  if (response.json) {
+    for (const arr of findArrays(response.json)) items.push(...arr.items.map((x) => objectToItem(x, requestedCourt)));
   }
-  return { items: [], sourcePath: '', rejected: [] };
+
+  items.push(...parseHtmlItems(response.text, requestedCourt));
+
+  const seen = new Set();
+  const valid = [];
+  for (const item of items) {
+    if (item.invalid) {
+      rejected.push(item.invalidReason);
+      continue;
+    }
+    const key = `${item.court}|${item.caseNo}|${item.address}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    valid.push(item);
+  }
+
+  return { items: valid, rejected: rejected.slice(0, 10) };
 }
 
 function usageCodes(usage) {
@@ -230,9 +247,9 @@ function usageCodes(usage) {
   return { lclDspslGdsLstUsgCd: '', mclDspslGdsLstUsgCd: '', sclDspslGdsLstUsgCd: '' };
 }
 
-function buildDetailedSearchPayload({ cortOfcCd, startYmd, endYmd, usage, maxBidRate, withUsage = false, withRate = false }) {
-  const codes = withUsage ? usageCodes(usage) : { lclDspslGdsLstUsgCd: '', mclDspslGdsLstUsgCd: '', sclDspslGdsLstUsgCd: '' };
-  const rateMax = withRate && Number(maxBidRate || 1) < 1 ? String(Math.round(Number(maxBidRate) * 100)) : '';
+function buildPayload({ cortOfcCd, startYmd, endYmd, usage, maxBidRate, useUsage, useRate }) {
+  const codes = useUsage ? usageCodes(usage) : usageCodes('all');
+  const rateMax = useRate && Number(maxBidRate || 1) < 1 ? String(Math.round(Number(maxBidRate) * 100)) : '';
   return {
     dma_pageInfo: { pageNo: 1, pageSize: 40, bfPageNo: '', startRowNo: '', totalCnt: '', totalYn: 'Y', groupTotalCount: '' },
     dma_srchGdsDtlSrchInfo: {
@@ -248,12 +265,6 @@ function buildDetailedSearchPayload({ cortOfcCd, startYmd, endYmd, usage, maxBid
   };
 }
 
-function buildLegacyPayloads({ cortOfcCd, startYmd, endYmd, usage }) {
-  const base = { cortOfcCd, dspslDxdyYmdFr: startYmd, dspslDxdyYmdTo: endYmd, dxdyYmdFr: startYmd, dxdyYmdTo: endYmd, searchFromDate: startYmd, searchToDate: endYmd, pageNo: 1, rowSize: 50, recordCountPerPage: 50 };
-  const usagePayload = usage && usage !== 'all' ? { lclDspslGdsLstUsgCd: usage } : {};
-  return [{ dma_search: { ...base, ...usagePayload } }, { dma_srchGdsDtl: { ...base, ...usagePayload } }, { dma_srchLst: { ...base, ...usagePayload } }, { dma_searchParam: { ...base, ...usagePayload } }, { ...base, ...usagePayload }];
-}
-
 function matchesUsage(item, usage) {
   if (!usage || usage === 'all') return true;
   if (usage === '20104') return /아파트/.test(item.usage || '');
@@ -261,34 +272,13 @@ function matchesUsage(item, usage) {
   return true;
 }
 
-function applyFilters(items, options = {}) {
-  const maxBidRate = Number(options.maxBidRate || 1);
+function applyFilters(items, options) {
+  const maxRate = Number(options.maxBidRate || 1);
   return items
-    .filter((item) => matchesUsage(item, options.usage))
-    .filter((item) => !maxBidRate || maxBidRate >= 1 || !item.bidRate || item.bidRate <= maxBidRate)
+    .filter((x) => matchesUsage(x, options.usage))
+    .filter((x) => maxRate >= 1 || !x.bidRate || x.bidRate <= maxRate)
     .sort((a, b) => b.score - a.score || b.margin - a.margin)
     .slice(0, Number(options.limit || 20));
-}
-
-async function tryAndExtract({ endpoint, payload, courtName, debug }) {
-  const attempt = { endpoint, payloadKeys: Object.keys(payload), ok: false };
-  try {
-    const data = await callApi(endpoint, payload);
-    const extracted = extractItems(data, courtName);
-    attempt.ok = true;
-    attempt.status = data.status;
-    attempt.message = data.message || '';
-    attempt.sourcePath = extracted.sourcePath;
-    attempt.count = extracted.items.length;
-    attempt.rejected = extracted.rejected || [];
-    if (data?.data && typeof data.data === 'object') attempt.dataKeys = Object.keys(data.data).slice(0, 20);
-    debug.attempts.push(attempt);
-    return extracted.items;
-  } catch (e) {
-    attempt.error = e.message || String(e);
-    debug.attempts.push(attempt);
-    return [];
-  }
 }
 
 async function findAuctionsByDate(options = {}) {
@@ -296,33 +286,51 @@ async function findAuctionsByDate(options = {}) {
   const endYmd = compactDate(options.end) || addDaysYmd(7);
   const courtName = normalizeCourtName(options.court || '서울중앙');
   const cortOfcCd = COURT_CODES[courtName];
-  const usage = options.usage || 'all';
-  const debug = { courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
+  const debug = { engine: 'date-recommendations-v2-json-html', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
 
-  if (!cortOfcCd) return { ok: false, error: `지원하지 않는 법원명입니다: ${options.court}`, debug, items: [] };
+  if (!cortOfcCd) return { ok: false, verified: false, error: `지원하지 않는 법원명입니다: ${options.court}`, debug, items: [] };
 
-  const mainPayloads = [
-    buildDetailedSearchPayload({ cortOfcCd, startYmd, endYmd, usage, maxBidRate: options.maxBidRate, withUsage: false, withRate: false }),
-    buildDetailedSearchPayload({ cortOfcCd, startYmd, endYmd, usage, maxBidRate: options.maxBidRate, withUsage: true, withRate: false }),
-    buildDetailedSearchPayload({ cortOfcCd, startYmd, endYmd, usage, maxBidRate: options.maxBidRate, withUsage: true, withRate: true }),
+  const payloads = [
+    buildPayload({ cortOfcCd, startYmd, endYmd, usage: options.usage, maxBidRate: options.maxBidRate, useUsage: false, useRate: false }),
+    buildPayload({ cortOfcCd, startYmd, endYmd, usage: options.usage, maxBidRate: options.maxBidRate, useUsage: true, useRate: false }),
+    buildPayload({ cortOfcCd, startYmd, endYmd, usage: options.usage, maxBidRate: options.maxBidRate, useUsage: true, useRate: true }),
   ];
 
-  for (const payload of mainPayloads) {
-    const items = await tryAndExtract({ endpoint: '/pgj/pgjsearch/searchControllerMain.on', payload, courtName, debug });
-    if (items.length) return { ok: true, verified: true, court: courtName, start: formatYmd(startYmd), end: formatYmd(endYmd), count: applyFilters(items, { ...options, usage }).length, items: applyFilters(items, { ...options, usage }), debug };
-  }
-
-  const endpointCandidates = ['/pgj/pgj15A/selectGdsDtlSrchRslt.on', '/pgj/pgj15A/selectAuctnGdsSrchRslt.on', '/pgj/pgj15A/selectAuctnGdsList.on', '/pgj/pgj15A/selectDxdyGdsSrchRslt.on', '/pgj/pgj15A/selectAuctnDxdySrchRslt.on'];
-  const legacyPayloads = buildLegacyPayloads({ cortOfcCd, startYmd, endYmd, usage });
-
-  for (const endpoint of endpointCandidates) {
-    for (const payload of legacyPayloads) {
-      const items = await tryAndExtract({ endpoint, payload, courtName, debug });
-      if (items.length) return { ok: true, verified: true, court: courtName, start: formatYmd(startYmd), end: formatYmd(endYmd), count: applyFilters(items, { ...options, usage }).length, items: applyFilters(items, { ...options, usage }), debug };
+  for (const payload of payloads) {
+    const attempt = { endpoint: '/pgj/pgjsearch/searchControllerMain.on', payloadKeys: Object.keys(payload), ok: false };
+    try {
+      const response = await postCourt('/pgj/pgjsearch/searchControllerMain.on', payload);
+      const extracted = extractItems(response, courtName);
+      attempt.ok = true;
+      attempt.status = response.status;
+      attempt.json = Boolean(response.json);
+      attempt.textLength = response.text.length;
+      attempt.rawHasCaseNo = /(20\d{2})\s*타경/.test(stripHtml(response.text));
+      attempt.count = extracted.items.length;
+      attempt.rejected = extracted.rejected;
+      attempt.sampleText = stripHtml(response.text).slice(0, 500);
+      if (response.json?.data) attempt.dataKeys = Object.keys(response.json.data).slice(0, 20);
+      debug.attempts.push(attempt);
+      if (extracted.items.length) {
+        const filtered = applyFilters(extracted.items, options);
+        return { ok: true, verified: true, court: courtName, start: formatYmd(startYmd), end: formatYmd(endYmd), count: filtered.length, items: filtered, debug };
+      }
+    } catch (e) {
+      attempt.error = e.message || String(e);
+      debug.attempts.push(attempt);
     }
   }
 
-  return { ok: false, verified: false, error: '검증 가능한 매각기일 목록 데이터가 없습니다. 법원/날짜 조건을 바꾸거나 진단 원문을 확인하세요.', court: courtName, start: formatYmd(startYmd), end: formatYmd(endYmd), items: [], debug };
+  return {
+    ok: false,
+    verified: false,
+    error: '검증 가능한 매각기일 목록 데이터가 없습니다. 진단 원문에서 rawHasCaseNo/textLength/dataKeys/sampleText를 확인하세요.',
+    court: courtName,
+    start: formatYmd(startYmd),
+    end: formatYmd(endYmd),
+    items: [],
+    debug,
+  };
 }
 
 module.exports = { findAuctionsByDate };
