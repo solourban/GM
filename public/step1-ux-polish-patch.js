@@ -3,7 +3,9 @@
     .gm-map-empty-small{border:1px solid #e5dfd5;background:#fbfaf7;border-radius:14px;padding:16px 18px!important;min-height:auto!important;color:#111827!important;text-align:left!important}
     .gm-map-empty-small .t{font-weight:900;font-size:16px;margin-bottom:4px}.gm-map-empty-small .d{color:#667085;font-size:13px;line-height:1.55}
     .gm-hide-before-step1{display:none!important}
-    .gm-stake-card.gm-collapsed table tbody tr:nth-child(n+9){display:none}.gm-stake-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 12px;color:#667085;font-size:13px}.gm-stake-tools button{background:#004733;color:#fff2c7;border:0;border-radius:10px;padding:9px 12px;font-weight:900;cursor:pointer}
+    .gm-stake-card.gm-collapsed table tbody tr:nth-child(n+9),.gm-auto-card.gm-collapsed table tbody tr:nth-child(n+9){display:none}
+    .gm-stake-tools,.gm-auto-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 12px;color:#667085;font-size:13px}
+    .gm-stake-tools button,.gm-auto-tools button{background:#004733;color:#fff2c7;border:0;border-radius:10px;padding:9px 12px;font-weight:900;cursor:pointer}
     .gm-temp-note{margin:8px 0 10px;color:#667085;font-size:13px;line-height:1.55}.gm-temp-note b{color:#0b4f3f}
     .gm-schedule-small{padding-top:14px!important;padding-bottom:14px!important}.gm-schedule-small .note,.gm-schedule-small .warn-note{font-size:13px!important;line-height:1.55!important}
     .gm-address-wrap{display:block;line-height:1.45}.gm-address-wrap .main{display:block}.gm-address-wrap .sub{display:block;margin-top:4px;font-size:.86em;color:#344054}.gm-address-wrap .building{display:block;margin-top:3px;font-size:.86em;color:#667085}
@@ -39,12 +41,6 @@
     [...document.querySelectorAll('.gm-map-empty-small')].forEach(el=>{
       el.classList.toggle('gm-hide-before-step1', !allow);
     });
-    if(!allow){
-      [...document.querySelectorAll('div,section')].forEach(el=>{
-        const t=tx(el);
-        if(t==='지도 연동 필요 Kakao API 키가 정상 연결되면 지도와 주변 입지 분석이 표시됩니다. 지금은 카카오맵 열기 버튼으로 주소를 확인하세요.') el.classList.add('gm-hide-before-step1');
-      });
-    }
   }
 
   function mapEmpty(){
@@ -70,21 +66,24 @@
     [...card.querySelectorAll('div,p')].forEach(el=>{if(tx(el).includes('기일내역이 자동 조회되지 않았습니다'))el.textContent='기일내역은 원문에서 재확인하세요. 현재는 자동 수집된 매각기일만 요약에 반영했습니다.'});
   }
 
-  function stakeholders(){
-    const h=heading(/이해관계인\s*\(/);
+  function collapseTable({titleRe, cardClass, toolClass, label}){
+    const h=heading(titleRe);
     const card=h&&cardOf(h);
     const table=card&&card.querySelector('table');
-    if(!card||!table||card.dataset.gmStake)return;
+    if(!card||!table||card.dataset[cardClass])return;
     const rows=[...table.querySelectorAll('tbody tr')];
     if(rows.length<=8)return;
-    card.dataset.gmStake='1';
-    card.classList.add('gm-stake-card','gm-collapsed');
+    card.dataset[cardClass]='1';
+    card.classList.add(cardClass,'gm-collapsed');
     const tools=document.createElement('div');
-    tools.className='gm-stake-tools';
-    tools.innerHTML='<div><b>요약 표시</b> · 전체 '+rows.length+'명 중 8명만 우선 표시</div><button type="button">상세 목록 펼치기</button>';
+    tools.className=toolClass;
+    tools.innerHTML='<div><b>요약 표시</b> · 전체 '+rows.length+'개 항목 중 8개만 우선 표시</div><button type="button">상세 펼치기</button>';
     table.insertAdjacentElement('beforebegin',tools);
-    tools.querySelector('button').onclick=()=>{const collapsed=card.classList.toggle('gm-collapsed');tools.querySelector('button').textContent=collapsed?'상세 목록 펼치기':'상세 목록 접기'};
+    tools.querySelector('button').onclick=()=>{const collapsed=card.classList.toggle('gm-collapsed');tools.querySelector('button').textContent=collapsed?'상세 펼치기':'상세 접기'};
   }
+
+  function autoInfo(){collapseTable({titleRe:/자동\s*수집된\s*사건\s*정보/,cardClass:'gm-auto-card',toolClass:'gm-auto-tools',label:'사건정보'})}
+  function stakeholders(){collapseTable({titleRe:/이해관계인\s*\(/,cardClass:'gm-stake-card',toolClass:'gm-stake-tools',label:'이해관계인'})}
 
   function splitAddress(raw){
     const s=String(raw||'').replace(/\s+/g,' ').trim();
@@ -139,9 +138,9 @@
     });
   }
 
-  function run(){hideStaleOnSearch();summaryTitle();mapEmpty();scheduleSmall();stakeholders();addressLines();apiCards();gateMapCards()}
+  function run(){hideStaleOnSearch();summaryTitle();mapEmpty();scheduleSmall();autoInfo();stakeholders();addressLines();apiCards();gateMapCards()}
   document.addEventListener('DOMContentLoaded',run);
   setInterval(run,1000);
   run();
-  window.GM?.patches?.register?.('step1-ux-polish',{version:'v4-gated-map-state'});
+  window.GM?.patches?.register?.('step1-ux-polish',{version:'v5-collapse-long-tables'});
 })();
