@@ -56,6 +56,8 @@
     document.head.appendChild(style);
   }
 
+  function text(el) { return String(el?.textContent || '').replace(/\s+/g, ' ').trim(); }
+
   function getSavedTab() {
     try { return localStorage.getItem(TAB_KEY) || DEFAULT_TAB; } catch { return DEFAULT_TAB; }
   }
@@ -70,6 +72,12 @@
 
   function panelFor(tab) {
     return document.querySelector(`[data-home-hero-panel="${tab}"]`);
+  }
+
+  function resultsBusy() {
+    const rs = document.getElementById('resultsSection');
+    const t = text(rs);
+    return Boolean(t && /대법원 경매정보에서 기본정보를 가져오는 중|기본정보 수집|Step\s*1|현재 기준 1차 판단 요약|자동 수집된 사건 정보|이해관계인|권리분석/.test(t));
   }
 
   function ensureTabs() {
@@ -113,6 +121,7 @@
     const panel = panelFor(tab);
     const card = document.querySelector(selector);
     if (!panel || !card) return false;
+    if (card.closest('#resultsSection')) return false;
     if (card.parentElement !== panel) panel.appendChild(card);
     panel.querySelector(`[data-home-placeholder="${tab}"]`)?.remove();
     return true;
@@ -153,16 +162,19 @@
   function initTabs() {
     moveCards();
     wireBrand();
-    setActive(getSavedTab(), false);
-    window.GM?.patches?.register?.('home-tabs', { version: 'v4-hero-panels' });
+    setActive(normalizeTab(getSavedTab()), false);
+    window.GM?.patches?.register?.('home-tabs', { version: 'v5-ignore-results-mutations' });
   }
 
   let scheduled = false;
-  function schedule() {
+  function schedule(mutations = []) {
+    if (resultsBusy()) return;
+    if (mutations.length && mutations.every((m) => m.target?.closest?.('#resultsSection'))) return;
     if (scheduled) return;
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
+      if (resultsBusy()) return;
       const active = normalizeTab(getSavedTab());
       moveCards();
       setActive(active, false);
@@ -171,7 +183,7 @@
 
   document.addEventListener('DOMContentLoaded', initTabs);
   if (document.body) {
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver((mutations) => schedule(mutations)).observe(document.body, { childList: true, subtree: true });
     initTabs();
   }
 })();
