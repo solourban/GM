@@ -2,6 +2,7 @@
   const css = `
     .gm-map-empty-small{border:1px solid #e5dfd5;background:#fbfaf7;border-radius:14px;padding:16px 18px!important;min-height:auto!important;color:#111827!important;text-align:left!important}
     .gm-map-empty-small .t{font-weight:900;font-size:16px;margin-bottom:4px}.gm-map-empty-small .d{color:#667085;font-size:13px;line-height:1.55}
+    .gm-hide-before-step1{display:none!important}
     .gm-stake-card.gm-collapsed table tbody tr:nth-child(n+9){display:none}.gm-stake-tools{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0 12px;color:#667085;font-size:13px}.gm-stake-tools button{background:#004733;color:#fff2c7;border:0;border-radius:10px;padding:9px 12px;font-weight:900;cursor:pointer}
     .gm-temp-note{margin:8px 0 10px;color:#667085;font-size:13px;line-height:1.55}.gm-temp-note b{color:#0b4f3f}
     .gm-schedule-small{padding-top:14px!important;padding-bottom:14px!important}.gm-schedule-small .note,.gm-schedule-small .warn-note{font-size:13px!important;line-height:1.55!important}
@@ -17,6 +18,8 @@
   function heading(re){return [...document.querySelectorAll('h1,h2,h3,h4,strong,b')].find(el=>re.test(tx(el)))}
   function cardOf(el){let c=el;for(let i=0;c&&i<8;i++,c=c.parentElement){const cls=String(c.className||'');if(c.offsetWidth>300&&(c.querySelector('table')||/card|box|panel|section|extra/i.test(cls)))return c}return el&&el.parentElement}
   function isLeafish(el){return el && el.children.length <= 1 && tx(el).length < 170}
+  function hasStep1Result(){return Boolean(heading(/Step\s*1\s*완료|기본정보\s*수집|물건·현황\s*요약|입지분석\s*\/\s*시세\s*검증|이해관계인\s*\(/))}
+  function isLoading(){return /가져오는 중|조회 중|수집 중|로딩 중/.test(tx(document.body))}
 
   function summaryTitle(){
     const h=heading(/최종\s*입찰\s*판단\s*요약/);
@@ -31,15 +34,30 @@
     }
   }
 
+  function gateMapCards(){
+    const allow = hasStep1Result() && !isLoading();
+    [...document.querySelectorAll('.gm-map-empty-small')].forEach(el=>{
+      el.classList.toggle('gm-hide-before-step1', !allow);
+    });
+    if(!allow){
+      [...document.querySelectorAll('div,section')].forEach(el=>{
+        const t=tx(el);
+        if(t==='지도 연동 필요 Kakao API 키가 정상 연결되면 지도와 주변 입지 분석이 표시됩니다. 지금은 카카오맵 열기 버튼으로 주소를 확인하세요.') el.classList.add('gm-hide-before-step1');
+      });
+    }
+  }
+
   function mapEmpty(){
+    if(!hasStep1Result() || isLoading()) { gateMapCards(); return; }
     const box=[...document.querySelectorAll('div,section')].find(el=>{
       const t=tx(el);
       return !el.dataset.gmDone && t.includes('지도 로딩 실패') && t.includes('Kakao 지도 SDK 로드 실패') && el.offsetHeight>90;
     });
-    if(!box)return;
+    if(!box){ gateMapCards(); return; }
     box.dataset.gmDone='1';
     box.className=(box.className+' gm-map-empty-small').trim();
     box.innerHTML='<div class="t">지도 연동 필요</div><div class="d">Kakao API 키가 정상 연결되면 지도와 주변 입지 분석이 표시됩니다. 지금은 카카오맵 열기 버튼으로 주소를 확인하세요.</div>';
+    gateMapCards();
   }
 
   function scheduleSmall(){
@@ -94,6 +112,7 @@
   }
 
   function apiCards(){
+    if(!hasStep1Result() || isLoading()) return;
     [...document.querySelectorAll('div,span')].forEach(el=>{
       const t=tx(el);
       if(el.dataset.gmApi||!isLeafish(el))return;
@@ -109,9 +128,20 @@
     });
   }
 
-  function run(){summaryTitle();mapEmpty();scheduleSmall();stakeholders();addressLines();apiCards()}
+  function hideStaleOnSearch(){
+    [...document.querySelectorAll('button')].forEach(btn=>{
+      if(btn.dataset.gmSearchBound)return;
+      if(!/물건\s*기본정보\s*조회|조회/.test(tx(btn)))return;
+      btn.dataset.gmSearchBound='1';
+      btn.addEventListener('click',()=>{
+        [...document.querySelectorAll('.gm-map-empty-small')].forEach(el=>el.classList.add('gm-hide-before-step1'));
+      },true);
+    });
+  }
+
+  function run(){hideStaleOnSearch();summaryTitle();mapEmpty();scheduleSmall();stakeholders();addressLines();apiCards();gateMapCards()}
   document.addEventListener('DOMContentLoaded',run);
-  setInterval(run,1500);
+  setInterval(run,1000);
   run();
-  window.GM?.patches?.register?.('step1-ux-polish',{version:'v3-stable-selectors'});
+  window.GM?.patches?.register?.('step1-ux-polish',{version:'v4-gated-map-state'});
 })();
