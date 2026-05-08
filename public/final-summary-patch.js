@@ -161,12 +161,7 @@
     return actions.slice(0, 4);
   }
 
-  function renderFinalSummaryCard() {
-    injectStyles();
-    const rs = document.getElementById('resultsSection');
-    const firstVerdict = rs?.querySelector('.verdict');
-    if (!rs || !firstVerdict) return;
-
+  function buildFinalSummaryHtml() {
     const base = reportBase();
     const scenario = getScenario();
     const checklist = getChecklistRate();
@@ -179,12 +174,12 @@
     const verdict = decide({ base, scenario, maxBid, capital, cashflow, checklist });
     const actions = nextActions({ verdict, risks, checklist, scenario, capital, cashflow, maxBid, minBid: base.minBid });
 
-    const html = `
-      <div class="final-summary-card">
+    return `
+      <div class="final-summary-card" data-final-summary-stable="1">
         <div class="final-summary-head">
           <div>
-            <h3>🏁 최종 입찰 판단 요약</h3>
-            <div class="final-summary-note">현재 입력값과 계산 카드들을 종합한 1차 의사결정 요약입니다.</div>
+            <h3>🏁 현재 기준 1차 판단 요약</h3>
+            <div class="final-summary-note">현재 입력값과 자동 수집 정보를 종합한 임시 의사결정 요약입니다. 명세서·임차인·시세·자금 입력 후 다시 갱신됩니다.</div>
           </div>
           <span class="final-summary-verdict ${verdict.cls}">${verdict.label} · ${verdict.score}점</span>
         </div>
@@ -210,15 +205,32 @@
         </div>
         <div class="final-summary-note">이 요약은 입력값 기반의 1차 필터입니다. 실제 입찰 전 원본 서류, 현장, 대출, 세금은 별도로 확인해야 합니다.</div>
       </div>`;
+  }
 
-    let card = rs.querySelector('.final-summary-card');
-    if (card) card.outerHTML = html;
-    else firstVerdict.insertAdjacentHTML('beforebegin', html);
+  function renderFinalSummaryCard() {
+    injectStyles();
+    const rs = document.getElementById('resultsSection');
+    const firstVerdict = rs?.querySelector('.verdict');
+    if (!rs || !firstVerdict) return;
+
+    const html = buildFinalSummaryHtml();
+    const card = rs.querySelector('.final-summary-card');
+    if (card) {
+      if (card.dataset.lastHtml === html) return;
+      card.dataset.lastHtml = html;
+      card.outerHTML = html;
+      const next = rs.querySelector('.final-summary-card');
+      if (next) next.dataset.lastHtml = html;
+    } else {
+      firstVerdict.insertAdjacentHTML('beforebegin', html);
+      const next = rs.querySelector('.final-summary-card');
+      if (next) next.dataset.lastHtml = html;
+    }
   }
 
   function scheduleRender() {
     clearTimeout(window.__finalSummaryTimer);
-    window.__finalSummaryTimer = setTimeout(renderFinalSummaryCard, 80);
+    window.__finalSummaryTimer = setTimeout(renderFinalSummaryCard, 120);
   }
 
   const wait = setInterval(() => {
@@ -233,7 +245,11 @@
     }
   }, 50);
 
-  const observer = new MutationObserver(scheduleRender);
+  const observer = new MutationObserver((mutations) => {
+    if (mutations.every((m) => m.target?.closest?.('.final-summary-card'))) return;
+    scheduleRender();
+  });
+
   document.addEventListener('DOMContentLoaded', () => {
     injectStyles();
     document.addEventListener('input', scheduleRender, true);
@@ -245,4 +261,5 @@
     scheduleRender();
   });
   if (document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['checked', 'class'] });
+  window.GM?.patches?.register?.('final-summary', { version: 'v2-stable-render' });
 })();
