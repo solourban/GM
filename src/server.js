@@ -47,6 +47,7 @@ app.get('/', (req, res, next) => {
       '/date-rec-guard-patch.js',
       '/stepflow-patch.js',
       '/fetch-error-patch.js',
+      '/fetch-flow-guard-patch.js',
       '/court-list-patch.js',
       '/bulk-fetch-patch.js',
       '/map-patch.js',
