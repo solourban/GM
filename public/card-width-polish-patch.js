@@ -50,6 +50,21 @@
       margin-right: auto !important;
     }
 
+    .search-box {
+      margin-bottom: 26px !important;
+    }
+
+    .results-section.container {
+      margin-top: 34px !important;
+      padding-top: 0 !important;
+    }
+
+    .results-section.container > .card:first-child,
+    .results-section.container > section:first-child,
+    .results-section.container > div:first-child {
+      margin-top: 0 !important;
+    }
+
     .home-tab-panel > .bulk-card,
     .home-tab-panel > .date-rec-card,
     .home-tab-panel > .date-recs-card,
@@ -97,6 +112,12 @@
       .today-dashboard-card {
         max-width: 100% !important;
       }
+      .search-box {
+        margin-bottom: 22px !important;
+      }
+      .results-section.container {
+        margin-top: 26px !important;
+      }
       .header-inner {
         align-items: flex-start !important;
         flex-direction: column !important;
@@ -110,5 +131,5 @@
     }
   `;
   document.head.appendChild(style);
-  window.GM?.patches?.register?.('card-width-polish', { version: 'v2-header-aligned' });
+  window.GM?.patches?.register?.('card-width-polish', { version: 'v3-hero-result-spacing' });
 })();
