@@ -24,11 +24,12 @@ function parseMoney(s) {
     if (eok) total += Math.round(Number(eok[1].replace(/,/g, '')) * 100_000_000);
     if (man) total += Math.round(Number(man[1].replace(/,/g, '')) * 10_000);
     if (!man && cheon) total += Math.round(Number(cheon[1].replace(/,/g, '')) * 10_000_000);
-    if (total > 0) return total;
+    if (Number.isFinite(total) && total > 0) return total;
   }
 
   const digits = text.replace(/[^0-9]/g, '');
-  return digits ? parseInt(digits, 10) : 0;
+  const parsed = digits ? parseInt(digits, 10) : 0;
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }
 
 function normalizeDate(s) {
@@ -50,10 +51,25 @@ function normalizeDate(s) {
   return text;
 }
 
+function isValidDateString(s) {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(String(s))) return false;
+  const [y, m, d] = String(s).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+function compareDate(a, b) {
+  if (!isValidDateString(a) || !isValidDateString(b)) return null;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
 function formatMoney(n) {
-  if (!n) return '-';
-  const 억 = Math.floor(n / 100_000_000);
-  const 만 = Math.floor((n % 100_000_000) / 10_000);
+  const safe = Math.max(0, Number(n || 0));
+  if (!safe) return '-';
+  const 억 = Math.floor(safe / 100_000_000);
+  const 만 = Math.floor((safe % 100_000_000) / 10_000);
   const parts = [];
   if (억) parts.push(`${억}억`);
   if (만) parts.push(`${만.toLocaleString('ko-KR')}만`);
@@ -62,42 +78,55 @@ function formatMoney(n) {
 
 function normalizeRights(raw = []) {
   return raw
-    .map((r) => ({
-      date: normalizeDate(r['접수일자'] || r['접수일'] || r['접수'] || r.date || ''),
-      type: (r['권리종류'] || r['등기'] || r.type || '').trim(),
-      holder: (r['권리자'] || r['등기명의인'] || r.holder || '').trim(),
-      amount: parseMoney(r['채권금액'] || r['채권최고액'] || r['금액'] || r.amount || ''),
-      _userMalso: Boolean(r._userMalso),
-    }))
-    .filter((r) => r.date || r.type);
+    .map((r) => {
+      const date = normalizeDate(r['접수일자'] || r['접수일'] || r['접수'] || r.date || '');
+      return {
+        date,
+        dateValid: !date || isValidDateString(date),
+        type: (r['권리종류'] || r['등기'] || r.type || '').trim(),
+        holder: (r['권리자'] || r['등기명의인'] || r.holder || '').trim(),
+        amount: parseMoney(r['채권금액'] || r['채권최고액'] || r['금액'] || r.amount || ''),
+        _userMalso: Boolean(r._userMalso),
+      };
+    })
+    .filter((r) => r.date || r.type || r.holder || r.amount);
 }
 
 function normalizeTenants(raw = []) {
   return raw
-    .map((t) => ({
-      name: (t['임차인'] || t['성명'] || t.name || '').trim(),
-      moveIn: normalizeDate(t['전입신고일자'] || t['전입일'] || t['전입'] || t.moveIn || ''),
-      fixed: normalizeDate(t['확정일자'] || t.fixed || ''),
-      deposit: parseMoney(t['보증금'] || t['임차보증금'] || t.deposit || ''),
-    }))
+    .map((t) => {
+      const moveIn = normalizeDate(t['전입신고일자'] || t['전입일'] || t['전입'] || t.moveIn || '');
+      const fixed = normalizeDate(t['확정일자'] || t.fixed || '');
+      return {
+        name: (t['임차인'] || t['성명'] || t.name || '').trim(),
+        moveIn,
+        moveInValid: !moveIn || isValidDateString(moveIn),
+        fixed,
+        fixedValid: !fixed || isValidDateString(fixed),
+        deposit: parseMoney(t['보증금'] || t['임차보증금'] || t.deposit || ''),
+      };
+    })
     .filter((t) => t.name || t.moveIn || t.fixed || t.deposit);
 }
 
 function findMalso(rights) {
-  const userSelected = rights.find((r) => r._userMalso);
+  const userSelected = rights.find((r) => r._userMalso && r.dateValid);
   if (userSelected) return userSelected;
 
-  const candidates = rights.filter((r) => MALSO_KEYWORDS.some((k) => r.type.includes(k)));
+  const candidates = rights.filter((r) => r.dateValid && MALSO_KEYWORDS.some((k) => r.type.includes(k)));
   if (!candidates.length) return null;
   candidates.sort((a, b) => a.date.localeCompare(b.date));
   return candidates[0];
 }
 
 function analyzeRights(rights, malso) {
-  const sorted = [...rights].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...rights].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   return sorted.map((r) => {
     const out = { ...r };
-    if (ALWAYS_INHERIT.some((k) => r.type.includes(k))) {
+    if (!r.dateValid) {
+      out.status = '?';
+      out.reason = '접수일자 형식이 올바르지 않아 권리 순위를 판단할 수 없습니다.';
+    } else if (ALWAYS_INHERIT.some((k) => r.type.includes(k))) {
       out.status = '인수';
       out.reason = `${r.type}은(는) 경매로 소멸되지 않을 수 있는 특수권리입니다. 원본 서류 확인이 필요합니다.`;
     } else if (!malso) {
@@ -107,12 +136,18 @@ function analyzeRights(rights, malso) {
       out.status = '소멸';
       out.reason = '사용자가 입력한 말소기준권리입니다.';
       out.isMalso = true;
-    } else if (r.date && malso.date && r.date < malso.date) {
-      out.status = '인수';
-      out.reason = '말소기준보다 선순위로 보입니다. 인수 여부 원본 확인이 필요합니다.';
     } else {
-      out.status = '소멸';
-      out.reason = '말소기준 이후 권리로 추정됩니다.';
+      const cmp = compareDate(r.date, malso.date);
+      if (cmp === null) {
+        out.status = '?';
+        out.reason = '날짜 비교가 불가능해 인수·소멸 여부를 판단할 수 없습니다.';
+      } else if (cmp < 0) {
+        out.status = '인수';
+        out.reason = '말소기준보다 선순위로 보입니다. 인수 여부 원본 확인이 필요합니다.';
+      } else {
+        out.status = '소멸';
+        out.reason = '말소기준 이후 권리로 추정됩니다.';
+      }
     }
     return out;
   });
@@ -124,34 +159,50 @@ function analyzeTenants(tenants, malso) {
     if (!t.moveIn) {
       out.daehang = '확인필요';
       out.reason = '전입신고일이 없어 대항력 판단이 불가능합니다.';
+    } else if (!t.moveInValid) {
+      out.daehang = '확인필요';
+      out.reason = '전입신고일 형식이 올바르지 않아 대항력 판단이 불가능합니다.';
+    } else if (t.fixed && !t.fixedValid) {
+      out.daehang = '확인필요';
+      out.reason = '확정일자 형식이 올바르지 않아 배당순위 판단이 불안정합니다.';
     } else if (!malso) {
       out.daehang = '?';
       out.reason = '말소기준권리를 확정할 수 없습니다.';
-    } else if (t.moveIn < malso.date) {
-      out.daehang = '있음';
-      out.reason = `전입(${t.moveIn}) < 말소기준(${malso.date}) → 대항력 있음으로 추정`;
     } else {
-      out.daehang = '없음';
-      out.reason = `전입(${t.moveIn}) ≥ 말소기준(${malso.date}) → 대항력 없음으로 추정`;
+      const cmp = compareDate(t.moveIn, malso.date);
+      if (cmp === null) {
+        out.daehang = '확인필요';
+        out.reason = '전입일과 말소기준일 비교가 불가능합니다.';
+      } else if (cmp < 0) {
+        out.daehang = '있음';
+        out.reason = `전입(${t.moveIn}) < 말소기준(${malso.date}) → 대항력 있음으로 추정`;
+      } else {
+        out.daehang = '없음';
+        out.reason = `전입(${t.moveIn}) ≥ 말소기준(${malso.date}) → 대항력 없음으로 추정`;
+      }
+    }
+
+    if (!t.deposit) {
+      out.depositWarning = '보증금이 0원이거나 입력되지 않아 인수금액 계산이 제한됩니다.';
     }
     return out;
   });
 }
 
 function simulateBaedang(bidPrice, rights, tenants, region) {
-  let remain = bidPrice;
+  const safeBid = Math.max(0, Number(bidPrice || 0));
+  let remain = safeBid;
   const allocations = [];
 
-  const cost = Math.round(bidPrice * 0.03);
+  const cost = Math.round(safeBid * 0.03);
   allocations.push({ order: 1, label: '경매집행비용(임의 추정 3%)', amount: cost });
-  remain -= cost;
-  if (remain < 0) remain = 0;
+  remain = Math.max(0, remain - cost);
 
   const [limit, maxAmt] = CHOI_U_SEON[region] || CHOI_U_SEON.other;
-  const half = Math.floor(bidPrice / 2);
+  const half = Math.floor(safeBid / 2);
   let choiTotal = 0;
   tenants.forEach((t) => {
-    if (t.deposit <= limit) {
+    if (t.deposit > 0 && t.deposit <= limit) {
       const allow = Math.max(0, Math.min(t.deposit, maxAmt, half - choiTotal));
       if (allow > 0) {
         allocations.push({ order: 2, label: `소액임차인 최우선변제 (${t.name || '임차인'})`, amount: allow });
@@ -164,17 +215,16 @@ function simulateBaedang(bidPrice, rights, tenants, region) {
       t._choi = 0;
     }
   });
-  remain -= choiTotal;
-  if (remain < 0) remain = 0;
+  remain = Math.max(0, remain - choiTotal);
 
   const priority = [];
   rights.forEach((r) => {
-    if (/근저당|저당|전세권|담보가등기/.test(r.type) && r.status === '소멸') {
+    if (r.dateValid && /근저당|저당|전세권|담보가등기/.test(r.type) && r.status === '소멸') {
       priority.push({ kind: 'right', date: r.date, label: `${r.type} (${r.holder})`, amount: r.amount, ref: r });
     }
   });
   tenants.forEach((t) => {
-    if (t.fixed) {
+    if (t.deposit > 0 && t.fixed && t.fixedValid && t.moveInValid) {
       const remainDep = Math.max(0, t.deposit - (t._choi || 0));
       if (remainDep > 0) {
         const wuseon = t.fixed > t.moveIn ? t.fixed : t.moveIn;
@@ -186,13 +236,14 @@ function simulateBaedang(bidPrice, rights, tenants, region) {
 
   priority.forEach((p) => {
     if (remain <= 0) return;
-    const pay = Math.min(p.amount, remain);
+    const pay = Math.max(0, Math.min(p.amount, remain));
+    if (!pay) return;
     allocations.push({ order: 3, label: `${p.label} — ${p.date}`, amount: pay });
-    p.ref._baedang = (p.ref._baedang || 0) + pay;
-    remain -= pay;
+    p.ref._baedang = Math.max(0, (p.ref._baedang || 0) + pay);
+    remain = Math.max(0, remain - pay);
   });
 
-  return { bidPrice, allocations, surplus: remain };
+  return { bidPrice: safeBid, allocations, surplus: remain };
 }
 
 function calculateInherited(rights, tenants) {
@@ -200,14 +251,15 @@ function calculateInherited(rights, tenants) {
   let total = 0;
   rights.forEach((r) => {
     if (r.status === '인수') {
+      const amount = Math.max(0, Number(r.amount || 0));
       const note = ALWAYS_INHERIT.some((k) => r.type.includes(k)) ? '특수권리 확인 필요' : '선순위 권리 인수 가능성';
-      items.push({ label: `${r.type} (${r.holder})`, amount: r.amount, note });
-      total += r.amount;
+      items.push({ label: `${r.type} (${r.holder})`, amount, note });
+      total += amount;
     }
   });
   tenants.forEach((t) => {
     if (t.daehang === '있음') {
-      const received = (t._choi || 0) + (t._baedang || 0);
+      const received = Math.max(0, (t._choi || 0) + (t._baedang || 0));
       const unpaid = Math.max(0, t.deposit - received);
       if (unpaid > 0) {
         items.push({ label: `대항력 임차인 미배당 추정 (${t.name || '임차인'})`, amount: unpaid, note: '낙찰자 인수 가능성' });
@@ -215,12 +267,35 @@ function calculateInherited(rights, tenants) {
       }
     }
   });
-  return { total, items };
+  return { total: Math.max(0, total), items };
 }
 
-function assessRisk(rights, tenants, inherited, minBid) {
+function assessRisk(rights, tenants, inherited, minBid, malso) {
   const flags = [];
   let level = 'ok';
+
+  if (!malso) {
+    flags.push({ sev: 'warn', msg: '말소기준권리를 확정할 수 없습니다.' });
+    level = 'warn';
+  }
+
+  const invalidRights = rights.filter((r) => r.date && !r.dateValid);
+  if (invalidRights.length) {
+    flags.push({ sev: 'warn', msg: `접수일자 형식 확인이 필요한 권리 ${invalidRights.length}건` });
+    level = 'warn';
+  }
+
+  const invalidTenantDates = tenants.filter((t) => (t.moveIn && !t.moveInValid) || (t.fixed && !t.fixedValid));
+  if (invalidTenantDates.length) {
+    flags.push({ sev: 'warn', msg: `날짜 형식 확인이 필요한 임차인 ${invalidTenantDates.length}명` });
+    level = 'warn';
+  }
+
+  const zeroDepositTenants = tenants.filter((t) => !t.deposit);
+  if (zeroDepositTenants.length) {
+    flags.push({ sev: 'warn', msg: `보증금 확인이 필요한 임차인 ${zeroDepositTenants.length}명` });
+    level = 'warn';
+  }
 
   const unknownTenants = tenants.filter((t) => t.daehang === '확인필요' || t.daehang === '?');
   if (unknownTenants.length) {
@@ -238,10 +313,12 @@ function assessRisk(rights, tenants, inherited, minBid) {
   if (daehang.length) {
     flags.push({ sev: inherited.total > 0 ? 'danger' : 'warn', msg: `대항력 있는 것으로 보이는 임차인 ${daehang.length}명` });
     if (level === 'ok') level = 'warn';
+    if (inherited.total > 0) level = 'danger';
   }
 
-  if (inherited.total > 0 && minBid) {
-    const ratio = inherited.total / minBid;
+  const safeMinBid = Math.max(0, Number(minBid || 0));
+  if (inherited.total > 0 && safeMinBid) {
+    const ratio = inherited.total / safeMinBid;
     if (ratio >= 0.3) {
       flags.push({ sev: 'danger', msg: `인수 추정금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
       level = 'danger';
@@ -256,10 +333,14 @@ function assessRisk(rights, tenants, inherited, minBid) {
 }
 
 function recommendBid(appraisal, minBid, inheritedTotal) {
-  if (!appraisal || !minBid) return null;
-  const taxAndOther = appraisal * 0.056;
-  const upper = Math.max(minBid, Math.floor(Math.min(appraisal * 0.85, appraisal - inheritedTotal - taxAndOther)));
-  return { lower: minBid, upper, base: appraisal };
+  const safeAppraisal = Math.max(0, Number(appraisal || 0));
+  const safeMinBid = Math.max(0, Number(minBid || 0));
+  const safeInherited = Math.max(0, Number(inheritedTotal || 0));
+  if (!safeAppraisal || !safeMinBid) return null;
+  const taxAndOther = safeAppraisal * 0.056;
+  const rawUpper = Math.floor(Math.min(safeAppraisal * 0.85, safeAppraisal - safeInherited - taxAndOther));
+  const upper = Math.max(safeMinBid, rawUpper, 0);
+  return { lower: safeMinBid, upper, base: safeAppraisal };
 }
 
 function generateExplanation(rep) {
@@ -267,9 +348,11 @@ function generateExplanation(rep) {
   if (rep.malso) {
     lines.push(
       `<p><b>1. 말소기준권리</b><br>` +
-      `${rep.malso.date}에 ${rep.malso.holder}가 설정한 <b>${rep.malso.type}</b>을 말소기준권리로 보고 분석했습니다. ` +
+      `${rep.malso.date}에 ${rep.malso.holder || '-'}가 설정한 <b>${rep.malso.type}</b>을 말소기준권리로 보고 분석했습니다. ` +
       `이 날짜 이후의 권리는 소멸되는 것으로 추정하고, 이전 권리는 인수 가능성이 있는 것으로 표시했습니다.</p>`
     );
+  } else {
+    lines.push(`<p><b>1. 말소기준권리</b><br>말소기준권리를 확정할 수 없어 권리분석 신뢰도가 낮습니다. 등기부상 최선순위 권리를 다시 확인하세요.</p>`);
   }
   const inheritList = rep.rights.filter((r) => r.status === '인수');
   if (inheritList.length) {
@@ -295,30 +378,32 @@ function generateExplanation(rep) {
     ok: '입력값 기준으로 큰 인수 위험은 보이지 않습니다. 다만 원본 서류와 등기부 확인은 필수입니다.',
     warn: `인수 추정금액 ${formatMoney(rep.inherited.total)}을 실질 투자비에 반영해 판단하세요.`,
     danger: '위험 요소가 있습니다. 실제 입찰 전 전문가 검토가 필요합니다.',
-  }[rep.risk.level];
+  }[rep.risk.level] || '원본 서류 재확인이 필요합니다.';
   lines.push(`<p><b>4. 총평 · ${rep.risk.level.toUpperCase()}</b><br>${total}</p>`);
   return lines.join('');
 }
 
 function analyzeCase(raw, region = 'other') {
-  const rights = normalizeRights(raw.rights);
-  const tenantsRaw = normalizeTenants(raw.tenants);
+  const safeRaw = raw || {};
+  const rights = normalizeRights(safeRaw.rights);
+  const tenantsRaw = normalizeTenants(safeRaw.tenants);
   const malso = findMalso(rights);
   const analyzedRights = analyzeRights(rights, malso);
   const tenants = analyzeTenants(tenantsRaw, malso);
 
-  const minBid = parseMoney(raw.basic['최저매각가격'] || raw.basic['최저가']);
-  const appraisal = parseMoney(raw.basic['감정평가액'] || raw.basic['감정가']);
+  const basic = safeRaw.basic || {};
+  const minBid = parseMoney(basic['최저매각가격'] || basic['최저가']);
+  const appraisal = parseMoney(basic['감정평가액'] || basic['감정가']);
 
   const baedang = simulateBaedang(minBid || appraisal || 100_000_000, analyzedRights, tenants, region);
   const inherited = calculateInherited(analyzedRights, tenants);
-  const risk = assessRisk(analyzedRights, tenants, inherited, minBid);
+  const risk = assessRisk(analyzedRights, tenants, inherited, minBid, malso);
   const bidRec = recommendBid(appraisal, minBid, inherited.total);
 
   const pre = {
-    case: raw.caseNo,
-    court: raw.court,
-    basic: raw.basic,
+    case: safeRaw.caseNo,
+    court: safeRaw.court,
+    basic,
     malso,
     rights: analyzedRights,
     tenants,
@@ -326,7 +411,7 @@ function analyzeCase(raw, region = 'other') {
     inherited,
     risk,
     bidRec,
-    url: raw.url,
+    url: safeRaw.url,
   };
   return { ...pre, explanation: generateExplanation(pre) };
 }
