@@ -19,24 +19,11 @@
     return document.getElementById('resultsSection');
   }
 
-  function ensureAnalyzeMount() {
-    const root = resultRoot();
-    if (!root) return null;
-    let mount = document.getElementById('v2AnalyzeMount');
-    if (!mount) {
-      mount = document.createElement('div');
-      mount.id = 'v2AnalyzeMount';
-      root.appendChild(mount);
-    }
-    return mount;
-  }
-
   function injectStyles() {
     if (document.getElementById('v2AnalyzeStyles')) return;
     const style = document.createElement('style');
     style.id = 'v2AnalyzeStyles';
     style.textContent = `
-      .v2-analyze-ready { border-left:4px solid var(--accent); }
       .v2-analyze-result { border-left:4px solid var(--accent); }
       .v2-risk-badge { display:inline-flex; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:900; }
       .v2-risk-badge.ok { background:var(--ok-bg); color:var(--ok); }
@@ -44,6 +31,7 @@
       .v2-risk-badge.danger { background:var(--danger-bg); color:var(--danger); }
       .v2-analyze-list { margin:10px 0 0; padding-left:18px; color:var(--ink-2); font-size:13px; line-height:1.7; }
       .v2-analyze-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+      .v2-hidden-legacy-action { display:none !important; }
     `;
     document.head.appendChild(style);
   }
@@ -87,31 +75,30 @@
     if (daehang) items.push(`대항력 있음으로 분류된 임차인이 ${daehang}명 있습니다.`);
     if (unknown) items.push(`전입일 등 확인이 필요한 임차인이 ${unknown}명 있습니다.`);
     if (takeover) items.push(`말소되지 않고 인수로 분류된 권리가 ${takeover}건 있습니다.`);
-    if (!items.length) items.push('입력값 기준 중대 위험은 확인되지 않았습니다.');
     return items.slice(0, 6);
   }
 
-  function renderAnalyzePanel() {
-    injectStyles();
-    const app = rootState();
-    const mount = ensureAnalyzeMount();
-    if (!mount || !app || app.status !== 'success' || !app.raw) return;
+  function findStep2ActionRow() {
+    const cards = [...document.querySelectorAll('.v2-step2-card')];
+    const card = cards[cards.length - 1];
+    if (!card) return null;
+    const rows = [...card.querySelectorAll('.v2-cta-row')];
+    return rows[rows.length - 1] || null;
+  }
 
-    const canAnalyze = hasMeaningfulManual(app);
+  function renderAnalyzeResult() {
+    const root = resultRoot();
+    if (!root) return;
+    let mount = document.getElementById('v2AnalyzeMount');
+    if (!mount) {
+      mount = document.createElement('div');
+      mount.id = 'v2AnalyzeMount';
+      root.appendChild(mount);
+    }
+
     const report = state.report;
     const risk = riskLabel(report?.risk?.level);
     const body = [];
-
-    body.push(`
-      <section class="v2-result-card v2-analyze-ready">
-        <h3>권리분석 실행</h3>
-        <p class="v2-note">Step 2 입력값을 기준으로 1차 권리분석을 실행합니다. 실패해도 조회 결과와 입력값은 유지됩니다.</p>
-        <div class="v2-analyze-actions">
-          <button class="v2-btn" type="button" id="btnAnalyzeV2" ${state.analyzing || !canAnalyze ? 'disabled' : ''}>${state.analyzing ? '분석 중...' : '권리분석 실행'}</button>
-          ${!canAnalyze ? '<span class="v2-note">최선순위 권리, 임차인, 특수권리 중 하나 이상 입력하면 실행할 수 있습니다.</span>' : ''}
-        </div>
-      </section>
-    `);
 
     if (state.error) {
       body.push(`<section class="v2-result-card v2-error"><h3>권리분석 실패</h3><p>${esc(state.error)}</p><p class="v2-note">Step 2 입력값은 유지됩니다. 입력값을 확인한 뒤 다시 실행하세요.</p></section>`);
@@ -136,7 +123,22 @@
     }
 
     mount.innerHTML = body.join('');
+  }
+
+  function syncStep2AnalyzeControl() {
+    injectStyles();
+    const app = rootState();
+    const row = findStep2ActionRow();
+    if (!row || !app || app.status !== 'success' || !app.raw) return;
+
+    const canAnalyze = hasMeaningfulManual(app);
+    row.innerHTML = `
+      <button class="v2-btn" type="button" id="btnAnalyzeV2" ${state.analyzing || !canAnalyze ? 'disabled' : ''}>${state.analyzing ? '분석 중...' : '권리분석 실행'}</button>
+      ${!canAnalyze ? '<span class="v2-note">최선순위 권리, 임차인, 특수권리 중 하나 이상 입력하면 실행할 수 있습니다.</span>' : '<button class="v2-secondary-btn" type="button" id="btnAnalyzeScrollV2">결과 영역 보기</button>'}
+    `;
     document.getElementById('btnAnalyzeV2')?.addEventListener('click', runAnalyze);
+    document.getElementById('btnAnalyzeScrollV2')?.addEventListener('click', () => document.getElementById('v2AnalyzeMount')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    renderAnalyzeResult();
   }
 
   async function runAnalyze() {
@@ -144,7 +146,7 @@
     if (!app?.raw || state.analyzing) return;
     state.analyzing = true;
     state.error = '';
-    renderAnalyzePanel();
+    syncStep2AnalyzeControl();
 
     try {
       const res = await fetch('/api/analyze', {
@@ -165,19 +167,45 @@
       state.error = err.message || String(err);
     } finally {
       state.analyzing = false;
-      renderAnalyzePanel();
+      syncStep2AnalyzeControl();
       document.getElementById('v2AnalyzeMount')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 
-  const originalRenderResultsWait = setInterval(() => {
-    if (!window.__auctionV2?.renderResults) return;
-    clearInterval(originalRenderResultsWait);
-    const originalRenderResults = window.__auctionV2.renderResults;
-    window.__auctionV2.renderResults = function patchedRenderResults(...args) {
-      originalRenderResults(...args);
-      renderAnalyzePanel();
-    };
-    renderAnalyzePanel();
+  function clearLegacySaveMessage() {
+    const app = rootState();
+    if (app?.formMessage && app.formMessage.includes('권리분석 실행을 연결')) {
+      app.formMessage = '';
+      const msg = document.getElementById('v2FormMessage');
+      if (msg) {
+        msg.className = 'v2-form-message';
+        msg.textContent = '';
+      }
+    }
+  }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-action="save-step2"]')) {
+      setTimeout(() => {
+        clearLegacySaveMessage();
+        syncStep2AnalyzeControl();
+      }, 0);
+    }
+    if (event.target.closest('[data-action="open-step2"], [data-action="add-tenant"], [data-action="remove-tenant"], [data-action="add-special"], [data-action="remove-special"]')) {
+      setTimeout(syncStep2AnalyzeControl, 0);
+    }
+  });
+
+  document.addEventListener('input', (event) => {
+    if (event.target.closest('[data-manual-path]')) setTimeout(syncStep2AnalyzeControl, 0);
+  });
+  document.addEventListener('change', (event) => {
+    if (event.target.closest('[data-manual-path]')) setTimeout(syncStep2AnalyzeControl, 0);
+  });
+
+  const wait = setInterval(() => {
+    if (!window.__auctionV2?.state) return;
+    clearInterval(wait);
+    syncStep2AnalyzeControl();
   }, 50);
 })();
