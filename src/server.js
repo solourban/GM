@@ -38,6 +38,7 @@ app.get('/', (req, res, next) => {
       '/landing-polish-patch.js',
       '/card-width-polish-patch.js',
       '/home-default-tab-patch.js',
+      '/home-ui-unify-patch.js',
       '/platform-patch.js',
       '/address-fix.js',
       '/watchlist-patch.js',
