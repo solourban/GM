@@ -14,18 +14,40 @@ const CHOI_U_SEON = {
 
 function parseMoney(s) {
   if (!s) return 0;
-  const digits = String(s).replace(/[^0-9]/g, '');
+  const text = String(s).replace(/\s+/g, '').trim();
+
+  if (/[억만천]/.test(text)) {
+    let total = 0;
+    const eok = text.match(/([0-9,]+(?:\.\d+)?)억/);
+    const man = text.match(/([0-9,]+(?:\.\d+)?)만/);
+    const cheon = text.match(/([0-9,]+(?:\.\d+)?)천/);
+    if (eok) total += Math.round(Number(eok[1].replace(/,/g, '')) * 100_000_000);
+    if (man) total += Math.round(Number(man[1].replace(/,/g, '')) * 10_000);
+    if (!man && cheon) total += Math.round(Number(cheon[1].replace(/,/g, '')) * 10_000_000);
+    if (total > 0) return total;
+  }
+
+  const digits = text.replace(/[^0-9]/g, '');
   return digits ? parseInt(digits, 10) : 0;
 }
 
 function normalizeDate(s) {
   if (!s) return '';
-  const m = String(s).match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
-  if (m) {
-    const [, y, mo, d] = m;
+  const text = String(s).trim().replace(/\s+/g, '');
+
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compact) {
+    const [, y, mo, d] = compact;
+    return `${y}-${mo}-${d}`;
+  }
+
+  const separated = text.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})\.?/);
+  if (separated) {
+    const [, y, mo, d] = separated;
     return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
   }
-  return String(s);
+
+  return text;
 }
 
 function formatMoney(n) {
