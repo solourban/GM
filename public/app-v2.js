@@ -6,6 +6,9 @@
     error: null,
     elapsed: '',
     interestedExpanded: false,
+    requestId: 0,
+    formMessage: '',
+    formMessageType: 'info',
   };
 
   const $ = (id) => document.getElementById(id);
@@ -54,8 +57,14 @@
       .v2-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
       .v2-field span { color:var(--ink-3); font-size:12px; font-weight:750; }
       .v2-field input, .v2-field select { width:100%; background:#fff; border:1px solid var(--line-2); color:var(--ink); padding:13px 14px; border-radius:12px; font-size:15px; font-weight:650; outline:none; }
+      .v2-field input:focus, .v2-field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(11,61,46,.12); }
       .v2-btn { background:var(--accent); color:#fff; min-height:48px; padding:0 22px; border:0; border-radius:12px; font-weight:900; cursor:pointer; box-shadow:0 10px 22px rgba(11,61,46,.18); }
       .v2-btn:disabled { opacity:.62; cursor:not-allowed; }
+      .v2-form-message { margin-top:12px; border-radius:12px; padding:11px 12px; font-size:13px; font-weight:750; line-height:1.45; display:none; }
+      .v2-form-message.show { display:block; }
+      .v2-form-message.info { background:var(--accent-soft); color:var(--accent); }
+      .v2-form-message.warn { background:#fff7e6; color:#9a6700; border:1px solid #fedf89; }
+      .v2-form-message.error { background:#fff1f0; color:#b42318; border:1px solid #fecdca; }
       .v2-placeholder { text-align:center; padding:34px 22px; }
       .results-section { display:block !important; min-height:0; padding-top:32px; scroll-margin-top:100px; }
       .v2-result-card { background:#fff; border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(0,0,0,.05); margin-bottom:16px; }
@@ -130,6 +139,7 @@
             <label class="v2-field v2-case"><span>사건번호</span><input id="saSerV2" type="text" placeholder="예: 110754" inputmode="numeric"></label>
             <button id="btnFetchV2" class="v2-btn">물건 기본정보 조회</button>
           </div>
+          <div id="v2FormMessage" class="v2-form-message"></div>
           <p class="v2-note">Step 1 — 조회 결과는 아래 결과 영역에 고정 표시됩니다.</p>
         </div>
       </section>
@@ -152,6 +162,7 @@
       if (courts.includes('천안지원')) select.value = '천안지원';
     } catch (_) {
       select.innerHTML = fallback.map((name) => `<option>${esc(name)}</option>`).join('');
+      setFormMessage('법원 목록을 불러오지 못해 기본 목록을 표시했습니다.', 'warn');
     }
   }
 
@@ -160,52 +171,92 @@
     document.querySelectorAll('.v2-panel').forEach((panel) => panel.classList.toggle('active', panel.dataset.panel === state.activeTab));
   }
 
+  function renderFormMessage() {
+    const el = $('v2FormMessage');
+    if (!el) return;
+    el.className = `v2-form-message ${state.formMessage ? 'show' : ''} ${state.formMessageType || 'info'}`;
+    el.textContent = state.formMessage || '';
+  }
+
+  function setFormMessage(message, type = 'info') {
+    state.formMessage = message || '';
+    state.formMessageType = type;
+    renderFormMessage();
+  }
+
   function validateInput() {
     const court = clean($('jiwonNmV2')?.value);
     const year = clean($('saYearV2')?.value);
     const serial = clean($('saSerV2')?.value);
     if (!court) return '법원을 선택해주세요.';
     if (!/^\d{4}$/.test(year)) return '사건연도는 4자리 숫자로 입력해주세요.';
+    if (!serial) return '사건번호를 입력해주세요.';
     if (!/^\d+$/.test(serial)) return '사건번호는 숫자만 입력해주세요.';
     return '';
   }
 
-  function setStatus(next) {
+  function setStatus(next, options = {}) {
     Object.assign(state, next);
-    renderResults();
+    renderFormMessage();
+    renderResults(options);
+  }
+
+  function currentPayload() {
+    return {
+      jiwonNm: clean($('jiwonNmV2')?.value),
+      saYear: clean($('saYearV2')?.value),
+      saSer: clean($('saSerV2')?.value),
+    };
   }
 
   async function fetchCase() {
     const error = validateInput();
     if (error) {
-      setStatus({ status: 'error', error, raw: null, elapsed: '' });
+      setFormMessage(error, 'error');
+      $('saSerV2')?.focus();
       return;
     }
+
+    const requestId = state.requestId + 1;
+    state.requestId = requestId;
     const btn = $('btnFetchV2');
-    if (btn) btn.disabled = true;
-    setStatus({ status: 'loading', error: null, raw: null, elapsed: '', interestedExpanded: false });
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '조회 중...';
+    }
+    setFormMessage('대법원 경매정보에서 기본정보를 조회하고 있습니다.', 'info');
+    setStatus({ status: 'loading', error: null, elapsed: '', interestedExpanded: false }, { preserveSuccess: true });
+
     try {
-      const payload = {
-        jiwonNm: clean($('jiwonNmV2').value),
-        saYear: clean($('saYearV2').value),
-        saSer: clean($('saSerV2').value),
-      };
+      const payload = currentPayload();
       const res = await fetch('/api/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
+      if (requestId !== state.requestId) return;
       if (!res.ok || !data.ok) throw new Error(data.error || data.detail || '조회에 실패했습니다.');
+      setFormMessage('기본정보 조회가 완료되었습니다.', 'info');
       setStatus({ status: 'success', raw: data.raw, elapsed: data.elapsed || '', error: null, interestedExpanded: false });
     } catch (err) {
-      setStatus({ status: 'error', error: err.message || String(err), raw: null, elapsed: '' });
+      if (requestId !== state.requestId) return;
+      const message = err.message || String(err);
+      setFormMessage(message, 'error');
+      if (state.raw) {
+        setStatus({ status: 'success', error: message }, { keepScroll: true });
+      } else {
+        setStatus({ status: 'error', error: message, raw: null, elapsed: '' });
+      }
     } finally {
-      if (btn) btn.disabled = false;
+      if (requestId === state.requestId && btn) {
+        btn.disabled = false;
+        btn.textContent = '물건 기본정보 조회';
+      }
     }
   }
 
-  function renderResults() {
+  function renderResults(options = {}) {
     const root = $('resultsSection');
     if (!root) return;
     if (state.status === 'idle') {
@@ -213,26 +264,33 @@
       return;
     }
     if (state.status === 'loading') {
-      root.innerHTML = `<div class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>대법원 경매정보에서 기본정보를 가져오는 중...</h3><p class="v2-note">조회 결과가 나오면 이 영역에 고정 표시됩니다.</p></div></div></div>`;
-      root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (options.preserveSuccess && state.raw) {
+        root.innerHTML = renderStep1(state.raw, state.elapsed, { loading: true });
+      } else {
+        root.innerHTML = `<div class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>대법원 경매정보에서 기본정보를 가져오는 중...</h3><p class="v2-note">조회 결과가 나오면 이 영역에 고정 표시됩니다.</p></div></div></div>`;
+      }
+      if (!options.keepScroll) root.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     if (state.status === 'error') {
       root.innerHTML = `<div class="v2-result-card v2-error"><h3>조회 실패</h3><p>${esc(state.error)}</p></div>`;
-      root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!options.keepScroll) root.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     root.innerHTML = renderStep1(state.raw, state.elapsed);
-    root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!options.keepScroll) root.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function renderStep1(raw, elapsed) {
+  function renderStep1(raw, elapsed, meta = {}) {
     const basic = raw?.basic || {};
     const objects = Array.isArray(raw?.objects) ? raw.objects : [];
     const schedule = Array.isArray(raw?.schedule) ? raw.schedule : [];
     const interested = Array.isArray(raw?.interested) ? raw.interested : [];
     const tenants = interested.filter((x) => x.type === '임차인');
+    const loadingBanner = meta.loading ? `<section class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>새 조회를 진행 중입니다.</h3><p class="v2-note">기존 결과는 유지하고, 최신 응답이 도착하면 교체합니다.</p></div></div></section>` : '';
+    const errorBanner = state.error && !meta.loading ? `<section class="v2-result-card v2-error"><h3>최근 조회 실패</h3><p>${esc(state.error)}</p><p class="v2-note">아래에는 마지막으로 성공한 조회 결과를 유지했습니다.</p></section>` : '';
     return `
+      ${loadingBanner}${errorBanner}
       <section class="v2-result-card">
         <div class="v2-result-head">
           <div><span class="v2-badge">Step 1 완료</span><h3>물건 기본정보</h3><p class="v2-note">${esc(raw?.court || '')} ${esc(raw?.caseNo || '')} ${elapsed ? `· ${esc(elapsed)}` : ''}</p></div>
@@ -295,6 +353,14 @@
   function bind() {
     $('btnFetchV2')?.addEventListener('click', fetchCase);
     $('saSerV2')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') fetchCase(); });
+    ['jiwonNmV2', 'saYearV2', 'saSerV2'].forEach((id) => {
+      $(id)?.addEventListener('input', () => {
+        if (state.formMessageType === 'error') setFormMessage('', 'info');
+      });
+      $(id)?.addEventListener('change', () => {
+        if (state.formMessageType === 'error') setFormMessage('', 'info');
+      });
+    });
     document.querySelector('.brand')?.addEventListener('click', (e) => {
       e.preventDefault();
       state.activeTab = 'search';
@@ -310,6 +376,7 @@
     loadCourts();
     bind();
     renderHome();
+    renderFormMessage();
     renderResults();
     window.__auctionV2 = {
       state,
@@ -317,7 +384,7 @@
       renderResults,
       toggleInterested() {
         state.interestedExpanded = !state.interestedExpanded;
-        renderResults();
+        renderResults({ keepScroll: true });
       },
     };
   }
