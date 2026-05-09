@@ -5,6 +5,7 @@
     raw: null,
     error: null,
     elapsed: '',
+    interestedExpanded: false,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -13,6 +14,17 @@
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
+
+  function splitAddress(value) {
+    const s = clean(value);
+    if (!s) return '-';
+    const m = s.match(/\(([^()]+)\)\s*$/);
+    const building = m ? m[0] : '';
+    const body = building ? s.slice(0, s.length - building.length).trim() : s;
+    const parts = body.split(',').map((x) => x.trim()).filter(Boolean);
+    if (parts.length <= 1 && !building) return esc(s);
+    return `<span class="v2-address"><span>${esc(parts[0] || body)}</span>${parts.slice(1).map((p) => `<span class="sub">${esc(p)}</span>`).join('')}${building ? `<span class="building">${esc(building)}</span>` : ''}</span>`;
+  }
 
   function injectStyles() {
     let style = $('v2Styles');
@@ -29,12 +41,13 @@
       .v2-tabs { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
       .v2-tab { border:1px solid var(--line); background:#fff; color:var(--ink-2); border-radius:999px; padding:9px 14px; font-size:13px; font-weight:900; cursor:pointer; white-space:nowrap; }
       .v2-tab.active { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
-      .hero { min-height: 640px; display:flex; align-items:center; background: radial-gradient(circle at 82% 10%, rgba(244,233,199,.08), transparent 28%), linear-gradient(180deg,#074332 0%,#063727 100%); }
+      .hero { min-height: 660px; display:flex; align-items:center; background: radial-gradient(circle at 82% 10%, rgba(244,233,199,.08), transparent 28%), linear-gradient(180deg,#074332 0%,#063727 100%); }
       .hero-inner { width:100%; }
       .hero-copy { max-width:760px; margin:0 auto 34px; text-align:center; }
+      #v2HomePanels { min-height: 202px; }
       .v2-panel { display:none; max-width:var(--v2-card-width); margin:0 auto; }
       .v2-panel.active { display:block; }
-      .v2-card { background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 18px 48px rgba(0,0,0,.18); }
+      .v2-card { background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 18px 48px rgba(0,0,0,.18); min-height: 174px; }
       .v2-card h3 { margin:0 0 6px; font-size:20px; letter-spacing:-.04em; }
       .v2-card p { margin:0; color:var(--ink-3); font-size:13px; line-height:1.55; }
       .v2-form { display:grid; grid-template-columns:minmax(220px,1.4fr) minmax(90px,.55fr) minmax(180px,1fr) auto; gap:12px; align-items:end; margin-top:18px; }
@@ -46,25 +59,36 @@
       .v2-placeholder { text-align:center; padding:34px 22px; }
       .results-section { display:block !important; min-height:0; padding-top:32px; scroll-margin-top:100px; }
       .v2-result-card { background:#fff; border:1px solid var(--line); border-radius:18px; padding:20px; box-shadow:0 12px 28px rgba(0,0,0,.05); margin-bottom:16px; }
+      .v2-result-card h3 { margin:0 0 10px; font-size:21px; letter-spacing:-.04em; }
       .v2-result-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
-      .v2-result-head h3 { margin:0; font-size:22px; letter-spacing:-.04em; }
+      .v2-result-head h3 { margin:6px 0 0; font-size:24px; letter-spacing:-.045em; }
       .v2-badge { display:inline-flex; border-radius:999px; padding:6px 10px; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:900; }
       .v2-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; margin-top:14px; }
+      .v2-grid.compact { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
       .v2-info { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; min-width:0; }
+      .v2-info.wide { grid-column: 1 / -1; }
       .v2-info .k { color:var(--ink-3); font-size:12px; margin-bottom:4px; }
       .v2-info .v { font-weight:900; font-size:16px; line-height:1.45; overflow-wrap:anywhere; }
-      .v2-table-wrap { overflow:auto; margin-top:12px; }
-      .v2-table { width:100%; border-collapse:collapse; font-size:13px; }
-      .v2-table th { text-align:left; color:var(--ink-3); border-bottom:1px solid var(--line); padding:9px 8px; white-space:nowrap; }
-      .v2-table td { border-bottom:1px solid var(--line); padding:10px 8px; vertical-align:top; }
+      .v2-address { display:block; line-height:1.5; }
+      .v2-address span { display:block; }
+      .v2-address .sub { margin-top:3px; color:var(--ink-2); font-size:.92em; }
+      .v2-address .building { margin-top:3px; color:var(--ink-3); font-size:.9em; }
+      .v2-table-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+      .v2-table-head h3 { margin:0; }
+      .v2-small-btn { border:1px solid var(--line); background:var(--bg); color:var(--ink-2); border-radius:10px; padding:8px 11px; font-size:12px; font-weight:900; cursor:pointer; }
+      .v2-table-wrap { overflow:auto; margin-top:12px; border:1px solid var(--line); border-radius:14px; }
+      .v2-table { width:100%; border-collapse:collapse; font-size:13px; min-width: 620px; }
+      .v2-table th { text-align:left; color:var(--ink-3); border-bottom:1px solid var(--line); padding:10px 9px; white-space:nowrap; background:var(--bg); }
+      .v2-table td { border-bottom:1px solid var(--line); padding:10px 9px; vertical-align:top; }
+      .v2-table tr:last-child td { border-bottom:0; }
       .v2-note { margin-top:12px; color:var(--ink-3); font-size:13px; line-height:1.6; }
       .v2-loading { display:flex; align-items:center; gap:12px; }
       .v2-spinner { width:22px; height:22px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--accent); animation:v2spin .9s linear infinite; }
       @keyframes v2spin { to { transform:rotate(360deg); } }
       .v2-error { border-color:#fecdca; background:#fff7f7; }
       .v2-error h3 { color:#b42318; }
-      @media (max-width:900px){ .v2-form{grid-template-columns:1fr 110px}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} .header-inner{align-items:flex-start; flex-direction:column; padding:14px 0;} .v2-tabs{justify-content:flex-start;} }
-      @media (max-width:720px){ .hero{min-height:auto; padding:44px 0 38px;} .hero-copy{text-align:left;margin-bottom:24px;} .v2-form{grid-template-columns:1fr;} }
+      @media (max-width:900px){ .v2-form{grid-template-columns:1fr 110px}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} .header-inner{align-items:flex-start; flex-direction:column; padding:14px 0;} .v2-tabs{justify-content:flex-start;} .hero{min-height:680px;} }
+      @media (max-width:720px){ .hero{min-height:auto; padding:44px 0 38px;} .hero-copy{text-align:left;margin-bottom:24px;} #v2HomePanels{min-height:0}.v2-card{min-height:0}.v2-form{grid-template-columns:1fr;} }
     `;
   }
 
@@ -159,7 +183,7 @@
     }
     const btn = $('btnFetchV2');
     if (btn) btn.disabled = true;
-    setStatus({ status: 'loading', error: null, raw: null, elapsed: '' });
+    setStatus({ status: 'loading', error: null, raw: null, elapsed: '', interestedExpanded: false });
     try {
       const payload = {
         jiwonNm: clean($('jiwonNmV2').value),
@@ -173,7 +197,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || data.detail || '조회에 실패했습니다.');
-      setStatus({ status: 'success', raw: data.raw, elapsed: data.elapsed || '', error: null });
+      setStatus({ status: 'success', raw: data.raw, elapsed: data.elapsed || '', error: null, interestedExpanded: false });
     } catch (err) {
       setStatus({ status: 'error', error: err.message || String(err), raw: null, elapsed: '' });
     } finally {
@@ -218,7 +242,7 @@
           ${info('법원', basic['법원'] || raw?.court)}
           ${info('담당계', basic['담당계'])}
           ${info('사건명', basic['사건명'])}
-          ${info('소재지', basic['소재지'])}
+          ${infoHtml('소재지', splitAddress(basic['소재지']), 'wide')}
           ${info('물건종별', basic['물건종별'])}
           ${info('감정평가액', money(basic['감정평가액']))}
           ${info('최저매각가격', money(basic['최저매각가격']))}
@@ -230,7 +254,7 @@
       </section>
       <section class="v2-result-card">
         <h3>현황 요약</h3>
-        <div class="v2-grid">
+        <div class="v2-grid compact">
           ${info('물건 수', `${objects.length || 1}개`)}
           ${info('이해관계인', `${interested.length}명`)}
           ${info('임차인', `${tenants.length}명`)}
@@ -246,18 +270,26 @@
     `;
   }
 
-  function info(k, v) {
-    return `<div class="v2-info"><div class="k">${esc(k)}</div><div class="v">${esc(clean(v) || '-')}</div></div>`;
+  function info(k, v, extraClass = '') {
+    return `<div class="v2-info ${extraClass}"><div class="k">${esc(k)}</div><div class="v">${esc(clean(v) || '-')}</div></div>`;
+  }
+
+  function infoHtml(k, html, extraClass = '') {
+    return `<div class="v2-info ${extraClass}"><div class="k">${esc(k)}</div><div class="v">${html || '-'}</div></div>`;
   }
 
   function renderSchedule(rows) {
     if (!rows.length) return `<section class="v2-result-card"><h3>진행일정 / 매각기일</h3><p class="v2-note">자동 수집된 기일내역이 없습니다. 원문에서 재확인하세요.</p></section>`;
-    return `<section class="v2-result-card"><h3>진행일정 / 매각기일</h3><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>일자</th><th>시간</th><th>장소</th><th>구분</th><th>결과</th><th>최저가</th></tr></thead><tbody>${rows.map((r) => `<tr>${[0,1,2,3,4,5].map((i) => `<td>${esc(r[i] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
+    const visible = rows.slice(0, 12);
+    return `<section class="v2-result-card"><div class="v2-table-head"><h3>진행일정 / 매각기일</h3><span class="v2-badge">${rows.length}건</span></div><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>일자</th><th>시간</th><th>장소</th><th>구분</th><th>결과</th><th>최저가</th></tr></thead><tbody>${visible.map((r) => `<tr>${[0,1,2,3,4,5].map((i) => `<td>${esc(r[i] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>${rows.length > visible.length ? `<p class="v2-note">기일내역은 ${visible.length}건까지만 우선 표시했습니다. 원문에서 전체 일정을 재확인하세요.</p>` : ''}</section>`;
   }
 
   function renderInterested(rows) {
     if (!rows.length) return `<section class="v2-result-card"><h3>이해관계인</h3><p class="v2-note">자동 수집된 이해관계인 정보가 없습니다.</p></section>`;
-    return `<section class="v2-result-card"><h3>이해관계인</h3><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>구분</th><th>이름</th><th>순번</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.type || '')}</td><td>${esc(r.name || '')}</td><td>${esc(r.seq || '')}</td></tr>`).join('')}</tbody></table></div></section>`;
+    const limit = 8;
+    const visible = state.interestedExpanded ? rows : rows.slice(0, limit);
+    const button = rows.length > limit ? `<button class="v2-small-btn" type="button" onclick="window.__auctionV2.toggleInterested()">${state.interestedExpanded ? '상세 목록 접기' : `상세 목록 펼치기`}</button>` : '';
+    return `<section class="v2-result-card"><div class="v2-table-head"><h3>이해관계인</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="v2-badge">${rows.length}명</span>${button}</div></div><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>구분</th><th>이름</th><th>순번</th></tr></thead><tbody>${visible.map((r) => `<tr><td>${esc(r.type || '')}</td><td>${esc(r.name || '')}</td><td>${esc(r.seq || '')}</td></tr>`).join('')}</tbody></table></div>${rows.length > limit && !state.interestedExpanded ? `<p class="v2-note">전체 ${rows.length}명 중 ${limit}명만 우선 표시합니다.</p>` : ''}</section>`;
   }
 
   function bind() {
@@ -279,7 +311,15 @@
     bind();
     renderHome();
     renderResults();
-    window.__auctionV2 = { state, renderHome, renderResults };
+    window.__auctionV2 = {
+      state,
+      renderHome,
+      renderResults,
+      toggleInterested() {
+        state.interestedExpanded = !state.interestedExpanded;
+        renderResults();
+      },
+    };
   }
 
   document.addEventListener('DOMContentLoaded', boot);
