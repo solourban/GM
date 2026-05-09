@@ -31,44 +31,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res, next) => {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
-    let patched = html;
-    const scripts = [
-      '/gm-core-patch.js',
-      '/patch-registry-patch.js',
-      '/landing-polish-patch.js',
-      '/card-width-polish-patch.js',
-      '/home-default-tab-patch.js',
-      '/home-ui-unify-patch.js',
-      '/platform-patch.js',
-      '/address-fix.js',
-      '/watchlist-patch.js',
-      '/watchlist-enhance-patch.js',
-      '/today-dashboard-patch.js',
-      '/date-recommendations-patch.js',
-      '/date-rec-guard-patch.js',
-      '/stepflow-patch.js',
-      '/fetch-error-patch.js',
-      '/fetch-flow-guard-patch.js',
-      '/court-list-patch.js',
-      '/bulk-fetch-patch.js',
-      '/map-patch.js',
-      '/molit-patch.js',
-      '/molit-fallback-patch.js',
-      '/molit-scenario-patch.js',
-      '/capital-patch.js',
-      '/cashflow-patch.js',
-      '/stability-patch.js',
-      '/diagnostics-patch.js',
-      '/exit-plan-patch.js',
-      '/bid-checklist-patch.js',
-      '/final-summary-patch.js',
-      '/step1-ux-polish-patch.js',
-      '/api-guide-patch.js',
-    ];
-    scripts.forEach((src) => {
-      if (!patched.includes(src)) patched = patched.replace('</body>', `<script src="${src}"></script>\n</body>`);
-    });
-    res.type('html').send(patched);
+    res.type('html').send(html);
   });
 });
 
