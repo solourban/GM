@@ -9,6 +9,12 @@
     requestId: 0,
     formMessage: '',
     formMessageType: 'info',
+    step2Visible: false,
+    manual: {
+      malso: { date: '', type: '근저당권', holder: '', amount: '' },
+      tenants: [{ name: '', moveIn: '', fixed: '', deposit: '' }],
+      specials: [],
+    },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -96,8 +102,21 @@
       @keyframes v2spin { to { transform:rotate(360deg); } }
       .v2-error { border-color:#fecdca; background:#fff7f7; }
       .v2-error h3 { color:#b42318; }
+      .v2-cta-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+      .v2-secondary-btn { border:1px solid var(--line); background:#fff; color:var(--ink-2); min-height:42px; padding:0 14px; border-radius:11px; font-weight:900; cursor:pointer; }
+      .v2-step2-card { border-left:4px solid var(--accent); }
+      .v2-step2-section { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+      .v2-step2-section:first-of-type { margin-top:10px; padding-top:0; border-top:0; }
+      .v2-step2-section h4 { margin:0 0 10px; font-size:16px; letter-spacing:-.03em; }
+      .v2-input-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+      .v2-input-grid .v2-field input, .v2-input-grid .v2-field select { padding:11px 12px; font-size:14px; }
+      .v2-repeat-card { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--bg); margin-top:10px; }
+      .v2-repeat-head { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; }
+      .v2-repeat-head b { font-size:13px; }
+      .v2-danger-btn { border:1px solid #fecdca; background:#fff7f7; color:#b42318; border-radius:9px; padding:7px 10px; font-size:12px; font-weight:900; cursor:pointer; }
+      .v2-manual-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-top:14px; }
       @media (max-width:900px){ .v2-form{grid-template-columns:1fr 110px}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} .header-inner{align-items:flex-start; flex-direction:column; padding:14px 0;} .v2-tabs{justify-content:flex-start;} .hero{min-height:680px;} }
-      @media (max-width:720px){ .hero{min-height:auto; padding:44px 0 38px;} .hero-copy{text-align:left;margin-bottom:24px;} #v2HomePanels{min-height:0}.v2-card{min-height:0}.v2-form{grid-template-columns:1fr;} }
+      @media (max-width:720px){ .hero{min-height:auto; padding:44px 0 38px;} .hero-copy{text-align:left;margin-bottom:24px;} #v2HomePanels{min-height:0}.v2-card{min-height:0}.v2-form{grid-template-columns:1fr;} .v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;} }
     `;
   }
 
@@ -321,10 +340,8 @@
       </section>
       ${renderSchedule(schedule)}
       ${renderInterested(interested)}
-      <section class="v2-result-card">
-        <h3>다음 단계</h3>
-        <p class="v2-note">v2 1차에서는 기본정보 조회 안정화까지만 반영했습니다. Step 2 명세서 입력과 권리분석은 결과 유지가 확인된 뒤 연결합니다.</p>
-      </section>
+      ${renderNextStep()}
+      ${state.step2Visible ? renderStep2() : ''}
     `;
   }
 
@@ -346,8 +363,173 @@
     if (!rows.length) return `<section class="v2-result-card"><h3>이해관계인</h3><p class="v2-note">자동 수집된 이해관계인 정보가 없습니다.</p></section>`;
     const limit = 8;
     const visible = state.interestedExpanded ? rows : rows.slice(0, limit);
-    const button = rows.length > limit ? `<button class="v2-small-btn" type="button" onclick="window.__auctionV2.toggleInterested()">${state.interestedExpanded ? '상세 목록 접기' : `상세 목록 펼치기`}</button>` : '';
+    const button = rows.length > limit ? `<button class="v2-small-btn" type="button" data-action="toggle-interested">${state.interestedExpanded ? '상세 목록 접기' : `상세 목록 펼치기`}</button>` : '';
     return `<section class="v2-result-card"><div class="v2-table-head"><h3>이해관계인</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="v2-badge">${rows.length}명</span>${button}</div></div><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>구분</th><th>이름</th><th>순번</th></tr></thead><tbody>${visible.map((r) => `<tr><td>${esc(r.type || '')}</td><td>${esc(r.name || '')}</td><td>${esc(r.seq || '')}</td></tr>`).join('')}</tbody></table></div>${rows.length > limit && !state.interestedExpanded ? `<p class="v2-note">전체 ${rows.length}명 중 ${limit}명만 우선 표시합니다.</p>` : ''}</section>`;
+  }
+
+  function renderNextStep() {
+    const tenantCount = state.manual.tenants.length;
+    const specialCount = state.manual.specials.length;
+    const hasMalso = Boolean(clean(state.manual.malso.date) || clean(state.manual.malso.holder) || clean(state.manual.malso.amount));
+    return `
+      <section class="v2-result-card">
+        <h3>다음 단계</h3>
+        <p class="v2-note">매각물건명세서와 등기부 기준으로 최선순위·임차인·특수권리를 입력하면 권리분석 준비가 됩니다.</p>
+        <div class="v2-manual-summary">
+          ${info('최선순위', hasMalso ? '입력 중' : '미입력')}
+          ${info('임차인 입력', `${tenantCount}명`)}
+          ${info('특수권리 입력', `${specialCount}건`)}
+        </div>
+        <div class="v2-cta-row">
+          <button class="v2-btn" type="button" data-action="open-step2">${state.step2Visible ? 'Step 2 입력 계속하기' : 'Step 2 명세서 입력 시작'}</button>
+          ${state.step2Visible ? '<button class="v2-secondary-btn" type="button" data-action="close-step2">Step 2 접기</button>' : ''}
+        </div>
+      </section>`;
+  }
+
+  function manualValue(path) {
+    const [group, indexOrKey, maybeKey] = path.split('.');
+    if (group === 'malso') return state.manual.malso[indexOrKey] || '';
+    if (group === 'tenants') return state.manual.tenants[Number(indexOrKey)]?.[maybeKey] || '';
+    if (group === 'specials') return state.manual.specials[Number(indexOrKey)]?.[maybeKey] || '';
+    return '';
+  }
+
+  function renderManualInput(path, label, placeholder = '', type = 'text') {
+    return `<label class="v2-field"><span>${esc(label)}</span><input type="${esc(type)}" value="${esc(manualValue(path))}" placeholder="${esc(placeholder)}" data-manual-path="${esc(path)}"></label>`;
+  }
+
+  function renderManualSelect(path, label, options) {
+    const value = manualValue(path);
+    return `<label class="v2-field"><span>${esc(label)}</span><select data-manual-path="${esc(path)}">${options.map((opt) => `<option value="${esc(opt)}" ${opt === value ? 'selected' : ''}>${esc(opt)}</option>`).join('')}</select></label>`;
+  }
+
+  function renderTenant(index, tenant) {
+    return `
+      <div class="v2-repeat-card">
+        <div class="v2-repeat-head"><b>임차인 ${index + 1}</b>${state.manual.tenants.length > 1 ? `<button class="v2-danger-btn" type="button" data-action="remove-tenant" data-index="${index}">삭제</button>` : ''}</div>
+        <div class="v2-input-grid">
+          ${renderManualInput(`tenants.${index}.name`, '임차인명', '예: 김OO')}
+          ${renderManualInput(`tenants.${index}.moveIn`, '전입일', '예: 2023.01.15')}
+          ${renderManualInput(`tenants.${index}.fixed`, '확정일자', '예: 2023.01.16')}
+          ${renderManualInput(`tenants.${index}.deposit`, '보증금', '예: 50,000,000')}
+        </div>
+      </div>`;
+  }
+
+  function renderSpecial(index) {
+    return `
+      <div class="v2-repeat-card">
+        <div class="v2-repeat-head"><b>특수권리 ${index + 1}</b><button class="v2-danger-btn" type="button" data-action="remove-special" data-index="${index}">삭제</button></div>
+        <div class="v2-input-grid">
+          ${renderManualSelect(`specials.${index}.type`, '권리 유형', ['유치권', '법정지상권', '분묘기지권', '예고등기', '가처분', '가압류', '기타'])}
+          ${renderManualInput(`specials.${index}.holder`, '권리자', '예: 김OO')}
+          ${renderManualInput(`specials.${index}.date`, '신고/접수일', '예: 2024.01.01')}
+          ${renderManualInput(`specials.${index}.amount`, '금액/비고', '예: 10,000,000')}
+        </div>
+      </div>`;
+  }
+
+  function renderStep2() {
+    return `
+      <section class="v2-result-card v2-step2-card" id="step2InputCard">
+        <div class="v2-result-head">
+          <div><span class="v2-badge">Step 2 입력</span><h3>명세서·권리 입력</h3><p class="v2-note">현재 단계에서는 입력값을 저장하고 유지하는 것까지만 연결했습니다. 권리분석 실행은 다음 패치에서 붙입니다.</p></div>
+        </div>
+        <div class="v2-step2-section">
+          <h4>1. 최선순위 권리</h4>
+          <div class="v2-input-grid">
+            ${renderManualInput('malso.date', '접수일자', '예: 2020.05.01')}
+            ${renderManualSelect('malso.type', '권리종류', ['근저당권', '저당권', '압류', '가압류', '담보가등기', '전세권', '기타'])}
+            ${renderManualInput('malso.holder', '권리자', '예: OO은행')}
+            ${renderManualInput('malso.amount', '채권금액', '예: 120,000,000')}
+          </div>
+          <p class="v2-note">말소기준권리 판단의 기준이 되는 항목입니다. 정확한 접수일자와 권리종류를 입력하세요.</p>
+        </div>
+        <div class="v2-step2-section">
+          <div class="v2-table-head"><h4>2. 임차인</h4><button class="v2-small-btn" type="button" data-action="add-tenant">임차인 추가</button></div>
+          ${state.manual.tenants.map(renderTenant).join('')}
+        </div>
+        <div class="v2-step2-section">
+          <div class="v2-table-head"><h4>3. 특수권리</h4><button class="v2-small-btn" type="button" data-action="add-special">특수권리 추가</button></div>
+          ${state.manual.specials.length ? state.manual.specials.map((_, index) => renderSpecial(index)).join('') : '<p class="v2-note">유치권·법정지상권 등 별도 확인 권리가 있으면 추가하세요.</p>'}
+        </div>
+        <div class="v2-cta-row">
+          <button class="v2-secondary-btn" type="button" data-action="save-step2">입력 상태 확인</button>
+          <button class="v2-btn" type="button" disabled>권리분석 실행은 다음 단계에서 연결</button>
+        </div>
+      </section>`;
+  }
+
+  function setManualPath(path, value) {
+    const [group, indexOrKey, maybeKey] = path.split('.');
+    if (group === 'malso') {
+      state.manual.malso[indexOrKey] = value;
+      return;
+    }
+    const index = Number(indexOrKey);
+    if (group === 'tenants' && state.manual.tenants[index]) state.manual.tenants[index][maybeKey] = value;
+    if (group === 'specials' && state.manual.specials[index]) state.manual.specials[index][maybeKey] = value;
+  }
+
+  function scrollToStep2() {
+    setTimeout(() => $('step2InputCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+
+  function handleResultClick(event) {
+    const button = event.target.closest('[data-action]');
+    if (!button) return;
+    const action = button.dataset.action;
+    if (action === 'toggle-interested') {
+      state.interestedExpanded = !state.interestedExpanded;
+      renderResults({ keepScroll: true });
+      return;
+    }
+    if (action === 'open-step2') {
+      state.step2Visible = true;
+      renderResults({ keepScroll: true });
+      scrollToStep2();
+      return;
+    }
+    if (action === 'close-step2') {
+      state.step2Visible = false;
+      renderResults({ keepScroll: true });
+      return;
+    }
+    if (action === 'add-tenant') {
+      state.manual.tenants.push({ name: '', moveIn: '', fixed: '', deposit: '' });
+      renderResults({ keepScroll: true });
+      scrollToStep2();
+      return;
+    }
+    if (action === 'remove-tenant') {
+      const index = Number(button.dataset.index);
+      if (state.manual.tenants.length > 1 && Number.isInteger(index)) state.manual.tenants.splice(index, 1);
+      renderResults({ keepScroll: true });
+      return;
+    }
+    if (action === 'add-special') {
+      state.manual.specials.push({ type: '유치권', holder: '', date: '', amount: '' });
+      renderResults({ keepScroll: true });
+      scrollToStep2();
+      return;
+    }
+    if (action === 'remove-special') {
+      const index = Number(button.dataset.index);
+      if (Number.isInteger(index)) state.manual.specials.splice(index, 1);
+      renderResults({ keepScroll: true });
+      return;
+    }
+    if (action === 'save-step2') {
+      setFormMessage('Step 2 입력값을 현재 화면 상태에 저장했습니다. 다음 단계에서 권리분석 실행을 연결합니다.', 'info');
+      $('v2FormMessage')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function handleManualInput(event) {
+    const input = event.target.closest('[data-manual-path]');
+    if (!input) return;
+    setManualPath(input.dataset.manualPath, input.value);
   }
 
   function bind() {
@@ -361,6 +543,9 @@
         if (state.formMessageType === 'error') setFormMessage('', 'info');
       });
     });
+    $('resultsSection')?.addEventListener('click', handleResultClick);
+    $('resultsSection')?.addEventListener('input', handleManualInput);
+    $('resultsSection')?.addEventListener('change', handleManualInput);
     document.querySelector('.brand')?.addEventListener('click', (e) => {
       e.preventDefault();
       state.activeTab = 'search';
@@ -382,10 +567,6 @@
       state,
       renderHome,
       renderResults,
-      toggleInterested() {
-        state.interestedExpanded = !state.interestedExpanded;
-        renderResults({ keepScroll: true });
-      },
     };
   }
 
