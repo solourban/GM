@@ -34,59 +34,6 @@
         입찰 전에 필요한 내용을 한 화면에서 정리합니다.
       </p>
     </div>
-
-    <div class="search-box">
-      <div class="search-title">
-        <span class="search-icon">⌕</span>
-        <div>
-          <b>물건 검색</b>
-          <p>사건번호로 경매물건 기본정보를 조회합니다.</p>
-        </div>
-      </div>
-      <div class="search-row">
-        <label class="field court-field">
-          <span>법원</span>
-          <select id="jiwonNm">
-            <option>서울중앙지방법원</option>
-            <option>서울동부지방법원</option>
-            <option>서울서부지방법원</option>
-            <option>서울남부지방법원</option>
-            <option>서울북부지방법원</option>
-            <option>수원지방법원</option>
-            <option>성남지원</option><option>여주지원</option><option>평택지원</option>
-            <option>안산지원</option><option>안양지원</option><option>고양지원</option><option>부천지원</option>
-            <option>인천지방법원</option>
-            <option>의정부지방법원</option>
-            <option>대전지방법원</option>
-            <option>천안지원</option>
-            <option>청주지방법원</option>
-            <option>부산지방법원</option>
-            <option>부산지방법원 동부지원</option>
-            <option>부산지방법원 서부지원</option>
-            <option>대구지방법원</option>
-            <option>울산지방법원</option>
-            <option>창원지방법원</option>
-            <option>광주지방법원</option>
-            <option>전주지방법원</option>
-            <option>춘천지방법원</option>
-            <option>제주지방법원</option>
-          </select>
-        </label>
-        <label class="field year-field">
-          <span>연도</span>
-          <input id="saYear" type="text" value="2024" inputmode="numeric">
-        </label>
-        <label class="field case-field">
-          <span>사건번호</span>
-          <div class="case-input-wrap">
-            <span class="sep">타경</span>
-            <input id="saSer" type="text" placeholder="예: 110754" inputmode="numeric">
-          </div>
-        </label>
-        <button id="btnFetch" class="btn-primary">물건 기본정보 조회</button>
-      </div>
-      <p class="search-hint">Step 1 — 대법원 경매정보에서 물건 기본정보를 수집합니다.</p>
-    </div>
   </div>
 </section>
 
@@ -97,7 +44,6 @@
   <p class="muted">분석 로직은 주택임대차보호법·민사집행법 일반원칙 기반. 실제 입찰 전 원본 서류 재확인 필수.</p>
 </footer>
 
-<script src="/app.js"></script>
-<script src="/home-tabs-patch.js"></script>
+<script src="/app-v2.js"></script>
 </body>
 </html>
