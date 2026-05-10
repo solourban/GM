@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "test": "node tests/analyzer.test.js"
+    "test:syntax": "node --check src/server.js && node --check src/analyzer.js && node --check src/dateRecommendations.js && node --check src/crawler.js",
+    "test:analyzer": "node tests/analyzer.test.js",
+    "test": "npm run test:syntax && npm run test:analyzer"
   },
   "dependencies": {
     "express": "^4.19.2",
