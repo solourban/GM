@@ -107,6 +107,60 @@ run('혼합 날짜 형식과 한글 금액을 같은 값으로 정규화한다',
   assert.strictEqual(report.tenants[0].daehang, '있음');
 });
 
+run('전입일이 말소기준일과 같은 날이면 대항력 없음으로 판단한다', () => {
+  const report = analyzeCase({
+    basic: baseBasic(),
+    rights: [{ date: '20220501', type: '근저당권', holder: 'OO은행', amount: '100000000', _userMalso: true }],
+    tenants: [{ name: '동일일자임차인', moveIn: '20220501', fixed: '20220501', deposit: '50000000' }],
+  });
+
+  assert.strictEqual(report.malso.date, '2022-05-01');
+  assert.strictEqual(report.tenants[0].daehang, '없음');
+  assert.strictEqual(report.inherited.total, 0);
+});
+
+run('확정일자가 전입일보다 빨라도 대항력 판단은 전입일 기준으로 유지한다', () => {
+  const report = analyzeCase({
+    basic: baseBasic(),
+    rights: [{ date: '20220324', type: '근저당권', holder: 'OO은행', amount: '40000000', _userMalso: true }],
+    tenants: [{ name: '확정일자선행', moveIn: '20220225', fixed: '20220203', deposit: '100000000' }],
+  });
+
+  assert.strictEqual(report.tenants[0].moveIn, '2022-02-25');
+  assert.strictEqual(report.tenants[0].fixed, '2022-02-03');
+  assert.strictEqual(report.tenants[0].daehang, '있음');
+  assert.strictEqual(report.risk.level, 'danger');
+});
+
+run('유치권은 말소기준 이후 입력되어도 특수권리 위험으로 유지한다', () => {
+  const report = analyzeCase({
+    basic: baseBasic(),
+    rights: [
+      { date: '20200501', type: '근저당권', holder: 'OO은행', amount: '120000000', _userMalso: true },
+      { date: '20240101', type: '유치권', holder: '공사업자', amount: '30000000' },
+    ],
+    tenants: [],
+  });
+
+  const lien = report.rights.find((right) => right.type === '유치권');
+  assert.ok(lien);
+  assert.strictEqual(lien.status, '인수');
+  assert.strictEqual(report.risk.level, 'danger');
+  assert.ok(report.inherited.items.some((item) => /유치권/.test(item.label)));
+});
+
+run('말소기준권리가 없으면 위험도는 ok가 아니어야 한다', () => {
+  const report = analyzeCase({
+    basic: baseBasic(),
+    rights: [{ date: '20200101', type: '소유권이전', holder: '소유자', amount: '' }],
+    tenants: [{ name: '임차인', moveIn: '20220101', fixed: '20220102', deposit: '30000000' }],
+  });
+
+  assert.strictEqual(report.malso, null);
+  assert.notStrictEqual(report.risk.level, 'ok');
+  assert.ok(report.risk.flags.some((flag) => /말소기준권리/.test(flag.msg)));
+});
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 }
