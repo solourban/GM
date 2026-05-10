@@ -1,10 +1,11 @@
 const assert = require('assert');
 const { analyzeCase } = require('../src/analyzer');
 
-function baseBasic() {
+function baseBasic(overrides = {}) {
   return {
     감정평가액: '242000000',
     최저매각가격: '6811000',
+    ...overrides,
   };
 }
 
@@ -71,6 +72,39 @@ run('보증금 0원 임차인은 경고 플래그를 유지한다', () => {
   assert.strictEqual(report.tenants[0].deposit, 0);
   assert.ok(report.tenants[0].depositWarning);
   assert.notStrictEqual(report.risk.level, 'ok');
+});
+
+run('예시 물건 2024타경110754는 대항력 임차인 고위험 케이스로 유지한다', () => {
+  const report = analyzeCase({
+    caseNo: '2024타경110754',
+    court: '서울중앙지방법원',
+    basic: baseBasic({ 감정평가액: '242,000,000', 최저매각가격: '8,514,000' }),
+    rights: [{ date: '2022.3.24.', type: '근저당권', holder: '합자회사금오주류', amount: '40,000,000', _userMalso: true }],
+    tenants: [{ name: '김예슬', moveIn: '2022.02.25', fixed: '2022/02/03', deposit: '267,000,000' }],
+  });
+
+  assert.strictEqual(report.case, '2024타경110754');
+  assert.strictEqual(report.malso.date, '2022-03-24');
+  assert.strictEqual(report.tenants[0].moveIn, '2022-02-25');
+  assert.strictEqual(report.tenants[0].fixed, '2022-02-03');
+  assert.strictEqual(report.tenants[0].deposit, 267000000);
+  assert.strictEqual(report.tenants[0].daehang, '있음');
+  assert.strictEqual(report.risk.level, 'danger');
+});
+
+run('혼합 날짜 형식과 한글 금액을 같은 값으로 정규화한다', () => {
+  const report = analyzeCase({
+    basic: baseBasic(),
+    rights: [{ date: '2022.3.24.', type: '근저당권', holder: '합자회사금오주류', amount: '4천만원', _userMalso: true }],
+    tenants: [{ name: '김예슬', moveIn: '20220225', fixed: '2022/02/03', deposit: '2억6700만원' }],
+  });
+
+  assert.strictEqual(report.malso.date, '2022-03-24');
+  assert.strictEqual(report.rights[0].amount, 40000000);
+  assert.strictEqual(report.tenants[0].moveIn, '2022-02-25');
+  assert.strictEqual(report.tenants[0].fixed, '2022-02-03');
+  assert.strictEqual(report.tenants[0].deposit, 267000000);
+  assert.strictEqual(report.tenants[0].daehang, '있음');
 });
 
 if (process.exitCode) {
