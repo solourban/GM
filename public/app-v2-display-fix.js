@@ -148,6 +148,13 @@
     return '입력값 기준으로 산출한 보수적 검토 범위입니다. 실제 입찰가는 시세와 경쟁률을 함께 봐야 합니다.';
   }
 
+  function fundingMessage(report, minTotal, upperTotal) {
+    const level = report?.risk?.level || 'ok';
+    if (level === 'danger') return '고위험 물건은 보증금만 준비해서는 부족합니다. 인수 가능 금액, 명도비, 수리비까지 별도 예비비를 두고 검토하세요.';
+    if (upperTotal > minTotal) return '최저가 기준과 검토상한 기준의 필요자금 차이가 있습니다. 실제 입찰가를 정한 뒤 보증금과 잔금 일정을 다시 계산하세요.';
+    return '입찰보증금은 최소 준비금일 뿐입니다. 낙찰 후 잔금, 취득세, 법무비, 관리비, 명도비용을 별도로 확인하세요.';
+  }
+
   function upsertBiddingSummary() {
     const s = state();
     const report = s?.report;
@@ -230,6 +237,51 @@
     `;
   }
 
+  function upsertFundingReview() {
+    const s = state();
+    const report = s?.report;
+    const bidRange = document.getElementById('v2BidRangeCard');
+    const summary = document.getElementById('v2BiddingSummaryCard');
+    if (!report || !summary) {
+      document.getElementById('v2FundingReviewCard')?.remove();
+      return;
+    }
+
+    const minBid = numberValue(report.basic?.['최저매각가격'] || report.basic?.['최저가']);
+    const bidDepositRate = numberValue(report.basic?.['입찰보증금률']) || 10;
+    const inheritedTotal = numberValue(report.inherited?.total);
+    const upper = numberValue(report.bidRec?.upper) || minBid;
+    const minBidDeposit = Math.round(minBid * bidDepositRate / 100);
+    const upperBidDeposit = Math.round(upper * bidDepositRate / 100);
+    const minTotal = minBid + inheritedTotal;
+    const upperTotal = upper + inheritedTotal;
+
+    let card = document.getElementById('v2FundingReviewCard');
+    if (!card) {
+      card = document.createElement('section');
+      card.id = 'v2FundingReviewCard';
+      card.className = 'v2-card';
+      const anchor = bidRange || summary;
+      anchor.parentNode.insertBefore(card, anchor.nextSibling);
+    }
+
+    card.innerHTML = `
+      <span class="v2-badge">자금 검토</span>
+      <h3>입찰 전 자금 검토</h3>
+      <p class="v2-note">현재 입력값 기준의 단순 추정입니다. 대출 가능액, 잔금기한, 세금, 수리·명도비는 별도로 확인해야 합니다.</p>
+      <div class="v2-grid four">
+        <div class="v2-info-box"><span>최저가 보증금</span><strong>${money(minBidDeposit)}</strong></div>
+        <div class="v2-info-box"><span>최저가+인수</span><strong>${money(minTotal)}</strong></div>
+        <div class="v2-info-box"><span>상한가 보증금</span><strong>${money(upperBidDeposit)}</strong></div>
+        <div class="v2-info-box"><span>상한가+인수</span><strong>${money(upperTotal)}</strong></div>
+      </div>
+      <ul class="v2-list">
+        <li>입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.</li>
+        <li>${fundingMessage(report, minTotal, upperTotal)}</li>
+      </ul>
+    `;
+  }
+
   function upsertChecklist() {
     const s = state();
     const report = s?.report;
@@ -245,8 +297,9 @@
       card = document.createElement('section');
       card.id = 'v2PreBidChecklistCard';
       card.className = 'v2-card';
+      const funding = document.getElementById('v2FundingReviewCard');
       const bidRange = document.getElementById('v2BidRangeCard');
-      summary.parentNode.insertBefore(card, bidRange?.nextSibling || summary.nextSibling);
+      summary.parentNode.insertBefore(card, funding?.nextSibling || bidRange?.nextSibling || summary.nextSibling);
     }
 
     card.innerHTML = `
@@ -264,6 +317,7 @@
     addMissingAmountNotice();
     upsertBiddingSummary();
     upsertBidRange();
+    upsertFundingReview();
     upsertChecklist();
   }
 
