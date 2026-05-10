@@ -30,6 +30,12 @@
     return Array.from(new Set(items.map(clean).filter(Boolean)));
   }
 
+  function insertAfter(card, anchor) {
+    if (!card || !anchor?.parentNode) return;
+    if (card.previousElementSibling === anchor) return;
+    anchor.parentNode.insertBefore(card, anchor.nextSibling);
+  }
+
   function isManualMalsoAmountMissing() {
     const s = state();
     return !clean(s?.manual?.malso?.amount);
@@ -220,6 +226,9 @@
       summary.parentNode.insertBefore(card, summary.nextSibling);
     }
 
+    const riskBrief = document.getElementById('v2RiskBriefCard');
+    insertAfter(card, riskBrief || summary);
+
     card.innerHTML = `
       <span class="v2-badge">가격 검토</span>
       <h3>입찰가 검토 기준</h3>
@@ -241,6 +250,7 @@
     const s = state();
     const report = s?.report;
     const bidRange = document.getElementById('v2BidRangeCard');
+    const riskBrief = document.getElementById('v2RiskBriefCard');
     const summary = document.getElementById('v2BiddingSummaryCard');
     if (!report || !summary) {
       document.getElementById('v2FundingReviewCard')?.remove();
@@ -261,9 +271,11 @@
       card = document.createElement('section');
       card.id = 'v2FundingReviewCard';
       card.className = 'v2-card';
-      const anchor = bidRange || summary;
+      const anchor = bidRange || riskBrief || summary;
       anchor.parentNode.insertBefore(card, anchor.nextSibling);
     }
+
+    insertAfter(card, bidRange || riskBrief || summary);
 
     card.innerHTML = `
       <span class="v2-badge">자금 검토</span>
@@ -299,8 +311,14 @@
       card.className = 'v2-card';
       const funding = document.getElementById('v2FundingReviewCard');
       const bidRange = document.getElementById('v2BidRangeCard');
-      summary.parentNode.insertBefore(card, funding?.nextSibling || bidRange?.nextSibling || summary.nextSibling);
+      const riskBrief = document.getElementById('v2RiskBriefCard');
+      summary.parentNode.insertBefore(card, funding?.nextSibling || bidRange?.nextSibling || riskBrief?.nextSibling || summary.nextSibling);
     }
+
+    const funding = document.getElementById('v2FundingReviewCard');
+    const bidRange = document.getElementById('v2BidRangeCard');
+    const riskBrief = document.getElementById('v2RiskBriefCard');
+    insertAfter(card, funding || bidRange || riskBrief || summary);
 
     card.innerHTML = `
       <span class="v2-badge">확인 목록</span>
