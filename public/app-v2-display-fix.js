@@ -20,6 +20,12 @@
     return n ? `${n.toLocaleString('ko-KR')}원` : '0원';
   }
 
+  function percent(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n)) return '-';
+    return `${n.toFixed(1)}%`;
+  }
+
   function uniqueList(items) {
     return Array.from(new Set(items.map(clean).filter(Boolean)));
   }
@@ -133,6 +139,15 @@
     return uniqueList(items);
   }
 
+  function bidRangeMessage(report, lower, upper, base, inheritedTotal) {
+    const level = report?.risk?.level || 'ok';
+    if (!upper || upper <= 0) return '검토 가능한 상한가를 계산하지 못했습니다. 감정가와 최저가 정보를 다시 확인하세요.';
+    if (level === 'danger') return '고위험 물건입니다. 이 범위는 자동 입찰 추천가가 아니라, 위험 반영 후 검토 상한선입니다.';
+    if (inheritedTotal > 0) return '인수 추정금액이 있으므로 입찰가는 낙찰가가 아니라 실질 부담액 기준으로 판단해야 합니다.';
+    if (base && upper < base) return '감정가 대비 할인 여지는 있으나, 시세·관리비·수리비·명도비를 별도로 반영해야 합니다.';
+    return '입력값 기준으로 산출한 보수적 검토 범위입니다. 실제 입찰가는 시세와 경쟁률을 함께 봐야 합니다.';
+  }
+
   function upsertBiddingSummary() {
     const s = state();
     const report = s?.report;
@@ -174,6 +189,47 @@
     `;
   }
 
+  function upsertBidRange() {
+    const s = state();
+    const report = s?.report;
+    const summary = document.getElementById('v2BiddingSummaryCard');
+    if (!report || !summary || !report.bidRec) {
+      document.getElementById('v2BidRangeCard')?.remove();
+      return;
+    }
+
+    const lower = numberValue(report.bidRec.lower);
+    const upper = numberValue(report.bidRec.upper);
+    const base = numberValue(report.bidRec.base);
+    const inheritedTotal = numberValue(report.inherited?.total);
+    const upperAfterInherited = Math.max(0, upper - inheritedTotal);
+    const upperRate = base ? (upper / base) * 100 : 0;
+
+    let card = document.getElementById('v2BidRangeCard');
+    if (!card) {
+      card = document.createElement('section');
+      card.id = 'v2BidRangeCard';
+      card.className = 'v2-card';
+      summary.parentNode.insertBefore(card, summary.nextSibling);
+    }
+
+    card.innerHTML = `
+      <span class="v2-badge">가격 검토</span>
+      <h3>입찰가 검토 기준</h3>
+      <p class="v2-note">자동 산식으로 만든 참고 범위입니다. 실제 입찰가는 실거래가, 현장 상태, 명도비, 경쟁률을 별도로 반영해야 합니다.</p>
+      <div class="v2-grid four">
+        <div class="v2-info-box"><span>입찰 하한 기준</span><strong>${money(lower)}</strong></div>
+        <div class="v2-info-box"><span>검토 상한 기준</span><strong>${money(upper)}</strong></div>
+        <div class="v2-info-box"><span>감정가 대비 상한</span><strong>${percent(upperRate)}</strong></div>
+        <div class="v2-info-box"><span>인수 반영 후 여유</span><strong>${money(upperAfterInherited)}</strong></div>
+      </div>
+      <ul class="v2-list">
+        <li>${bidRangeMessage(report, lower, upper, base, inheritedTotal)}</li>
+        <li>입찰가를 정할 때는 낙찰가가 아니라 낙찰가 + 인수금액 + 취득비용 + 수리·명도비용 기준으로 다시 계산하세요.</li>
+      </ul>
+    `;
+  }
+
   function upsertChecklist() {
     const s = state();
     const report = s?.report;
@@ -189,7 +245,8 @@
       card = document.createElement('section');
       card.id = 'v2PreBidChecklistCard';
       card.className = 'v2-card';
-      summary.parentNode.insertBefore(card, summary.nextSibling);
+      const bidRange = document.getElementById('v2BidRangeCard');
+      summary.parentNode.insertBefore(card, bidRange?.nextSibling || summary.nextSibling);
     }
 
     card.innerHTML = `
@@ -206,6 +263,7 @@
     replaceMalsoZeroAmountInAnalysis();
     addMissingAmountNotice();
     upsertBiddingSummary();
+    upsertBidRange();
     upsertChecklist();
   }
 
