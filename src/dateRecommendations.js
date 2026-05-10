@@ -242,7 +242,9 @@ function parseHtmlItems(text, requestedCourt) {
     out.push({ court: requestedCourt, caseNo, address: '주소 확인 필요', usage, appraisal, minBid, saleDate: date ? formatYmd(date) : '', failCount, margin: appraisal && minBid ? appraisal - minBid : 0, bidRate, score: score.score, decision: score.decision, reasons: score.reasons, source: 'html' });
   }
   return out;
-}\nfunction extractItems(response, requestedCourt, requestedCourtCode) {
+}
+
+function extractItems(response, requestedCourt, requestedCourtCode) {
   const items = [];
   const rejected = [];
   const courtCodeMismatches = {};
