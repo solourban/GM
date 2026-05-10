@@ -2,10 +2,14 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const packageJson = require('../package.json');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const SERVICE_NAME = packageJson.name || 'auction-analyzer';
+const SERVICE_VERSION = packageJson.version || 'unknown';
+const startedAt = new Date();
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
@@ -72,11 +76,18 @@ setInterval(() => {
   }
 }, RATE_LIMIT_WINDOW_MS).unref?.();
 
-app.use('/api', rateLimit);
-
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, message: '경매AI v3 서버 정상' });
+  res.json({
+    ok: true,
+    service: SERVICE_NAME,
+    version: SERVICE_VERSION,
+    startedAt: startedAt.toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
 });
+
+app.use('/api', rateLimit);
 
 app.get('/api/config', (req, res) => {
   const kakaoKey = process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '';
@@ -344,5 +355,5 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`경매AI v3 서버 시작: port ${PORT}`);
+  console.log(`${SERVICE_NAME} 서버 시작: port ${PORT}`);
 });
