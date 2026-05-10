@@ -1,4 +1,5 @@
 (() => {
+  const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -30,6 +31,32 @@
     const court = clean(report?.court || report?.raw?.court || '');
     const caseNo = clean(report?.case || report?.caseNo || '');
     return [court, caseNo].filter(Boolean).join(' ');
+  }
+
+  function bidPlanStorageKey(report) {
+    const court = clean(report?.court || report?.raw?.court || '');
+    const caseNo = clean(report?.case || report?.caseNo || '');
+    const key = [court, caseNo].filter(Boolean).join(':') || 'unknown';
+    return `${BID_PLAN_STORAGE_PREFIX}${key}`;
+  }
+
+  function loadPlannedBid(report) {
+    try {
+      const inputValue = clean(document.getElementById('v2PlannedBidInput')?.value || '');
+      if (inputValue) return numberValue(inputValue);
+      return numberValue(localStorage.getItem(bidPlanStorageKey(report)) || '');
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function plannedBidMessage({ plannedBid, minBid, upper, inheritedTotal, riskLevel }) {
+    if (!plannedBid) return '';
+    if (plannedBid < minBid) return '입찰 예정가가 최저가보다 낮아 실제 입찰 가능 여부 재확인이 필요합니다.';
+    if (upper && plannedBid > upper) return '입찰 예정가가 검토상한가를 초과합니다. 과입찰 가능성을 주의해야 합니다.';
+    if (riskLevel === 'danger' && inheritedTotal > 0) return '고위험 물건이므로 입찰가보다 인수금액 포함 실질 부담액을 우선 확인해야 합니다.';
+    if (inheritedTotal > 0) return '인수 추정금액이 있으므로 낙찰가가 아니라 실질 부담액 기준으로 판단해야 합니다.';
+    return '입력값 기준 검토 범위 안에 있으나 시세·명도비·수리비는 별도 반영이 필요합니다.';
   }
 
   function mainDecision(report, inheritedTotal, minBid) {
@@ -71,6 +98,17 @@
     const practicalBurden = minBid + inheritedTotal;
     const upper = numberValue(report?.bidRec?.upper);
     const upperTotal = upper ? upper + inheritedTotal : 0;
+    const plannedBid = loadPlannedBid(report);
+    const plannedBidDepositRate = numberValue(report?.basic?.['입찰보증금률']) || 10;
+    const plannedBidDeposit = Math.round(plannedBid * plannedBidDepositRate / 100);
+    const plannedTotal = plannedBid + inheritedTotal;
+    const plannedMessage = plannedBidMessage({
+      plannedBid,
+      minBid,
+      upper,
+      inheritedTotal,
+      riskLevel: report?.risk?.level || 'ok',
+    });
     const lines = [];
 
     lines.push('[낙찰노트 입찰 검토 요약]');
@@ -80,6 +118,14 @@
     lines.push(`인수 추정금액: ${money(inheritedTotal)}`);
     lines.push(`최저가 기준 실질 부담: ${money(practicalBurden)}`);
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
+    if (plannedBid) {
+      lines.push('');
+      lines.push('내 입찰가 시뮬레이션:');
+      lines.push(`- 입찰 예정가: ${money(plannedBid)}`);
+      lines.push(`- 입찰보증금(${plannedBidDepositRate}%): ${money(plannedBidDeposit)}`);
+      lines.push(`- 입찰가+인수 추정금액: ${money(plannedTotal)}`);
+      lines.push(`- 판단: ${plannedMessage}`);
+    }
     lines.push(`핵심 판단: ${mainDecision(report, inheritedTotal, minBid)}`);
     lines.push('');
     lines.push('입찰 전 확인 필요:');
