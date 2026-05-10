@@ -1,6 +1,6 @@
 (() => {
-  const STORAGE_PREFIX = 'auction-note:v2:case:';
-  const SCHEMA_VERSION = 2;
+  const STORAGE_PREFIX = 'auction-note:v2.2:case:';
+  const SCHEMA_VERSION = 3;
   const MAX_SAVED_CASES = 40;
   const MAX_AGE_DAYS = 90;
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -107,7 +107,7 @@
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
-      if (parsed.schemaVersion && parsed.schemaVersion > SCHEMA_VERSION) return null;
+      if (parsed.schemaVersion !== SCHEMA_VERSION) return null;
       return parsed;
     } catch (_) {
       try { localStorage.removeItem(key); } catch (__) {}
