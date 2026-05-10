@@ -117,14 +117,35 @@ function itemCourtCode(item) {
   return clean(pick(item, ['boCd', 'cortOfcCd', 'jibunCortCd', 'cortCd'])) || String(item?.docid || '').slice(0, 7);
 }
 
+function itemCourtName(item) {
+  return clean(pick(item, ['jibunCortNm', 'cortOfcNm', 'courtNm', 'cortNm', 'jdbnNm', 'bubwonNm']));
+}
+
+function hasAuctionShape(item) {
+  const text = clean(Object.values(item || {}).join(' '));
+  return /(20\d{2})\s*타경/.test(text) || Boolean(
+    pick(item, ['srnSaNo', 'printCsNo', 'userCsNo', 'csNo', 'userCsNoVal']) &&
+    (pick(item, ['dspslDxdyYmd', 'maeGiil', 'dxdyYmd']) || pick(item, ['notifyMinmaePrice1', 'fstPbancLwsDspslPrc', 'lwsDspslPrc']))
+  );
+}
+
 function itemCourtMatches(item, requestedCourt, requestedCourtCode) {
-  const code = itemCourtCode(item);
-  if (code && requestedCourtCode && code !== requestedCourtCode) return false;
-  const rawCourt = clean(pick(item, ['jibunCortNm', 'cortOfcNm', 'courtNm', 'cortNm']));
-  if (!rawCourt) return true;
+  const rawCourt = itemCourtName(item);
   const req = courtStem(requestedCourt);
   const got = courtStem(rawCourt);
-  return !got || !req || got.includes(req) || req.includes(got);
+
+  if (rawCourt && req && got) {
+    return got.includes(req) || req.includes(got);
+  }
+
+  const code = itemCourtCode(item);
+  if (code && requestedCourtCode && code === requestedCourtCode) return true;
+
+  // 대법원 매각목록 API는 법원별로 court code 필드가 비거나 다른 필드로 내려오는 경우가 있다.
+  // 이름 필드가 없고 사건번호/매각기일/가격정보 형태가 확인되면 일단 후보로 살린 뒤 결과에 raw boCd를 남긴다.
+  if (!rawCourt && hasAuctionShape(item)) return true;
+
+  return false;
 }
 
 function scoreCandidate({ appraisal, minBid, bidRate, usage, failCount }) {
@@ -185,10 +206,11 @@ function objectToItem(item, requestedCourt, requestedCourtCode) {
   const failCount = Number.isFinite(Number(failRaw)) ? Number(failRaw) : money(failRaw);
   const saleDateRaw = clean(pick(item, ['maeGiil', 'dspslDxdyYmd', 'dxdyYmd', '매각기일']));
   const score = scoreCandidate({ appraisal, minBid, bidRate, usage, failCount });
+  const rawCourt = itemCourtName(item);
 
   return {
     court: requestedCourt,
-    rawCourt: clean(pick(item, ['jibunCortNm', 'cortOfcNm', 'courtNm', 'cortNm'])),
+    rawCourt,
     boCd: itemCourtCode(item),
     caseNo,
     address: addressFromObject(item),
@@ -203,7 +225,7 @@ function objectToItem(item, requestedCourt, requestedCourtCode) {
     decision: score.decision,
     reasons: score.reasons,
     invalid: !caseNo || !courtOk,
-    invalidReason: !caseNo ? '사건번호 인식 실패' : `법원코드 불일치(${itemCourtCode(item)} != ${requestedCourtCode})`,
+    invalidReason: !caseNo ? '사건번호 인식 실패' : `법원 검증 실패(rawCourt=${rawCourt || '-'}, code=${itemCourtCode(item) || '-'}, requested=${requestedCourtCode || '-'})`,
     source: 'json',
   };
 }
@@ -236,13 +258,12 @@ function extractItems(response, requestedCourt, requestedCourtCode) {
   const items = [];
   const rejected = [];
   const courtCodeMismatches = {};
+  const rawCourtNames = {};
 
   if (response.json) {
     const direct = response.json?.data?.dlt_srchResult;
     if (Array.isArray(direct)) items.push(...direct.map((x) => objectToItem(x, requestedCourt, requestedCourtCode)));
 
-    // JSON 응답일 때는 원문 text를 HTML로 다시 파싱하지 않는다.
-    // 그렇지 않으면 JSON 필드 조각이 주소처럼 노출된다.
     if (!items.length) {
       for (const arr of findArrays(response.json)) items.push(...arr.items.map((x) => objectToItem(x, requestedCourt, requestedCourtCode)));
     }
@@ -253,6 +274,7 @@ function extractItems(response, requestedCourt, requestedCourtCode) {
   const seen = new Set();
   const valid = [];
   for (const item of items) {
+    if (item.rawCourt) rawCourtNames[item.rawCourt] = (rawCourtNames[item.rawCourt] || 0) + 1;
     if (item.invalid) {
       rejected.push(item.invalidReason);
       if (item.boCd) courtCodeMismatches[item.boCd] = (courtCodeMismatches[item.boCd] || 0) + 1;
@@ -264,7 +286,7 @@ function extractItems(response, requestedCourt, requestedCourtCode) {
     valid.push(item);
   }
 
-  return { items: valid, rejected: rejected.slice(0, 10), courtCodeMismatches };
+  return { items: valid, rawCount: items.length, rejected: rejected.slice(0, 10), courtCodeMismatches, rawCourtNames };
 }
 
 function usageCodes(usage) {
@@ -313,7 +335,7 @@ async function findAuctionsByDate(options = {}) {
   const endYmd = compactDate(options.end) || addDaysYmd(7);
   const courtName = normalizeCourtName(options.court || '서울중앙');
   const cortOfcCd = COURT_CODES[courtName];
-  const debug = { engine: 'date-recommendations-v3-json-only-when-json', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
+  const debug = { engine: 'date-recommendations-v4-relaxed-court-filter', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
 
   if (!cortOfcCd) return { ok: false, verified: false, error: `지원하지 않는 법원명입니다: ${options.court}`, debug, items: [] };
 
@@ -335,8 +357,10 @@ async function findAuctionsByDate(options = {}) {
         attempt.json = Boolean(response.json);
         attempt.textLength = response.text.length;
         attempt.rawHasCaseNo = /(20\d{2})\s*타경/.test(clean(response.text));
+        attempt.rawCount = extracted.rawCount;
         attempt.count = extracted.items.length;
         attempt.rejected = extracted.rejected;
+        attempt.rawCourtNames = extracted.rawCourtNames;
         attempt.courtCodeMismatches = extracted.courtCodeMismatches;
         if (response.json?.data) attempt.dataKeys = Object.keys(response.json.data).slice(0, 20);
         const direct = response.json?.data?.dlt_srchResult;
@@ -358,10 +382,13 @@ async function findAuctionsByDate(options = {}) {
     }
   }
 
+  const sawRawItems = debug.attempts.some((a) => Number(a.rawCount || a.rawResultCount || 0) > 0 || a.rawHasCaseNo);
   return {
     ok: false,
     verified: false,
-    error: '검증 가능한 매각기일 목록 데이터가 없습니다. 진단 원문에서 rawCourtCodes/courtCodeMismatches를 확인하세요.',
+    error: sawRawItems
+      ? '매각기일 응답은 확인했지만 현재 필터로 검증 가능한 후보를 만들지 못했습니다. 단일 사건 조회 또는 기간 확대가 필요합니다.'
+      : '해당 법원·기간에서 확인 가능한 매각기일 목록 데이터가 없습니다.',
     court: courtName,
     start: formatYmd(startYmd),
     end: formatYmd(endYmd),
