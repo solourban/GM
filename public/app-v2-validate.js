@@ -68,6 +68,10 @@
       deposit: clean(tenant?.deposit),
     })) : [{ name: '', moveIn: '', fixed: '', deposit: '' }];
 
+    if (!s.manual.tenants.length) {
+      s.manual.tenants = [{ name: '', moveIn: '', fixed: '', deposit: '' }];
+    }
+
     s.manual.specials = Array.isArray(s.manual.specials) ? s.manual.specials.map((special) => ({
       type: clean(special?.type) || '유치권',
       holder: clean(special?.holder),
@@ -78,6 +82,12 @@
 
   function tenantHasAnyValue(tenant) {
     return [tenant?.name, tenant?.moveIn, tenant?.fixed, tenant?.deposit].some(clean);
+  }
+
+  function filledTenants() {
+    const s = state();
+    if (!s?.manual?.tenants) return [];
+    return s.manual.tenants.filter(tenantHasAnyValue);
   }
 
   function validateAnalyzeInput() {
@@ -95,9 +105,10 @@
     (s.manual.tenants || []).forEach((tenant, index) => {
       if (!tenantHasAnyValue(tenant)) return;
       const label = `임차인 ${index + 1}`;
-      if (!clean(tenant.moveIn)) errors.push(`${label} 전입일을 입력해주세요.`);
-      else if (!isValidDate(tenant.moveIn)) errors.push(`${label} 전입일 형식이 올바르지 않습니다.`);
-      if (tenant.fixed && !isValidDate(tenant.fixed)) errors.push(`${label} 확정일자 형식이 올바르지 않습니다.`);
+      const hasIdentity = clean(tenant.name) || parseMoney(tenant.deposit) || clean(tenant.fixed);
+      if (hasIdentity && !clean(tenant.moveIn)) errors.push(`${label} 전입일을 입력해주세요.`);
+      else if (tenant.moveIn && !isValidDate(tenant.moveIn)) errors.push(`${label} 전입일 형식이 올바르지 않습니다. 예: 2023.01.15 또는 20230115`);
+      if (tenant.fixed && !isValidDate(tenant.fixed)) errors.push(`${label} 확정일자 형식이 올바르지 않습니다. 예: 2023.01.16 또는 20230116`);
       if (!parseMoney(tenant.deposit)) warnings.push(`${label} 보증금이 없거나 0원입니다. 인수금액 계산이 제한될 수 있습니다.`);
     });
 
@@ -151,6 +162,30 @@
     }, 0);
   }
 
+  function patchNextStepTenantCount() {
+    const s = state();
+    if (!s?.manual) return;
+    const actualCount = filledTenants().length;
+
+    document.querySelectorAll('.v2-result-card').forEach((card) => {
+      const title = card.querySelector('h3');
+      if (!title || title.textContent.trim() !== '다음 단계') return;
+      card.querySelectorAll('.v2-info').forEach((info) => {
+        const key = info.querySelector('.k')?.textContent?.trim();
+        const value = info.querySelector('.v');
+        if (key === '임차인 입력' && value) value.textContent = `${actualCount}명`;
+      });
+    });
+  }
+
+  function patchStateBeforeAnalyze() {
+    const s = state();
+    if (!s?.manual) return;
+    normalizeManual();
+    const nonEmpty = filledTenants();
+    s.manual.tenants = nonEmpty.length ? nonEmpty : [{ name: '', moveIn: '', fixed: '', deposit: '' }];
+  }
+
   document.addEventListener('click', (event) => {
     const target = event.target.closest('[data-action="analyze"]');
     if (!target) return;
@@ -160,8 +195,11 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       showStep2Message(result.errors, 'error');
+      patchNextStepTenantCount();
       return;
     }
+
+    patchStateBeforeAnalyze();
 
     if (result.warnings.length) {
       showStep2Message(result.warnings, 'warn');
@@ -173,12 +211,19 @@
   document.addEventListener('input', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
     clearStep2Message();
+    setTimeout(patchNextStepTenantCount, 0);
   }, true);
 
   document.addEventListener('change', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
-    setTimeout(normalizeManual, 0);
+    setTimeout(() => {
+      normalizeManual();
+      patchNextStepTenantCount();
+    }, 0);
   }, true);
 
-  setInterval(preservePreviousAnalysisOnFailure, 400);
+  setInterval(() => {
+    preservePreviousAnalysisOnFailure();
+    patchNextStepTenantCount();
+  }, 400);
 })();
