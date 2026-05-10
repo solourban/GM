@@ -20,6 +20,10 @@
     return n ? `${n.toLocaleString('ko-KR')}원` : '0원';
   }
 
+  function uniqueList(items) {
+    return Array.from(new Set(items.map(clean).filter(Boolean)));
+  }
+
   function isManualMalsoAmountMissing() {
     const s = state();
     return !clean(s?.manual?.malso?.amount);
@@ -103,6 +107,32 @@
     return '최저가 정보가 부족합니다. 기본정보와 원본 서류를 다시 확인하세요.';
   }
 
+  function checklistItems(report) {
+    const items = [];
+    const tenants = Array.isArray(report?.tenants) ? report.tenants : [];
+    const rights = Array.isArray(report?.rights) ? report.rights : [];
+    const riskFlags = Array.isArray(report?.risk?.flags) ? report.risk.flags : [];
+    const hasDaehangTenant = tenants.some((tenant) => tenant.daehang === '있음');
+    const hasUnknownTenant = tenants.some((tenant) => ['?', '확인필요'].includes(tenant.daehang));
+    const hasZeroDeposit = tenants.some((tenant) => !numberValue(tenant.deposit));
+    const hasSpecialRight = rights.some((right) => right.status === '인수');
+    const hasInvalidDate = riskFlags.some((flag) => /날짜|접수일자/.test(flag.msg || ''));
+
+    items.push('등기부등본에서 말소기준권리 접수일과 권리종류를 원본 기준으로 재확인');
+    items.push('매각물건명세서에서 임차인, 배당요구, 인수되는 권리 여부 확인');
+    items.push('전입세대열람 또는 현장 확인으로 실제 점유자와 전입일 확인');
+
+    if (!report?.malso) items.push('말소기준권리가 확정되지 않았으므로 등기부상 최선순위 권리부터 다시 정리');
+    if (hasDaehangTenant) items.push('대항력 임차인의 보증금 전액 배당 가능성과 미배당 잔액 인수 가능성 확인');
+    if (hasUnknownTenant) items.push('대항력 판단이 불명확한 임차인의 전입일·확정일자·점유 여부 재확인');
+    if (hasZeroDeposit) items.push('보증금이 비어 있거나 0원인 임차인의 실제 보증금 확인');
+    if (hasSpecialRight) items.push('유치권·법정지상권·분묘기지권 등 특수권리 원본 서류와 현장 상태 확인');
+    if (hasInvalidDate) items.push('날짜 형식이 이상한 권리/임차인 항목을 원본 문서 기준으로 다시 입력');
+
+    items.push('최저가에 인수 추정금액과 취득세·수리비·명도비용을 더한 실질 부담액 기준으로 입찰가 검토');
+    return uniqueList(items);
+  }
+
   function upsertBiddingSummary() {
     const s = state();
     const report = s?.report;
@@ -144,10 +174,39 @@
     `;
   }
 
+  function upsertChecklist() {
+    const s = state();
+    const report = s?.report;
+    const summary = document.getElementById('v2BiddingSummaryCard');
+    if (!report || !summary) {
+      document.getElementById('v2PreBidChecklistCard')?.remove();
+      return;
+    }
+
+    const items = checklistItems(report);
+    let card = document.getElementById('v2PreBidChecklistCard');
+    if (!card) {
+      card = document.createElement('section');
+      card.id = 'v2PreBidChecklistCard';
+      card.className = 'v2-card';
+      summary.parentNode.insertBefore(card, summary.nextSibling);
+    }
+
+    card.innerHTML = `
+      <span class="v2-badge">확인 목록</span>
+      <h3>입찰 전 확인 체크리스트</h3>
+      <p class="v2-note">분석 결과에서 파생된 확인 항목입니다. 입찰 전 원본 서류와 현장 확인 기준으로 하나씩 점검하세요.</p>
+      <ul class="v2-list">
+        ${items.map((item) => `<li>□ ${item}</li>`).join('')}
+      </ul>
+    `;
+  }
+
   function run() {
     replaceMalsoZeroAmountInAnalysis();
     addMissingAmountNotice();
     upsertBiddingSummary();
+    upsertChecklist();
   }
 
   setInterval(run, 500);
