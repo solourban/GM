@@ -1,5 +1,6 @@
 (() => {
   const SUPPORTED_COURT = '서울중앙';
+  const SEARCH_COURT = '서울중앙지방법원';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function todayInput() {
@@ -57,6 +58,13 @@
     return Number.isFinite(n) && n > 0 ? `${n.toLocaleString('ko-KR')}원` : '-';
   }
 
+  function parseCaseNo(value) {
+    const raw = clean(value).replace(/\s+/g, '');
+    const match = raw.match(/(20\d{2})\s*타경\s*(\d{1,10})/);
+    if (!match) return null;
+    return { year: match[1], serial: match[2] };
+  }
+
   function findDatePanel() {
     const panels = Array.from(document.querySelectorAll('.v2-panel'));
     return panels.find((panel) => panel.querySelector('h3')?.textContent?.includes('매각기일 추천')) || null;
@@ -89,21 +97,26 @@
       <div class="v2-detail-table-wrap">
         <table class="v2-detail-table">
           <thead>
-            <tr><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>유찰</th><th>사유</th></tr>
+            <tr><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>유찰</th><th>사유</th><th>연결</th></tr>
           </thead>
           <tbody>
-            ${items.map((item) => `
-              <tr>
-                <td>${esc(item.score ?? '-')}</td>
-                <td>${esc(item.caseNo || '-')}</td>
-                <td>${esc(item.saleDate || '-')}</td>
-                <td>${esc(item.usage || '-')}</td>
-                <td>${formatWon(item.minBid)}</td>
-                <td>${formatWon(item.appraisal)}</td>
-                <td>${esc(item.failCount ?? '-')}</td>
-                <td>${esc(Array.isArray(item.reasons) ? item.reasons.join(', ') : '')}</td>
-              </tr>
-            `).join('')}
+            ${items.map((item) => {
+              const parsed = parseCaseNo(item.caseNo || '');
+              const disabled = parsed ? '' : 'disabled';
+              return `
+                <tr>
+                  <td>${esc(item.score ?? '-')}</td>
+                  <td>${esc(item.caseNo || '-')}</td>
+                  <td>${esc(item.saleDate || '-')}</td>
+                  <td>${esc(item.usage || '-')}</td>
+                  <td>${formatWon(item.minBid)}</td>
+                  <td>${formatWon(item.appraisal)}</td>
+                  <td>${esc(item.failCount ?? '-')}</td>
+                  <td>${esc(Array.isArray(item.reasons) ? item.reasons.join(', ') : '')}</td>
+                  <td><button type="button" class="v2-small-btn" data-date-search-case="${esc(item.caseNo || '')}" ${disabled}>이 사건 조회</button></td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
       </div>
@@ -135,7 +148,7 @@
           <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / ${state.items.length}건</p>
           <p class="v2-note">검증 상태: 서울중앙 기준 결과만 표시합니다. 요청 법원과 응답 법원이 다르면 결과를 폐기합니다.</p>
           ${renderRows(state.items)}
-          <p class="v2-note">목록 후보는 기본 필터 결과입니다. 관심 물건은 사건번호로 다시 조회해 권리분석을 진행하세요.</p>
+          <p class="v2-note">관심 물건은 “이 사건 조회”로 물건검색 탭에 값을 옮긴 뒤, 기본정보 조회 버튼을 눌러 권리분석을 진행하세요.</p>
         </div>
       ` : ''}
     `;
@@ -200,6 +213,44 @@
     }
   }
 
+  function openSearchTabWithCase(caseNo) {
+    const parsed = parseCaseNo(caseNo);
+    if (!parsed) {
+      state.message = '사건번호 형식을 읽지 못했습니다. 물건검색에서 직접 입력해 주세요.';
+      state.messageType = 'error';
+      render(findDatePanel());
+      return;
+    }
+
+    const searchTab = document.querySelector('.v2-tab[data-tab="search"]');
+    searchTab?.click();
+
+    window.setTimeout(() => {
+      const court = document.getElementById('jiwonNmV2');
+      const year = document.getElementById('saYearV2');
+      const serial = document.getElementById('saSerV2');
+      if (court) {
+        const option = Array.from(court.options || []).find((opt) => clean(opt.value || opt.textContent) === SEARCH_COURT);
+        court.value = option ? option.value : SEARCH_COURT;
+        court.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (year) {
+        year.value = parsed.year;
+        year.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      if (serial) {
+        serial.value = parsed.serial;
+        serial.dispatchEvent(new Event('input', { bubbles: true }));
+        serial.focus();
+      }
+      const msg = document.getElementById('v2FormMessage');
+      if (msg) {
+        msg.className = 'v2-form-message show info';
+        msg.textContent = '매각기일 후보의 사건번호를 입력했습니다. 물건 기본정보 조회를 눌러 확인하세요.';
+      }
+    }, 120);
+  }
+
   function bind(panel) {
     ['dateCourtV2', 'dateStartV2', 'dateEndV2', 'dateUsageV2'].forEach((id) => {
       const el = panel.querySelector(`#${id}`);
@@ -214,6 +265,12 @@
       btn.dataset.bound = '1';
       btn.addEventListener('click', () => fetchDateRecommendations(panel));
     }
+
+    panel.querySelectorAll('[data-date-search-case]').forEach((caseButton) => {
+      if (caseButton.dataset.bound) return;
+      caseButton.dataset.bound = '1';
+      caseButton.addEventListener('click', () => openSearchTabWithCase(caseButton.dataset.dateSearchCase));
+    });
   }
 
   function mount() {
