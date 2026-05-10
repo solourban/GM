@@ -175,7 +175,7 @@ function analyzeTenants(tenants, malso) {
         out.reason = '전입일과 말소기준일 비교가 불가능합니다.';
       } else if (cmp < 0) {
         out.daehang = '있음';
-        out.reason = `전입(${t.moveIn}) < 말소기준(${malso.date}) → 대항력 있음으로 추정`;
+        out.reason = `전입일(${t.moveIn})이 말소기준권리(${malso.date})보다 빠릅니다. 배당에서 보증금 전액을 받지 못하면 매수인 인수 가능성이 있습니다.`;
       } else {
         out.daehang = '없음';
         out.reason = `전입(${t.moveIn}) ≥ 말소기준(${malso.date}) → 대항력 없음으로 추정`;
@@ -262,7 +262,11 @@ function calculateInherited(rights, tenants) {
       const received = Math.max(0, (t._choi || 0) + (t._baedang || 0));
       const unpaid = Math.max(0, t.deposit - received);
       if (unpaid > 0) {
-        items.push({ label: `대항력 임차인 미배당 추정 (${t.name || '임차인'})`, amount: unpaid, note: '낙찰자 인수 가능성' });
+        items.push({
+          label: `대항력 임차인 미배당 보증금 추정 (${t.name || '임차인'})`,
+          amount: unpaid,
+          note: '배당 후 미배당 보증금 추정액입니다. 실제 배당 결과에 따라 보증금 전액 인수 가능성도 확인해야 합니다.',
+        });
         total += unpaid;
       }
     }
@@ -311,19 +315,23 @@ function assessRisk(rights, tenants, inherited, minBid, malso) {
 
   const daehang = tenants.filter((t) => t.daehang === '있음');
   if (daehang.length) {
-    flags.push({ sev: inherited.total > 0 ? 'danger' : 'warn', msg: `대항력 있는 것으로 보이는 임차인 ${daehang.length}명` });
-    if (level === 'ok') level = 'warn';
-    if (inherited.total > 0) level = 'danger';
+    const depositSum = daehang.reduce((sum, t) => sum + Math.max(0, Number(t.deposit || 0)), 0);
+    flags.push({
+      sev: depositSum > 0 ? 'danger' : 'warn',
+      msg: `대항력 있는 것으로 보이는 임차인 ${daehang.length}명. 배당 부족 시 보증금 인수 가능성이 있습니다.`,
+    });
+    if (depositSum > 0 || inherited.total > 0) level = 'danger';
+    else if (level === 'ok') level = 'warn';
   }
 
   const safeMinBid = Math.max(0, Number(minBid || 0));
   if (inherited.total > 0 && safeMinBid) {
     const ratio = inherited.total / safeMinBid;
     if (ratio >= 0.3) {
-      flags.push({ sev: 'danger', msg: `인수 추정금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
+      flags.push({ sev: 'danger', msg: `배당 후 미배당 추정액이 최저가의 ${(ratio * 100).toFixed(0)}%입니다.` });
       level = 'danger';
     } else if (ratio >= 0.05) {
-      flags.push({ sev: 'warn', msg: `인수 추정금액이 최저가의 ${(ratio * 100).toFixed(0)}%` });
+      flags.push({ sev: 'warn', msg: `배당 후 미배당 추정액이 최저가의 ${(ratio * 100).toFixed(0)}%입니다.` });
       if (level === 'ok') level = 'warn';
     }
   }
@@ -367,8 +375,10 @@ function generateExplanation(rep) {
   if (rep.tenants.length) {
     const daehang = rep.tenants.filter((t) => t.daehang === '있음');
     if (daehang.length) {
+      const depositSum = daehang.reduce((sum, t) => sum + Math.max(0, Number(t.deposit || 0)), 0);
       lines.push(
-        `<p><b>3. 임차인</b><br>${daehang.length}명이 대항력 있는 임차인으로 추정됩니다. 미배당 보증금은 낙찰자 인수 가능성이 있습니다.</p>`
+        `<p><b>3. 임차인</b><br>${daehang.length}명이 대항력 있는 임차인으로 추정됩니다. ` +
+        `입력 보증금 합계는 ${formatMoney(depositSum)}이며, 배당에서 보증금 전액을 받지 못하면 미배당 잔액이 매수인에게 인수될 수 있습니다.</p>`
       );
     } else {
       lines.push(`<p><b>3. 임차인</b><br>입력값 기준으로는 후순위 임차인으로 보입니다. 전입일·확정일자·배당요구 여부를 원본에서 재확인하세요.</p>`);
@@ -377,7 +387,7 @@ function generateExplanation(rep) {
   const total = {
     ok: '입력값 기준으로 큰 인수 위험은 보이지 않습니다. 다만 원본 서류와 등기부 확인은 필수입니다.',
     warn: `인수 추정금액 ${formatMoney(rep.inherited.total)}을 실질 투자비에 반영해 판단하세요.`,
-    danger: '위험 요소가 있습니다. 실제 입찰 전 전문가 검토가 필요합니다.',
+    danger: `대항력 임차인 또는 인수 가능 권리가 있습니다. 표시된 인수 추정금액은 배당 후 미배당액 기준의 1차 추정이며, 실제 배당 결과에 따라 보증금 전액 인수 가능성까지 확인해야 합니다.`,
   }[rep.risk.level] || '원본 서류 재확인이 필요합니다.';
   lines.push(`<p><b>4. 총평 · ${rep.risk.level.toUpperCase()}</b><br>${total}</p>`);
   return lines.join('');
