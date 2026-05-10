@@ -72,6 +72,63 @@
     `;
   }
 
+  function tenantAllocationRows(report) {
+    const tenants = Array.isArray(report?.tenants) ? report.tenants : [];
+    return tenants
+      .filter((tenant) => tenant?.daehang === '있음' && Number(tenant?.deposit || 0) > 0)
+      .map((tenant) => {
+        const deposit = Number(tenant.deposit || 0);
+        const paid = Math.max(0, Number(tenant._choi || 0) + Number(tenant._baedang || 0));
+        const unpaid = Math.max(0, deposit - paid);
+        return { tenant, deposit, paid, unpaid };
+      });
+  }
+
+  function renderFormula(report) {
+    const rows = tenantAllocationRows(report);
+    if (!rows.length) return '';
+
+    return `
+      <h4 class="v2-detail-title">임차인 인수 추정 계산식</h4>
+      <div class="v2-detail-table-wrap">
+        <table class="v2-detail-table">
+          <thead>
+            <tr><th>임차인</th><th>보증금</th><th>추정 배당액</th><th>인수 추정액</th><th>계산식</th></tr>
+          </thead>
+          <tbody>
+            ${rows.map(({ tenant, deposit, paid, unpaid }) => `
+              <tr>
+                <td>${esc(tenant.name || '임차인')}</td>
+                <td>${formatWon(deposit)}</td>
+                <td>${formatWon(paid)}</td>
+                <td>${formatWon(unpaid)}</td>
+                <td>${formatWon(deposit)} - ${formatWon(paid)} = ${formatWon(unpaid)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function renderPriorityNotes(report) {
+    const rows = tenantAllocationRows(report);
+    if (!rows.length) return '';
+
+    return `
+      <div class="v2-analysis-block">
+        <h4>배당순위 해석</h4>
+        <ul class="v2-analysis-list">
+          ${rows.map(({ tenant }) => `
+            <li>${esc(tenant.name || '임차인')}은 전입일(${esc(tenant.moveIn || '-')})이 말소기준권리(${esc(report?.malso?.date || '-')})보다 빨라 대항력 있는 임차인으로 추정됩니다.</li>
+          `).join('')}
+          <li>확정일자와 전입일이 선순위 권리보다 앞서는 경우, 배당 시뮬레이션에서 임차인 우선변제 항목이 먼저 반영될 수 있습니다.</li>
+          <li>이 계산은 최저가 기준 단순 추정이며, 실제 배당표·집행비용·조세채권·임금채권 등 선순위 항목에 따라 달라질 수 있습니다.</li>
+        </ul>
+      </div>
+    `;
+  }
+
   function renderAllocationCard() {
     const s = state();
     const report = s?.report;
@@ -106,8 +163,12 @@
         <div class="v2-info"><div class="k">인수 추정 총액</div><div class="v">${formatWon(inheritedTotal)}</div></div>
       </div>
 
+      ${renderPriorityNotes(report)}
+
       <h4 class="v2-detail-title">배당 시뮬레이션</h4>
       ${renderAllocations(report)}
+
+      ${renderFormula(report)}
 
       <h4 class="v2-detail-title">인수 가능 항목</h4>
       ${renderInheritedItems(report)}
