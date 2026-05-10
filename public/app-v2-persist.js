@@ -1,5 +1,8 @@
 (() => {
   const STORAGE_PREFIX = 'auction-note:v2:case:';
+  const SCHEMA_VERSION = 2;
+  const MAX_SAVED_CASES = 40;
+  const MAX_AGE_DAYS = 90;
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -10,17 +13,59 @@
     return app()?.state || null;
   }
 
-  function caseKeyFromState() {
+  function normalizeCourt(value) {
+    return clean(value)
+      .replace(/\s+/g, '')
+      .replace(/지방법원법원/g, '지방법원');
+  }
+
+  function normalizeCaseNo(value, yearHint = '') {
+    const raw = clean(value).replace(/\s+/g, '');
+    if (!raw) return '';
+
+    const full = raw.match(/(20\d{2})타경(\d{1,10})/);
+    if (full) return `${full[1]}타경${full[2]}`;
+
+    const digitsOnly = raw.replace(/[^0-9]/g, '');
+    const year = clean(yearHint).match(/20\d{2}/)?.[0] || '';
+    if (year && digitsOnly) return `${year}타경${digitsOnly}`;
+
+    return raw;
+  }
+
+  function yearFromCaseNo(caseNo, fallback = '') {
+    return clean(caseNo).match(/20\d{2}/)?.[0] || clean(fallback).match(/20\d{2}/)?.[0] || '';
+  }
+
+  function caseIdentityFromState() {
     const s = state();
-    const court = clean(s?.court || s?.form?.court || s?.report?.court || s?.caseData?.court || 'unknown-court');
-    const year = clean(s?.year || s?.form?.year || s?.caseData?.year || 'unknown-year');
-    const caseNo = clean(s?.caseNo || s?.form?.caseNo || s?.report?.case || s?.caseData?.caseNo || s?.caseData?.case || 'unknown-case');
-    if (caseNo === 'unknown-case') return '';
-    return `${STORAGE_PREFIX}${court}:${year}:${caseNo}`;
+    if (!s) return null;
+
+    const rawCaseNo = s.caseNo || s.form?.caseNo || s.report?.case || s.caseData?.caseNo || s.caseData?.case;
+    const rawYear = s.year || s.form?.year || s.caseData?.year;
+    const caseNo = normalizeCaseNo(rawCaseNo, rawYear);
+    const year = yearFromCaseNo(caseNo, rawYear);
+    const court = normalizeCourt(s.court || s.form?.court || s.report?.court || s.caseData?.court);
+
+    if (!court || !caseNo) return null;
+    return { court, year, caseNo, key: `${STORAGE_PREFIX}${court}:${year || 'no-year'}:${caseNo}` };
+  }
+
+  function caseKeyFromState() {
+    return caseIdentityFromState()?.key || '';
   }
 
   function safeManual(manual) {
     const src = manual || {};
+    const tenants = Array.isArray(src?.tenants) && src.tenants.length
+      ? src.tenants.map((tenant) => ({
+        name: clean(tenant?.name),
+        moveIn: clean(tenant?.moveIn),
+        fixed: clean(tenant?.fixed),
+        deposit: clean(tenant?.deposit),
+      }))
+      : [{ name: '', moveIn: '', fixed: '', deposit: '' }];
+
     return {
       malso: {
         date: clean(src?.malso?.date),
@@ -28,12 +73,7 @@
         holder: clean(src?.malso?.holder),
         amount: clean(src?.malso?.amount),
       },
-      tenants: Array.isArray(src?.tenants) ? src.tenants.map((tenant) => ({
-        name: clean(tenant?.name),
-        moveIn: clean(tenant?.moveIn),
-        fixed: clean(tenant?.fixed),
-        deposit: clean(tenant?.deposit),
-      })) : [{ name: '', moveIn: '', fixed: '', deposit: '' }],
+      tenants,
       specials: Array.isArray(src?.specials) ? src.specials.map((special) => ({
         type: clean(special?.type) || '유치권',
         holder: clean(special?.holder),
@@ -47,7 +87,7 @@
     const safe = safeManual(manual);
     const malsoHas = [safe.malso.date, safe.malso.holder, safe.malso.amount].some(clean);
     const tenantHas = safe.tenants.some((tenant) => [tenant.name, tenant.moveIn, tenant.fixed, tenant.deposit].some(clean));
-    const specialHas = safe.specials.some((special) => [special.type, special.holder, special.date, special.amount].some(clean));
+    const specialHas = safe.specials.some((special) => [special.holder, special.date, special.amount].some(clean));
     return malsoHas || tenantHas || specialHas;
   }
 
@@ -58,26 +98,34 @@
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
+      if (parsed.schemaVersion && parsed.schemaVersion > SCHEMA_VERSION) return null;
       return parsed;
     } catch (_) {
+      try { localStorage.removeItem(key); } catch (__) {}
       return null;
     }
   }
 
   function saveCaseState() {
     const s = state();
-    const key = caseKeyFromState();
-    if (!s || !key) return;
+    const identity = caseIdentityFromState();
+    if (!s || !identity?.key) return;
+
+    const manual = safeManual(s.manual);
+    const hasUsefulData = hasManualValue(manual) || Boolean(s.report);
+    if (!hasUsefulData) return;
 
     const payload = {
+      schemaVersion: SCHEMA_VERSION,
       savedAt: new Date().toISOString(),
-      manual: safeManual(s.manual),
+      identity,
+      manual,
       report: s.report || null,
-      validationWarnings: Array.isArray(s.validationWarnings) ? s.validationWarnings : [],
+      validationWarnings: Array.isArray(s.validationWarnings) ? s.validationWarnings.filter(clean) : [],
     };
 
     try {
-      localStorage.setItem(key, JSON.stringify(payload));
+      localStorage.setItem(identity.key, JSON.stringify(payload));
     } catch (_) {
       // 저장 실패는 화면 기능을 막지 않는다.
     }
@@ -104,7 +152,7 @@
     }
 
     if (!Array.isArray(s.validationWarnings) && Array.isArray(saved.validationWarnings)) {
-      s.validationWarnings = saved.validationWarnings;
+      s.validationWarnings = saved.validationWarnings.filter(clean);
     }
 
     if (typeof api.renderResults === 'function') {
@@ -169,6 +217,31 @@
     actions.appendChild(btn);
   }
 
+  function pruneOldSavedCases() {
+    try {
+      const now = Date.now();
+      const maxAgeMs = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+      const entries = [];
+
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
+        const saved = loadCaseState(key);
+        const savedTime = saved?.savedAt ? new Date(saved.savedAt).getTime() : 0;
+        if (!saved || !savedTime || now - savedTime > maxAgeMs) {
+          localStorage.removeItem(key);
+          continue;
+        }
+        entries.push({ key, savedTime });
+      }
+
+      entries
+        .sort((a, b) => b.savedTime - a.savedTime)
+        .slice(MAX_SAVED_CASES)
+        .forEach((entry) => localStorage.removeItem(entry.key));
+    } catch (_) {}
+  }
+
   function run() {
     restoreCaseState();
     injectStatus();
@@ -195,4 +268,6 @@
     saveCaseState();
     run();
   }, 1000);
+
+  setInterval(pruneOldSavedCases, 60_000);
 })();
