@@ -120,6 +120,7 @@
     const identity = caseIdentityFromState();
     if (!s || !identity?.key) return;
     if (s.__persistSwitchingCase) return;
+    if (s.__persistActiveCaseKey && s.__persistActiveCaseKey !== identity.key) return;
 
     const manual = safeManual(s.manual);
     const hasUsefulData = hasManualValue(manual) || Boolean(s.report);
@@ -242,28 +243,8 @@
     }
   }
 
-  function addResetButton() {
-    const s = state();
-    const key = caseKeyFromState();
-    const step2 = document.getElementById('step2InputCard');
-    if (!s || !key || !step2) return;
-    if (document.getElementById('v2PersistResetBtn')) return;
-
-    const actions = step2.querySelector('.v2-actions') || step2;
-    const btn = document.createElement('button');
-    btn.id = 'v2PersistResetBtn';
-    btn.type = 'button';
-    btn.className = 'v2-btn ghost';
-    btn.textContent = '입력 초기화';
-    btn.addEventListener('click', () => {
-      try { localStorage.removeItem(key); } catch (_) {}
-      s.manual = defaultManual();
-      s.report = null;
-      s.validationWarnings = [];
-      s.__persistRestoredKey = key;
-      if (typeof app()?.renderResults === 'function') app().renderResults({ keepScroll: true });
-    });
-    actions.appendChild(btn);
+  function removeResetButtonIfExists() {
+    document.getElementById('v2PersistResetBtn')?.remove();
   }
 
   function pruneOldSavedCases() {
@@ -292,31 +273,31 @@
   }
 
   function run() {
+    removeResetButtonIfExists();
     if (handleCaseSwitch()) return;
     restoreCaseState();
     injectStatus();
-    addResetButton();
   }
 
   document.addEventListener('input', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
-    setTimeout(saveCaseState, 0);
+    setTimeout(() => { run(); saveCaseState(); }, 0);
   }, true);
 
   document.addEventListener('change', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
-    setTimeout(saveCaseState, 0);
+    setTimeout(() => { run(); saveCaseState(); }, 0);
   }, true);
 
   document.addEventListener('click', (event) => {
     if (!event.target.closest('[data-action="analyze"]')) return;
-    setTimeout(saveCaseState, 500);
-    setTimeout(saveCaseState, 1500);
+    setTimeout(() => { run(); saveCaseState(); }, 500);
+    setTimeout(() => { run(); saveCaseState(); }, 1500);
   }, true);
 
   setInterval(() => {
-    saveCaseState();
     run();
+    saveCaseState();
   }, 1000);
 
   setInterval(pruneOldSavedCases, 60_000);
