@@ -5,7 +5,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node src/server.js"
+    "dev": "node src/server.js",
+    "test": "node tests/analyzer.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",
