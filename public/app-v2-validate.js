@@ -142,6 +142,43 @@
     if (box) box.remove();
   }
 
+  function setPersistedWarnings(warnings) {
+    const s = state();
+    if (!s) return;
+    s.validationWarnings = Array.isArray(warnings) ? warnings.filter(clean) : [];
+  }
+
+  function clearPersistedWarnings() {
+    const s = state();
+    if (s) s.validationWarnings = [];
+    document.getElementById('v2AnalyzeWarningKeepMessage')?.remove();
+  }
+
+  function renderPersistedWarnings() {
+    const s = state();
+    const warnings = Array.isArray(s?.validationWarnings) ? s.validationWarnings.filter(clean) : [];
+    const old = document.getElementById('v2AnalyzeWarningKeepMessage');
+    if (!warnings.length) {
+      old?.remove();
+      return;
+    }
+
+    const analysis = document.getElementById('analysisCard');
+    if (!analysis) return;
+
+    if (old) {
+      old.innerHTML = `<h3>입력값 경고</h3><p class="v2-note">분석은 실행했지만 아래 항목은 결과 신뢰도에 영향을 줄 수 있습니다.</p><ul class="v2-analysis-list">${warnings.map((msg) => `<li>${msg}</li>`).join('')}</ul>`;
+      return;
+    }
+
+    const box = document.createElement('section');
+    box.id = 'v2AnalyzeWarningKeepMessage';
+    box.className = 'v2-result-card';
+    box.style.borderLeft = '4px solid #d97706';
+    box.innerHTML = `<h3>입력값 경고</h3><p class="v2-note">분석은 실행했지만 아래 항목은 결과 신뢰도에 영향을 줄 수 있습니다.</p><ul class="v2-analysis-list">${warnings.map((msg) => `<li>${msg}</li>`).join('')}</ul>`;
+    analysis.parentNode.insertBefore(box, analysis);
+  }
+
   function preservePreviousAnalysisOnFailure() {
     const s = state();
     const api = app();
@@ -194,12 +231,14 @@
     if (!result.ok) {
       event.preventDefault();
       event.stopImmediatePropagation();
+      setPersistedWarnings([]);
       showStep2Message(result.errors, 'error');
       patchNextStepTenantCount();
       return;
     }
 
     patchStateBeforeAnalyze();
+    setPersistedWarnings(result.warnings);
 
     if (result.warnings.length) {
       showStep2Message(result.warnings, 'warn');
@@ -211,6 +250,7 @@
   document.addEventListener('input', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
     clearStep2Message();
+    clearPersistedWarnings();
     setTimeout(patchNextStepTenantCount, 0);
   }, true);
 
@@ -225,5 +265,6 @@
   setInterval(() => {
     preservePreviousAnalysisOnFailure();
     patchNextStepTenantCount();
+    renderPersistedWarnings();
   }, 400);
 })();
