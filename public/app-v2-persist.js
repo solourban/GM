@@ -281,12 +281,12 @@
 
   document.addEventListener('input', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
-    setTimeout(() => { run(); saveCaseState(); }, 0);
+    setTimeout(saveCaseState, 0);
   }, true);
 
   document.addEventListener('change', (event) => {
     if (!event.target.closest('[data-manual-path]')) return;
-    setTimeout(() => { run(); saveCaseState(); }, 0);
+    setTimeout(saveCaseState, 0);
   }, true);
 
   document.addEventListener('click', (event) => {
