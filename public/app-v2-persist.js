@@ -13,6 +13,14 @@
     return app()?.state || null;
   }
 
+  function defaultManual() {
+    return {
+      malso: { date: '', type: '근저당권', holder: '', amount: '' },
+      tenants: [{ name: '', moveIn: '', fixed: '', deposit: '' }],
+      specials: [],
+    };
+  }
+
   function normalizeCourt(value) {
     return clean(value)
       .replace(/\s+/g, '')
@@ -41,11 +49,12 @@
     const s = state();
     if (!s) return null;
 
-    const rawCaseNo = s.caseNo || s.form?.caseNo || s.report?.case || s.caseData?.caseNo || s.caseData?.case;
+    const basic = s.raw?.basic || {};
+    const rawCaseNo = s.raw?.caseNo || basic['사건번호'] || s.report?.case || s.caseNo || s.form?.caseNo || s.caseData?.caseNo || s.caseData?.case;
     const rawYear = s.year || s.form?.year || s.caseData?.year;
     const caseNo = normalizeCaseNo(rawCaseNo, rawYear);
     const year = yearFromCaseNo(caseNo, rawYear);
-    const court = normalizeCourt(s.court || s.form?.court || s.report?.court || s.caseData?.court);
+    const court = normalizeCourt(s.raw?.court || basic['법원'] || s.report?.court || s.court || s.form?.court || s.caseData?.court);
 
     if (!court || !caseNo) return null;
     return { court, year, caseNo, key: `${STORAGE_PREFIX}${court}:${year || 'no-year'}:${caseNo}` };
@@ -110,6 +119,7 @@
     const s = state();
     const identity = caseIdentityFromState();
     if (!s || !identity?.key) return;
+    if (s.__persistSwitchingCase) return;
 
     const manual = safeManual(s.manual);
     const hasUsefulData = hasManualValue(manual) || Boolean(s.report);
@@ -131,6 +141,48 @@
     }
   }
 
+  function applySavedOrBlankForCurrentCase(key) {
+    const s = state();
+    if (!s || !key) return false;
+
+    const saved = loadCaseState(key);
+    s.__persistSwitchingCase = true;
+    if (saved?.manual) {
+      s.manual = safeManual(saved.manual);
+      s.report = saved.report || null;
+      s.validationWarnings = Array.isArray(saved.validationWarnings) ? saved.validationWarnings.filter(clean) : [];
+    } else {
+      s.manual = defaultManual();
+      s.report = null;
+      s.validationWarnings = [];
+    }
+    s.__persistRestoredKey = key;
+    s.__persistSwitchingCase = false;
+    return Boolean(saved);
+  }
+
+  function handleCaseSwitch() {
+    const s = state();
+    const api = app();
+    const key = caseKeyFromState();
+    if (!s || !api || !key) return false;
+
+    if (!s.__persistActiveCaseKey) {
+      s.__persistActiveCaseKey = key;
+      return false;
+    }
+
+    if (s.__persistActiveCaseKey === key) return false;
+
+    s.__persistActiveCaseKey = key;
+    applySavedOrBlankForCurrentCase(key);
+
+    if (typeof api.renderResults === 'function') {
+      api.renderResults({ keepScroll: true });
+    }
+    return true;
+  }
+
   function restoreCaseState() {
     const s = state();
     const api = app();
@@ -140,6 +192,7 @@
 
     const saved = loadCaseState(key);
     s.__persistRestoredKey = key;
+    s.__persistActiveCaseKey = key;
     if (!saved) return false;
 
     const currentHasManual = hasManualValue(s.manual);
@@ -204,11 +257,7 @@
     btn.textContent = '입력 초기화';
     btn.addEventListener('click', () => {
       try { localStorage.removeItem(key); } catch (_) {}
-      s.manual = {
-        malso: { date: '', type: '근저당권', holder: '', amount: '' },
-        tenants: [{ name: '', moveIn: '', fixed: '', deposit: '' }],
-        specials: [],
-      };
+      s.manual = defaultManual();
       s.report = null;
       s.validationWarnings = [];
       s.__persistRestoredKey = key;
@@ -243,6 +292,7 @@
   }
 
   function run() {
+    if (handleCaseSwitch()) return;
     restoreCaseState();
     injectStatus();
     addResetButton();
