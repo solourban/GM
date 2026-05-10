@@ -1,4 +1,5 @@
 (() => {
+  const SUPPORTED_COURT = '서울중앙';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function todayInput() {
@@ -12,6 +13,14 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  function normalizeCourt(value) {
+    return clean(value).replace(/\s+/g, '').replace(/지방법원|법원|지원/g, '');
+  }
+
+  function isSupportedCourt(value) {
+    return normalizeCourt(value) === normalizeCourt(SUPPORTED_COURT);
+  }
+
   const state = {
     mounted: false,
     loading: false,
@@ -20,7 +29,7 @@
     items: [],
     meta: null,
     form: {
-      court: '서울중앙',
+      court: SUPPORTED_COURT,
       start: todayInput(),
       end: addDaysInput(7),
       usage: 'all',
@@ -37,6 +46,12 @@
     return clean(value).replace(/[^0-9]/g, '');
   }
 
+  function displayDate(value) {
+    const digits = compactDate(value);
+    if (/^\d{8}$/.test(digits)) return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
+    return clean(value);
+  }
+
   function formatWon(value) {
     const n = Number(value || 0);
     return Number.isFinite(n) && n > 0 ? `${n.toLocaleString('ko-KR')}원` : '-';
@@ -50,8 +65,10 @@
   function userMessageFromError(errorText) {
     const text = clean(errorText);
     if (!text) return '매각기일 목록을 불러오지 못했습니다. 법원명과 기간을 확인해 주세요.';
-    if (text.includes('지원하지 않는 법원명')) return '지원하지 않는 법원명입니다. 법원명을 다시 선택해 주세요.';
-    if (text.includes('검증 가능한 매각기일 목록 데이터가 없습니다')) return '해당 조건에서 검증 가능한 매각기일 목록을 찾지 못했습니다. 기간을 넓히거나 법원을 다시 선택해 주세요.';
+    if (text.includes('현재 지원 범위')) return text;
+    if (text.includes('지원하지 않는 법원명')) return '현재 매각기일 추천은 서울중앙만 검증 중입니다. 다른 법원은 안정화 후 개방합니다.';
+    if (text.includes('검증 가능한 매각기일 목록 데이터가 없습니다')) return '해당 조건에서 검증 가능한 매각기일 목록을 찾지 못했습니다. 기간을 넓히거나 조건을 바꿔 주세요.';
+    if (text.includes('응답 법원 불일치')) return '조회 결과의 법원 정보가 요청값과 일치하지 않아 결과를 표시하지 않았습니다.';
     return '매각기일 목록을 불러오지 못했습니다. 조건을 바꿔 다시 조회해 주세요.';
   }
 
@@ -100,12 +117,13 @@
         <h3>매각기일 추천</h3>
         <p>법원과 기간을 기준으로 이번에 볼 만한 매각기일 후보를 조회합니다. 결과는 후보 선별용이며, 단일 사건 조회로 다시 검토해야 합니다.</p>
         <div class="v2-form" style="grid-template-columns:minmax(180px,1fr) minmax(140px,.7fr) minmax(140px,.7fr) minmax(140px,.7fr) auto;">
-          <label class="v2-field"><span>법원</span><input id="dateCourtV2" type="text" value="${esc(state.form.court)}" placeholder="예: 서울중앙, 천안지원"></label>
+          <label class="v2-field"><span>법원</span><select id="dateCourtV2"><option value="${SUPPORTED_COURT}" ${selected(state.form.court, SUPPORTED_COURT)}>서울중앙</option></select></label>
           <label class="v2-field"><span>시작일</span><input id="dateStartV2" type="date" value="${esc(state.form.start)}"></label>
           <label class="v2-field"><span>종료일</span><input id="dateEndV2" type="date" value="${esc(state.form.end)}"></label>
           <label class="v2-field"><span>용도</span><select id="dateUsageV2"><option value="all" ${selected(state.form.usage, 'all')}>전체</option><option value="20100" ${selected(state.form.usage, '20100')}>주거형</option><option value="20104" ${selected(state.form.usage, '20104')}>아파트</option></select></label>
           <button id="dateFetchV2" class="v2-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? '조회 중...' : '매각기일 조회'}</button>
         </div>
+        <p class="v2-note">지원 범위: 현재 서울중앙만 검증 중입니다. 다른 법원은 조회 안정화 후 개방합니다.</p>
         <div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>
         <p class="v2-note">매각기일 조회는 물건검색 결과와 권리분석 결과를 변경하지 않습니다.</p>
       </div>
@@ -114,7 +132,8 @@
         <div class="v2-result-card">
           <span class="v2-badge">매각기일</span>
           <h3>조회 결과</h3>
-          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${esc(state.meta?.start || '')} ~ ${esc(state.meta?.end || '')} / ${state.items.length}건</p>
+          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / ${state.items.length}건</p>
+          <p class="v2-note">검증 상태: 서울중앙 기준 결과만 표시합니다. 요청 법원과 응답 법원이 다르면 결과를 폐기합니다.</p>
           ${renderRows(state.items)}
           <p class="v2-note">목록 후보는 기본 필터 결과입니다. 관심 물건은 사건번호로 다시 조회해 권리분석을 진행하세요.</p>
         </div>
@@ -129,6 +148,7 @@
     const start = compactDate(state.form.start);
     const end = compactDate(state.form.end);
     if (!court) return '법원을 입력해주세요.';
+    if (!isSupportedCourt(court)) return '현재 지원 범위는 서울중앙 매각기일 추천입니다. 다른 법원은 안정화 후 개방합니다.';
     if (!/^\d{8}$/.test(start)) return '시작일을 선택해주세요.';
     if (!/^\d{8}$/.test(end)) return '종료일을 선택해주세요.';
     if (start > end) return '종료일은 시작일 이후여야 합니다.';
@@ -138,19 +158,24 @@
   async function fetchDateRecommendations(panel) {
     const error = validate();
     if (error) {
+      state.items = [];
+      state.meta = null;
       state.message = error;
       state.messageType = 'error';
       render(panel);
       return;
     }
 
-    const court = clean(state.form.court);
+    const court = SUPPORTED_COURT;
+    state.form.court = SUPPORTED_COURT;
     const start = compactDate(state.form.start);
     const end = compactDate(state.form.end);
     const usage = clean(state.form.usage) || 'all';
     const params = new URLSearchParams({ court, start, end, usage, maxBidRate: '1', limit: '20' });
 
     state.loading = true;
+    state.items = [];
+    state.meta = null;
     state.message = '매각기일 목록을 조회하고 있습니다.';
     state.messageType = 'info';
     render(panel);
@@ -159,9 +184,10 @@
       const res = await fetch(`/api/recommendations/by-date?${params.toString()}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || '조회 실패');
+      if (!isSupportedCourt(data.court || court)) throw new Error('응답 법원 불일치');
       state.items = Array.isArray(data.items) ? data.items : [];
-      state.meta = { court: data.court || court, start: data.start || start, end: data.end || end };
-      state.message = state.items.length ? '매각기일 조회가 완료되었습니다.' : '조회된 후보가 없습니다. 기간이나 법원을 바꿔 다시 조회해 주세요.';
+      state.meta = { court: SUPPORTED_COURT, start: data.start || start, end: data.end || end };
+      state.message = state.items.length ? '매각기일 조회가 완료되었습니다.' : '조회된 후보가 없습니다. 기간이나 조건을 바꿔 다시 조회해 주세요.';
       state.messageType = state.items.length ? 'info' : 'warn';
     } catch (error) {
       state.items = [];
