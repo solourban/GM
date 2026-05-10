@@ -121,14 +121,6 @@ function itemCourtName(item) {
   return clean(pick(item, ['jibunCortNm', 'cortOfcNm', 'courtNm', 'cortNm', 'jdbnNm', 'bubwonNm']));
 }
 
-function hasAuctionShape(item) {
-  const text = clean(Object.values(item || {}).join(' '));
-  return /(20\d{2})\s*타경/.test(text) || Boolean(
-    pick(item, ['srnSaNo', 'printCsNo', 'userCsNo', 'csNo', 'userCsNoVal']) &&
-    (pick(item, ['dspslDxdyYmd', 'maeGiil', 'dxdyYmd']) || pick(item, ['notifyMinmaePrice1', 'fstPbancLwsDspslPrc', 'lwsDspslPrc']))
-  );
-}
-
 function itemCourtMatches(item, requestedCourt, requestedCourtCode) {
   const rawCourt = itemCourtName(item);
   const req = courtStem(requestedCourt);
@@ -141,10 +133,8 @@ function itemCourtMatches(item, requestedCourt, requestedCourtCode) {
   const code = itemCourtCode(item);
   if (code && requestedCourtCode && code === requestedCourtCode) return true;
 
-  // 대법원 매각목록 API는 법원별로 court code 필드가 비거나 다른 필드로 내려오는 경우가 있다.
-  // 이름 필드가 없고 사건번호/매각기일/가격정보 형태가 확인되면 일단 후보로 살린 뒤 결과에 raw boCd를 남긴다.
-  if (!rawCourt && hasAuctionShape(item)) return true;
-
+  // 법원명도 코드도 검증되지 않은 매각기일 목록은 표시하지 않는다.
+  // 잘못된 법원 결과를 보여주는 것보다 '검증 실패'가 안전하다.
   return false;
 }
 
@@ -252,9 +242,7 @@ function parseHtmlItems(text, requestedCourt) {
     out.push({ court: requestedCourt, caseNo, address: '주소 확인 필요', usage, appraisal, minBid, saleDate: date ? formatYmd(date) : '', failCount, margin: appraisal && minBid ? appraisal - minBid : 0, bidRate, score: score.score, decision: score.decision, reasons: score.reasons, source: 'html' });
   }
   return out;
-}
-
-function extractItems(response, requestedCourt, requestedCourtCode) {
+}\nfunction extractItems(response, requestedCourt, requestedCourtCode) {
   const items = [];
   const rejected = [];
   const courtCodeMismatches = {};
@@ -335,7 +323,7 @@ async function findAuctionsByDate(options = {}) {
   const endYmd = compactDate(options.end) || addDaysYmd(7);
   const courtName = normalizeCourtName(options.court || '서울중앙');
   const cortOfcCd = COURT_CODES[courtName];
-  const debug = { engine: 'date-recommendations-v4-relaxed-court-filter', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
+  const debug = { engine: 'date-recommendations-v5-strict-court-verification', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
 
   if (!cortOfcCd) return { ok: false, verified: false, error: `지원하지 않는 법원명입니다: ${options.court}`, debug, items: [] };
 
@@ -387,7 +375,7 @@ async function findAuctionsByDate(options = {}) {
     ok: false,
     verified: false,
     error: sawRawItems
-      ? '매각기일 응답은 확인했지만 현재 필터로 검증 가능한 후보를 만들지 못했습니다. 단일 사건 조회 또는 기간 확대가 필요합니다.'
+      ? '선택한 법원의 매각기일 목록인지 검증하지 못해 결과를 표시하지 않았습니다. 단일 사건번호 조회로 확인해 주세요.'
       : '해당 법원·기간에서 확인 가능한 매각기일 목록 데이터가 없습니다.',
     court: courtName,
     start: formatYmd(startYmd),
