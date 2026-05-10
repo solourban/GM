@@ -29,6 +29,7 @@
     messageType: 'info',
     items: [],
     meta: null,
+    handoff: null,
     form: {
       court: SUPPORTED_COURT,
       start: todayInput(),
@@ -213,6 +214,60 @@
     }
   }
 
+  function showSearchMessage(message, type = 'info') {
+    const msg = document.getElementById('v2FormMessage');
+    if (!msg) return false;
+    msg.className = `v2-form-message show ${type}`;
+    msg.textContent = message;
+    return true;
+  }
+
+  function setSearchCourt(courtSelect) {
+    if (!courtSelect) return false;
+    const options = Array.from(courtSelect.options || []);
+    const option = options.find((opt) => clean(opt.value || opt.textContent) === SEARCH_COURT);
+    if (option) {
+      courtSelect.value = option.value;
+    } else if (options.length) {
+      const normalizedTarget = normalizeCourt(SEARCH_COURT);
+      const looseOption = options.find((opt) => normalizeCourt(opt.value || opt.textContent) === normalizedTarget);
+      if (looseOption) courtSelect.value = looseOption.value;
+      else return false;
+    } else {
+      return false;
+    }
+    courtSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+
+  function applySearchHandoff(attempt = 0) {
+    const handoff = state.handoff;
+    if (!handoff) return;
+
+    const court = document.getElementById('jiwonNmV2');
+    const year = document.getElementById('saYearV2');
+    const serial = document.getElementById('saSerV2');
+    const ready = court && year && serial && setSearchCourt(court);
+
+    if (!ready) {
+      if (attempt < 12) {
+        window.setTimeout(() => applySearchHandoff(attempt + 1), 120);
+      } else {
+        showSearchMessage('사건번호 자동 입력에 실패했습니다. 물건검색에서 직접 입력해 주세요.', 'error');
+        state.handoff = null;
+      }
+      return;
+    }
+
+    year.value = handoff.year;
+    year.dispatchEvent(new Event('input', { bubbles: true }));
+    serial.value = handoff.serial;
+    serial.dispatchEvent(new Event('input', { bubbles: true }));
+    serial.focus();
+    showSearchMessage('매각기일 후보의 사건번호를 입력했습니다. 물건 기본정보 조회를 눌러 확인하세요.', 'info');
+    state.handoff = null;
+  }
+
   function openSearchTabWithCase(caseNo) {
     const parsed = parseCaseNo(caseNo);
     if (!parsed) {
@@ -222,33 +277,10 @@
       return;
     }
 
+    state.handoff = { ...parsed, caseNo: clean(caseNo) };
     const searchTab = document.querySelector('.v2-tab[data-tab="search"]');
     searchTab?.click();
-
-    window.setTimeout(() => {
-      const court = document.getElementById('jiwonNmV2');
-      const year = document.getElementById('saYearV2');
-      const serial = document.getElementById('saSerV2');
-      if (court) {
-        const option = Array.from(court.options || []).find((opt) => clean(opt.value || opt.textContent) === SEARCH_COURT);
-        court.value = option ? option.value : SEARCH_COURT;
-        court.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      if (year) {
-        year.value = parsed.year;
-        year.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-      if (serial) {
-        serial.value = parsed.serial;
-        serial.dispatchEvent(new Event('input', { bubbles: true }));
-        serial.focus();
-      }
-      const msg = document.getElementById('v2FormMessage');
-      if (msg) {
-        msg.className = 'v2-form-message show info';
-        msg.textContent = '매각기일 후보의 사건번호를 입력했습니다. 물건 기본정보 조회를 눌러 확인하세요.';
-      }
-    }, 120);
+    window.setTimeout(() => applySearchHandoff(0), 80);
   }
 
   function bind(panel) {
