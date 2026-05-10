@@ -1,21 +1,6 @@
 (() => {
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
-  const state = {
-    mounted: false,
-    loading: false,
-    message: '',
-    messageType: 'info',
-    items: [],
-    meta: null,
-  };
-
-  function esc(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    }[c]));
-  }
-
   function todayInput() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -25,6 +10,27 @@
     const d = new Date();
     d.setDate(d.getDate() + Number(days || 0));
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const state = {
+    mounted: false,
+    loading: false,
+    message: '',
+    messageType: 'info',
+    items: [],
+    meta: null,
+    form: {
+      court: '서울중앙',
+      start: todayInput(),
+      end: addDaysInput(7),
+      usage: 'all',
+    },
+  };
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
   }
 
   function compactDate(value) {
@@ -47,6 +53,17 @@
     if (text.includes('지원하지 않는 법원명')) return '지원하지 않는 법원명입니다. 법원명을 다시 선택해 주세요.';
     if (text.includes('검증 가능한 매각기일 목록 데이터가 없습니다')) return '해당 조건에서 검증 가능한 매각기일 목록을 찾지 못했습니다. 기간을 넓히거나 법원을 다시 선택해 주세요.';
     return '매각기일 목록을 불러오지 못했습니다. 조건을 바꿔 다시 조회해 주세요.';
+  }
+
+  function selected(value, target) {
+    return String(value) === String(target) ? 'selected' : '';
+  }
+
+  function captureForm() {
+    state.form.court = clean(document.getElementById('dateCourtV2')?.value) || state.form.court;
+    state.form.start = document.getElementById('dateStartV2')?.value || state.form.start;
+    state.form.end = document.getElementById('dateEndV2')?.value || state.form.end;
+    state.form.usage = document.getElementById('dateUsageV2')?.value || state.form.usage;
   }
 
   function renderRows(items) {
@@ -83,10 +100,10 @@
         <h3>매각기일 추천</h3>
         <p>법원과 기간을 기준으로 이번에 볼 만한 매각기일 후보를 조회합니다. 결과는 후보 선별용이며, 단일 사건 조회로 다시 검토해야 합니다.</p>
         <div class="v2-form" style="grid-template-columns:minmax(180px,1fr) minmax(140px,.7fr) minmax(140px,.7fr) minmax(140px,.7fr) auto;">
-          <label class="v2-field"><span>법원</span><input id="dateCourtV2" type="text" value="천안" placeholder="예: 천안, 서울중앙"></label>
-          <label class="v2-field"><span>시작일</span><input id="dateStartV2" type="date" value="${todayInput()}"></label>
-          <label class="v2-field"><span>종료일</span><input id="dateEndV2" type="date" value="${addDaysInput(7)}"></label>
-          <label class="v2-field"><span>용도</span><select id="dateUsageV2"><option value="all">전체</option><option value="20100">주거형</option><option value="20104">아파트</option></select></label>
+          <label class="v2-field"><span>법원</span><input id="dateCourtV2" type="text" value="${esc(state.form.court)}" placeholder="예: 서울중앙, 천안지원"></label>
+          <label class="v2-field"><span>시작일</span><input id="dateStartV2" type="date" value="${esc(state.form.start)}"></label>
+          <label class="v2-field"><span>종료일</span><input id="dateEndV2" type="date" value="${esc(state.form.end)}"></label>
+          <label class="v2-field"><span>용도</span><select id="dateUsageV2"><option value="all" ${selected(state.form.usage, 'all')}>전체</option><option value="20100" ${selected(state.form.usage, '20100')}>주거형</option><option value="20104" ${selected(state.form.usage, '20104')}>아파트</option></select></label>
           <button id="dateFetchV2" class="v2-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? '조회 중...' : '매각기일 조회'}</button>
         </div>
         <div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>
@@ -97,7 +114,7 @@
         <div class="v2-result-card">
           <span class="v2-badge">매각기일</span>
           <h3>조회 결과</h3>
-          <p class="v2-note">${esc(state.meta?.court || '')} ${esc(state.meta?.start || '')} ~ ${esc(state.meta?.end || '')} / ${state.items.length}건</p>
+          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${esc(state.meta?.start || '')} ~ ${esc(state.meta?.end || '')} / ${state.items.length}건</p>
           ${renderRows(state.items)}
           <p class="v2-note">목록 후보는 기본 필터 결과입니다. 관심 물건은 사건번호로 다시 조회해 권리분석을 진행하세요.</p>
         </div>
@@ -107,9 +124,10 @@
   }
 
   function validate() {
-    const court = clean(document.getElementById('dateCourtV2')?.value);
-    const start = compactDate(document.getElementById('dateStartV2')?.value);
-    const end = compactDate(document.getElementById('dateEndV2')?.value);
+    captureForm();
+    const court = clean(state.form.court);
+    const start = compactDate(state.form.start);
+    const end = compactDate(state.form.end);
     if (!court) return '법원을 입력해주세요.';
     if (!/^\d{8}$/.test(start)) return '시작일을 선택해주세요.';
     if (!/^\d{8}$/.test(end)) return '종료일을 선택해주세요.';
@@ -126,10 +144,10 @@
       return;
     }
 
-    const court = clean(document.getElementById('dateCourtV2')?.value);
-    const start = compactDate(document.getElementById('dateStartV2')?.value);
-    const end = compactDate(document.getElementById('dateEndV2')?.value);
-    const usage = clean(document.getElementById('dateUsageV2')?.value) || 'all';
+    const court = clean(state.form.court);
+    const start = compactDate(state.form.start);
+    const end = compactDate(state.form.end);
+    const usage = clean(state.form.usage) || 'all';
     const params = new URLSearchParams({ court, start, end, usage, maxBidRate: '1', limit: '20' });
 
     state.loading = true;
@@ -157,6 +175,14 @@
   }
 
   function bind(panel) {
+    ['dateCourtV2', 'dateStartV2', 'dateEndV2', 'dateUsageV2'].forEach((id) => {
+      const el = panel.querySelector(`#${id}`);
+      if (!el || el.dataset.bound) return;
+      el.dataset.bound = '1';
+      el.addEventListener('input', captureForm);
+      el.addEventListener('change', captureForm);
+    });
+
     const btn = panel.querySelector('#dateFetchV2');
     if (btn && !btn.dataset.bound) {
       btn.dataset.bound = '1';
