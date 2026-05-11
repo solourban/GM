@@ -30,6 +30,7 @@
     items: [],
     meta: null,
     handoff: null,
+    selectedCandidate: null,
     form: {
       court: SUPPORTED_COURT,
       start: todayInput(),
@@ -66,6 +67,10 @@
     return { year: match[1], serial: match[2] };
   }
 
+  function sameCase(left, right) {
+    return clean(left).replace(/\s+/g, '') === clean(right).replace(/\s+/g, '');
+  }
+
   function findDatePanel() {
     const panels = Array.from(document.querySelectorAll('.v2-panel'));
     return panels.find((panel) => panel.querySelector('h3')?.textContent?.includes('매각기일 추천')) || null;
@@ -92,20 +97,40 @@
     state.form.usage = document.getElementById('dateUsageV2')?.value || state.form.usage;
   }
 
+  function renderSelectedCandidate() {
+    const item = state.selectedCandidate;
+    if (!item) return '';
+    return `
+      <div class="v2-card">
+        <span class="v2-badge">최근 선택 후보</span>
+        <h3>${esc(item.caseNo || '사건번호 미확인')}</h3>
+        <p class="v2-note">선택한 매각기일 후보입니다. 물건검색에서 기본정보 조회 후 권리분석을 진행하세요.</p>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>매각기일</span><strong>${esc(item.saleDate || '-')}</strong></div>
+          <div class="v2-info-box"><span>용도</span><strong>${esc(item.usage || '-')}</strong></div>
+          <div class="v2-info-box"><span>최저가</span><strong>${formatWon(item.minBid)}</strong></div>
+          <div class="v2-info-box"><span>감정가</span><strong>${formatWon(item.appraisal)}</strong></div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderRows(items) {
     if (!items.length) return '<p class="v2-note">조회된 매각기일 후보가 없습니다.</p>';
     return `
       <div class="v2-detail-table-wrap">
         <table class="v2-detail-table">
           <thead>
-            <tr><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>유찰</th><th>사유</th><th>연결</th></tr>
+            <tr><th>상태</th><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>유찰</th><th>사유</th><th>연결</th></tr>
           </thead>
           <tbody>
             ${items.map((item) => {
               const parsed = parseCaseNo(item.caseNo || '');
               const disabled = parsed ? '' : 'disabled';
+              const isSelected = state.selectedCandidate && sameCase(state.selectedCandidate.caseNo, item.caseNo);
               return `
-                <tr>
+                <tr data-selected-candidate="${isSelected ? '1' : '0'}">
+                  <td>${isSelected ? '<span class="v2-badge">선택됨</span>' : '-'}</td>
                   <td>${esc(item.score ?? '-')}</td>
                   <td>${esc(item.caseNo || '-')}</td>
                   <td>${esc(item.saleDate || '-')}</td>
@@ -141,6 +166,7 @@
         <div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>
         <p class="v2-note">매각기일 조회는 물건검색 결과와 권리분석 결과를 변경하지 않습니다.</p>
       </div>
+      ${renderSelectedCandidate()}
       ${state.loading ? `<div class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>매각기일 목록을 조회 중입니다.</h3><p class="v2-note">조회 결과는 이 영역에 표시됩니다.</p></div></div></div>` : ''}
       ${state.meta || state.items.length ? `
         <div class="v2-result-card">
@@ -268,6 +294,11 @@
     state.handoff = null;
   }
 
+  function selectCandidate(caseNo) {
+    const item = state.items.find((candidate) => sameCase(candidate.caseNo, caseNo));
+    state.selectedCandidate = item ? { ...item } : { caseNo: clean(caseNo) };
+  }
+
   function openSearchTabWithCase(caseNo) {
     const parsed = parseCaseNo(caseNo);
     if (!parsed) {
@@ -277,9 +308,11 @@
       return;
     }
 
+    selectCandidate(caseNo);
     state.handoff = { ...parsed, caseNo: clean(caseNo) };
     const searchTab = document.querySelector('.v2-tab[data-tab="search"]');
     searchTab?.click();
+    render(findDatePanel());
     window.setTimeout(() => applySearchHandoff(0), 80);
   }
 
