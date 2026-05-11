@@ -31,6 +31,8 @@
     meta: null,
     handoff: null,
     selectedCandidate: null,
+    sortMode: 'score',
+    housingOnly: false,
     form: {
       court: SUPPORTED_COURT,
       start: todayInput(),
@@ -83,6 +85,28 @@
     return clean(left).replace(/\s+/g, '') === clean(right).replace(/\s+/g, '');
   }
 
+  function isHousing(item) {
+    return /주거|아파트|다세대|단독|연립|다가구|주택/i.test(clean(item?.usage));
+  }
+
+  function candidateDiscountRate(item) {
+    const minBid = numberValue(item?.minBid);
+    const appraisal = numberValue(item?.appraisal);
+    return minBid && appraisal ? (minBid / appraisal) * 100 : 0;
+  }
+
+  function visibleItems() {
+    const filtered = state.housingOnly ? state.items.filter(isHousing) : [...state.items];
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (state.sortMode === 'minBid') return numberValue(a.minBid) - numberValue(b.minBid);
+      if (state.sortMode === 'discount') return candidateDiscountRate(a) - candidateDiscountRate(b);
+      if (state.sortMode === 'failCount') return Number(b.failCount || 0) - Number(a.failCount || 0);
+      return Number(b.score || 0) - Number(a.score || 0);
+    });
+    return sorted;
+  }
+
   function findDatePanel() {
     const panels = Array.from(document.querySelectorAll('.v2-panel'));
     return panels.find((panel) => panel.querySelector('h3')?.textContent?.includes('매각기일 추천')) || null;
@@ -102,17 +126,15 @@
     return String(value) === String(target) ? 'selected' : '';
   }
 
+  function checked(value) {
+    return value ? 'checked' : '';
+  }
+
   function captureForm() {
     state.form.court = clean(document.getElementById('dateCourtV2')?.value) || state.form.court;
     state.form.start = document.getElementById('dateStartV2')?.value || state.form.start;
     state.form.end = document.getElementById('dateEndV2')?.value || state.form.end;
     state.form.usage = document.getElementById('dateUsageV2')?.value || state.form.usage;
-  }
-
-  function candidateDiscountRate(item) {
-    const minBid = numberValue(item?.minBid);
-    const appraisal = numberValue(item?.appraisal);
-    return minBid && appraisal ? (minBid / appraisal) * 100 : 0;
   }
 
   function average(values) {
@@ -153,10 +175,11 @@
     const items = state.items || [];
     if (!items.length) return '';
 
+    const displayItems = visibleItems();
     const lowestMinBid = pickLowest(items, (item) => numberValue(item.minBid));
     const lowestRate = pickLowest(items, candidateDiscountRate);
     const mostFailed = pickHighest(items, (item) => Number(item.failCount || 0));
-    const housingCount = items.filter((item) => /주거|아파트|다세대|단독|연립|다가구/i.test(clean(item.usage))).length;
+    const housingCount = items.filter(isHousing).length;
     const avgMinBid = average(items.map((item) => item.minBid));
 
     return `
@@ -172,6 +195,7 @@
         </div>
         <ul class="v2-list">
           <li>전체 후보 평균 최저가: ${formatWon(avgMinBid)}</li>
+          <li>현재 표시 후보: ${displayItems.length}건 / 전체 ${items.length}건</li>
           <li>${selectedComparisonText(avgMinBid)}</li>
         </ul>
       </div>
@@ -196,13 +220,32 @@
     `;
   }
 
+  function renderSortControls(items) {
+    if (!items.length) return '';
+    return `
+      <div class="v2-card">
+        <span class="v2-badge">목록 정렬</span>
+        <h3>후보 정렬·필터</h3>
+        <div class="v2-form" style="grid-template-columns:minmax(180px,1fr) minmax(180px,1fr);">
+          <label class="v2-field"><span>정렬 기준</span><select id="dateSortModeV2">
+            <option value="score" ${selected(state.sortMode, 'score')}>기본 추천순</option>
+            <option value="minBid" ${selected(state.sortMode, 'minBid')}>최저가 낮은순</option>
+            <option value="discount" ${selected(state.sortMode, 'discount')}>할인율 높은순</option>
+            <option value="failCount" ${selected(state.sortMode, 'failCount')}>유찰 많은순</option>
+          </select></label>
+          <label class="v2-field"><span>필터</span><label class="v2-check"><input id="dateHousingOnlyV2" type="checkbox" ${checked(state.housingOnly)}> 주거형만 보기</label></label>
+        </div>
+      </div>
+    `;
+  }
+
   function renderRows(items) {
-    if (!items.length) return '<p class="v2-note">조회된 매각기일 후보가 없습니다.</p>';
+    if (!items.length) return '<p class="v2-note">현재 정렬/필터 조건에 맞는 매각기일 후보가 없습니다.</p>';
     return `
       <div class="v2-detail-table-wrap">
         <table class="v2-detail-table">
           <thead>
-            <tr><th>상태</th><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>유찰</th><th>사유</th><th>연결</th></tr>
+            <tr><th>상태</th><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>할인율</th><th>유찰</th><th>사유</th><th>연결</th></tr>
           </thead>
           <tbody>
             ${items.map((item) => {
@@ -218,6 +261,7 @@
                   <td>${esc(item.usage || '-')}</td>
                   <td>${formatWon(item.minBid)}</td>
                   <td>${formatWon(item.appraisal)}</td>
+                  <td>${percent(candidateDiscountRate(item))}</td>
                   <td>${esc(item.failCount ?? '-')}</td>
                   <td>${esc(Array.isArray(item.reasons) ? item.reasons.join(', ') : '')}</td>
                   <td><button type="button" class="v2-small-btn" data-date-search-case="${esc(item.caseNo || '')}" ${disabled}>이 사건 조회</button></td>
@@ -232,6 +276,7 @@
 
   function render(panel) {
     const messageClass = state.message ? `v2-form-message show ${state.messageType}` : 'v2-form-message';
+    const displayItems = visibleItems();
     panel.innerHTML = `
       <div class="v2-card">
         <h3>매각기일 추천</h3>
@@ -254,9 +299,10 @@
         <div class="v2-result-card">
           <span class="v2-badge">매각기일</span>
           <h3>조회 결과</h3>
-          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / ${state.items.length}건</p>
+          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / 표시 ${displayItems.length}건 · 전체 ${state.items.length}건</p>
           <p class="v2-note">검증 상태: 서울중앙 기준 결과만 표시합니다. 요청 법원과 응답 법원이 다르면 결과를 폐기합니다.</p>
-          ${renderRows(state.items)}
+          ${renderSortControls(state.items)}
+          ${renderRows(displayItems)}
           <p class="v2-note">관심 물건은 “이 사건 조회”로 물건검색 탭에 값을 옮긴 뒤, 기본정보 조회 버튼을 눌러 권리분석을 진행하세요.</p>
         </div>
       ` : ''}
@@ -406,6 +452,24 @@
       el.addEventListener('input', captureForm);
       el.addEventListener('change', captureForm);
     });
+
+    const sort = panel.querySelector('#dateSortModeV2');
+    if (sort && !sort.dataset.bound) {
+      sort.dataset.bound = '1';
+      sort.addEventListener('change', () => {
+        state.sortMode = sort.value;
+        render(panel);
+      });
+    }
+
+    const housing = panel.querySelector('#dateHousingOnlyV2');
+    if (housing && !housing.dataset.bound) {
+      housing.dataset.bound = '1';
+      housing.addEventListener('change', () => {
+        state.housingOnly = housing.checked;
+        render(panel);
+      });
+    }
 
     const btn = panel.querySelector('#dateFetchV2');
     if (btn && !btn.dataset.bound) {
