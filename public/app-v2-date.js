@@ -49,6 +49,12 @@
     return clean(value).replace(/[^0-9]/g, '');
   }
 
+  function numberValue(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return Math.max(0, value);
+    const digits = clean(value).replace(/[^0-9]/g, '');
+    return digits ? Math.max(0, Number(digits)) : 0;
+  }
+
   function displayDate(value) {
     const digits = compactDate(value);
     if (/^\d{8}$/.test(digits)) return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
@@ -58,6 +64,12 @@
   function formatWon(value) {
     const n = Number(value || 0);
     return Number.isFinite(n) && n > 0 ? `${n.toLocaleString('ko-KR')}원` : '-';
+  }
+
+  function percent(value) {
+    const n = Number(value || 0);
+    if (!Number.isFinite(n) || n <= 0) return '-';
+    return `${n.toFixed(1)}%`;
   }
 
   function parseCaseNo(value) {
@@ -95,6 +107,75 @@
     state.form.start = document.getElementById('dateStartV2')?.value || state.form.start;
     state.form.end = document.getElementById('dateEndV2')?.value || state.form.end;
     state.form.usage = document.getElementById('dateUsageV2')?.value || state.form.usage;
+  }
+
+  function candidateDiscountRate(item) {
+    const minBid = numberValue(item?.minBid);
+    const appraisal = numberValue(item?.appraisal);
+    return minBid && appraisal ? (minBid / appraisal) * 100 : 0;
+  }
+
+  function average(values) {
+    const nums = values.map(numberValue).filter((n) => n > 0);
+    if (!nums.length) return 0;
+    return Math.round(nums.reduce((sum, n) => sum + n, 0) / nums.length);
+  }
+
+  function pickLowest(items, getter) {
+    return items.reduce((best, item) => {
+      const value = getter(item);
+      if (!value) return best;
+      if (!best || value < best.value) return { item, value };
+      return best;
+    }, null);
+  }
+
+  function pickHighest(items, getter) {
+    return items.reduce((best, item) => {
+      const value = getter(item);
+      if (!Number.isFinite(value)) return best;
+      if (!best || value > best.value) return { item, value };
+      return best;
+    }, null);
+  }
+
+  function selectedComparisonText(avgMinBid) {
+    const selectedItem = state.selectedCandidate;
+    if (!selectedItem || !avgMinBid) return '후보를 선택하면 목록 평균과 비교해 보여줍니다.';
+    const minBid = numberValue(selectedItem.minBid);
+    if (!minBid) return '선택 후보의 최저가 정보가 부족합니다.';
+    if (minBid < avgMinBid) return `선택 후보 최저가는 목록 평균보다 ${(avgMinBid - minBid).toLocaleString('ko-KR')}원 낮습니다.`;
+    if (minBid > avgMinBid) return `선택 후보 최저가는 목록 평균보다 ${(minBid - avgMinBid).toLocaleString('ko-KR')}원 높습니다.`;
+    return '선택 후보 최저가는 목록 평균과 같습니다.';
+  }
+
+  function renderCandidateComparison() {
+    const items = state.items || [];
+    if (!items.length) return '';
+
+    const lowestMinBid = pickLowest(items, (item) => numberValue(item.minBid));
+    const lowestRate = pickLowest(items, candidateDiscountRate);
+    const mostFailed = pickHighest(items, (item) => Number(item.failCount || 0));
+    const housingCount = items.filter((item) => /주거|아파트|다세대|단독|연립|다가구/i.test(clean(item.usage))).length;
+    const avgMinBid = average(items.map((item) => item.minBid));
+
+    return `
+      <div class="v2-card">
+        <span class="v2-badge">후보 비교</span>
+        <h3>매각기일 후보 비교 요약</h3>
+        <p class="v2-note">조회된 후보 목록 안에서 먼저 볼 만한 기준을 단순 비교한 값입니다. 실제 입찰 판단은 단일 사건 조회 후 권리분석으로 확인하세요.</p>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>최저가 최저 후보</span><strong>${esc(lowestMinBid?.item?.caseNo || '-')}</strong><small>${formatWon(lowestMinBid?.item?.minBid)}</small></div>
+          <div class="v2-info-box"><span>할인율 큰 후보</span><strong>${esc(lowestRate?.item?.caseNo || '-')}</strong><small>최저가/감정가 ${percent(lowestRate?.value)}</small></div>
+          <div class="v2-info-box"><span>유찰 최다 후보</span><strong>${esc(mostFailed?.item?.caseNo || '-')}</strong><small>${esc(mostFailed?.item?.failCount ?? '-')}회</small></div>
+          <div class="v2-info-box"><span>주거형 후보</span><strong>${housingCount}건</strong><small>전체 ${items.length}건 중</small></div>
+        </div>
+        <ul class="v2-list">
+          <li>전체 후보 평균 최저가: ${formatWon(avgMinBid)}</li>
+          <li>${selectedComparisonText(avgMinBid)}</li>
+        </ul>
+      </div>
+    `;
   }
 
   function renderSelectedCandidate() {
@@ -166,6 +247,7 @@
         <div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>
         <p class="v2-note">매각기일 조회는 물건검색 결과와 권리분석 결과를 변경하지 않습니다.</p>
       </div>
+      ${renderCandidateComparison()}
       ${renderSelectedCandidate()}
       ${state.loading ? `<div class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>매각기일 목록을 조회 중입니다.</h3><p class="v2-note">조회 결과는 이 영역에 표시됩니다.</p></div></div></div>` : ''}
       ${state.meta || state.items.length ? `
