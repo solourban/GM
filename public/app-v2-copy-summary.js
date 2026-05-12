@@ -1,5 +1,7 @@
 (() => {
   const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';
+  const DATE_CANDIDATE_STORAGE_KEY = 'auction-note:v2:selected-date-candidate';
+  const DATE_CANDIDATE_MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -8,6 +10,10 @@
 
   function state() {
     return app()?.state || null;
+  }
+
+  function compact(value) {
+    return clean(value).replace(/\s+/g, '').replace(/[^0-9가-힣A-Za-z]/g, '');
   }
 
   function numberValue(value) {
@@ -47,6 +53,24 @@
       return numberValue(localStorage.getItem(bidPlanStorageKey(report)) || '');
     } catch (_) {
       return 0;
+    }
+  }
+
+  function loadDateCandidate() {
+    try {
+      const raw = sessionStorage.getItem(DATE_CANDIDATE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function loadDateCandidateMemo(candidate) {
+    try {
+      if (!candidate?.caseNo) return '';
+      return clean(sessionStorage.getItem(`${DATE_CANDIDATE_MEMO_PREFIX}${compact(candidate.caseNo)}`) || '');
+    } catch (_) {
+      return '';
     }
   }
 
@@ -92,6 +116,23 @@
     return Array.from(new Set(checks)).slice(0, 6);
   }
 
+  function appendDateCandidateSummary(lines) {
+    const candidate = loadDateCandidate();
+    if (!candidate?.caseNo) return;
+    const memo = loadDateCandidateMemo(candidate);
+
+    lines.push('');
+    lines.push('매각기일 선택 후보:');
+    lines.push(`- 사건번호: ${clean(candidate.caseNo)}`);
+    if (candidate.saleDate) lines.push(`- 매각기일: ${clean(candidate.saleDate)}`);
+    if (candidate.usage) lines.push(`- 용도: ${clean(candidate.usage)}`);
+    if (candidate.minBid) lines.push(`- 후보 최저가: ${clean(candidate.minBid)}`);
+    if (candidate.appraisal) lines.push(`- 후보 감정가: ${clean(candidate.appraisal)}`);
+    if (candidate.failCount || candidate.discount) lines.push(`- 후보 조건: 유찰 ${clean(candidate.failCount || '-')} / 할인율 ${clean(candidate.discount || '-')}`);
+    if (candidate.reason) lines.push(`- 후보 사유: ${clean(candidate.reason)}`);
+    if (memo) lines.push(`- 검토 메모: ${memo}`);
+  }
+
   function buildSummaryText(report) {
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inheritedTotal = numberValue(report?.inherited?.total);
@@ -118,6 +159,7 @@
     lines.push(`인수 추정금액: ${money(inheritedTotal)}`);
     lines.push(`최저가 기준 실질 부담: ${money(practicalBurden)}`);
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
+    appendDateCandidateSummary(lines);
     if (plannedBid) {
       lines.push('');
       lines.push('내 입찰가 시뮬레이션:');
