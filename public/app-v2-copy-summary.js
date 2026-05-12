@@ -2,6 +2,7 @@
   const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';
   const DATE_CANDIDATE_STORAGE_KEY = 'auction-note:v2:selected-date-candidate';
   const DATE_CANDIDATE_STACK_KEY = 'auction-note:v2:date-candidate-stack';
+  const SAVED_CANDIDATES_KEY = 'auction-note:v2:saved-candidates';
   const DATE_CANDIDATE_MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -76,13 +77,74 @@
     }
   }
 
+  function loadSavedCandidates() {
+    try {
+      const raw = localStorage.getItem(SAVED_CANDIDATES_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   function loadDateCandidateMemo(candidate) {
     try {
       if (!candidate?.caseNo) return '';
-      return clean(sessionStorage.getItem(`${DATE_CANDIDATE_MEMO_PREFIX}${compact(candidate.caseNo)}`) || '');
+      const key = `${DATE_CANDIDATE_MEMO_PREFIX}${compact(candidate.caseNo)}`;
+      return clean(sessionStorage.getItem(key) || localStorage.getItem(key) || candidate.memo || '');
     } catch (_) {
-      return '';
+      return clean(candidate?.memo || '');
     }
+  }
+
+  function discountRate(candidate) {
+    const minBid = numberValue(candidate?.minBid);
+    const appraisal = numberValue(candidate?.appraisal);
+    return minBid && appraisal ? (minBid / appraisal) * 100 : 0;
+  }
+
+  function percent(value) {
+    const n = Number(value || 0);
+    return n > 0 ? `${n.toFixed(1)}%` : '-';
+  }
+
+  function isHousing(candidate) {
+    return /주거|아파트|다세대|단독|연립|다가구|주택/i.test(clean(candidate?.usage));
+  }
+
+  function candidateScore(candidate) {
+    let score = 0;
+    const minBid = numberValue(candidate?.minBid);
+    const appraisal = numberValue(candidate?.appraisal);
+    const failCount = Number(candidate?.failCount || 0);
+    const hasMemo = clean(candidate?.memo || loadDateCandidateMemo(candidate)).length > 0;
+
+    if (minBid > 0) score += 20;
+    if (appraisal > 0 && minBid > 0) score += Math.max(0, 40 - Math.round(discountRate(candidate) / 3));
+    if (failCount > 0) score += Math.min(20, failCount * 2);
+    if (isHousing(candidate)) score += 10;
+    if (hasMemo) score += 10;
+    return score;
+  }
+
+  function scoreReasons(candidate) {
+    const reasons = [];
+    const minBid = numberValue(candidate?.minBid);
+    const appraisal = numberValue(candidate?.appraisal);
+    const failCount = Number(candidate?.failCount || 0);
+    if (minBid > 0) reasons.push(`최저가 ${clean(candidate.minBid)}`);
+    if (appraisal > 0 && minBid > 0) reasons.push(`최저가/감정가 ${percent(discountRate(candidate))}`);
+    if (failCount > 0) reasons.push(`유찰 ${failCount}회`);
+    if (isHousing(candidate)) reasons.push('주거형');
+    if (clean(candidate?.memo || loadDateCandidateMemo(candidate))) reasons.push('메모 있음');
+    return reasons.join(' · ') || '기초 정보 부족';
+  }
+
+  function topSavedCandidates(limit = 5) {
+    return loadSavedCandidates()
+      .map((candidate) => ({ candidate, score: candidateScore(candidate), reasons: scoreReasons(candidate) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
   }
 
   function plannedBidMessage({ plannedBid, minBid, upper, inheritedTotal, riskLevel }) {
@@ -162,6 +224,24 @@
     });
   }
 
+  function appendSavedTopFiveSummary(lines) {
+    const top = topSavedCandidates(5);
+    if (!top.length) return;
+
+    lines.push('');
+    lines.push(`저장 후보 TOP 5: ${top.length}건`);
+    top.forEach(({ candidate, score, reasons }, index) => {
+      const memo = loadDateCandidateMemo(candidate);
+      lines.push(`${index + 1}. ${clean(candidate.caseNo || '사건번호 미확인')} / 점수 ${score}`);
+      if (candidate.saleDate) lines.push(`   - 매각기일: ${clean(candidate.saleDate)}`);
+      if (candidate.usage) lines.push(`   - 용도: ${clean(candidate.usage)}`);
+      if (candidate.minBid) lines.push(`   - 최저가: ${clean(candidate.minBid)}`);
+      if (candidate.appraisal) lines.push(`   - 감정가: ${clean(candidate.appraisal)}`);
+      lines.push(`   - 근거: ${reasons}`);
+      if (memo) lines.push(`   - 메모: ${memo}`);
+    });
+  }
+
   function buildSummaryText(report) {
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inheritedTotal = numberValue(report?.inherited?.total);
@@ -190,6 +270,7 @@
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
     appendDateCandidateSummary(lines);
     appendCandidateStackSummary(lines);
+    appendSavedTopFiveSummary(lines);
     if (plannedBid) {
       lines.push('');
       lines.push('내 입찰가 시뮬레이션:');
