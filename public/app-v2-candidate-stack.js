@@ -159,6 +159,10 @@
     }, null);
   }
 
+  function isHousing(item) {
+    return /주거|아파트|다세대|단독|연립|다가구|주택/i.test(clean(item?.usage));
+  }
+
   function candidateScore(item) {
     let score = 0;
     const minBid = numberValue(item.minBid);
@@ -169,16 +173,29 @@
     if (minBid > 0) score += 20;
     if (appraisal > 0 && minBid > 0) score += Math.max(0, 40 - Math.round(discountRate(item) / 3));
     if (failCount > 0) score += Math.min(20, failCount * 2);
-    if (/주거|아파트|다세대|단독|연립|다가구|주택/i.test(clean(item.usage))) score += 10;
+    if (isHousing(item)) score += 10;
     if (hasMemo) score += 10;
     return score;
   }
 
-  function topCandidates(items) {
+  function scoreReasons(item) {
+    const reasons = [];
+    const minBid = numberValue(item.minBid);
+    const appraisal = numberValue(item.appraisal);
+    const failCount = Number(item.failCount || 0);
+    if (minBid > 0) reasons.push(`최저가 ${formatWon(item.minBid)}`);
+    if (appraisal > 0 && minBid > 0) reasons.push(`최저가/감정가 ${percent(discountRate(item))}`);
+    if (failCount > 0) reasons.push(`유찰 ${failCount}회`);
+    if (isHousing(item)) reasons.push('주거형');
+    if (clean(item.memo || loadMemo(item.caseNo))) reasons.push('메모 있음');
+    return reasons.join(' · ') || '기초 정보 부족';
+  }
+
+  function topCandidates(items, limit = 3) {
     return [...items]
-      .map((item) => ({ item, score: candidateScore(item) }))
+      .map((item) => ({ item, score: candidateScore(item), reasons: scoreReasons(item) }))
       .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
+      .slice(0, limit);
   }
 
   function isSaved(caseNo) {
@@ -204,7 +221,7 @@
     const bestDiscount = pickLowest(items, discountRate);
     const mostFailed = pickHighest(items, (item) => Number(item.failCount || 0));
     const memoCount = items.filter((item) => clean(loadMemo(item.caseNo))).length;
-    const top = topCandidates(items);
+    const top = topCandidates(items, 3);
 
     return `
       <div class="v2-card" id="v2CandidateRankingCard">
@@ -263,6 +280,36 @@
     `;
   }
 
+  function renderSavedTopFive(saved) {
+    if (!saved.length) return '';
+    const top = topCandidates(saved, 5);
+    return `
+      <section class="v2-card" id="v2SavedTopFiveCard">
+        <span class="v2-badge">TOP 5</span>
+        <h3>저장 후보 TOP 5</h3>
+        <p class="v2-note">저장 후보를 최저가, 감정가 대비 할인율, 유찰횟수, 주거형 여부, 메모 여부 기준으로 단순 점수화한 목록입니다.</p>
+        <div class="v2-detail-table-wrap">
+          <table class="v2-detail-table">
+            <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>용도</th><th>최저가</th><th>근거</th></tr></thead>
+            <tbody>
+              ${top.map(({ item, score, reasons }, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${esc(item.caseNo || '-')}</td>
+                  <td>${score}</td>
+                  <td>${esc(item.usage || '-')}</td>
+                  <td>${esc(item.minBid || '-')}</td>
+                  <td>${esc(reasons)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <p class="v2-note">이 점수는 기초 정렬용입니다. 권리위험, 자금계획, 시세 비교는 다음 단계에서 별도로 보강해야 합니다.</p>
+      </section>
+    `;
+  }
+
   function renderSavedCandidates() {
     const saved = loadSavedCandidates();
     if (!saved.length) {
@@ -276,10 +323,11 @@
     }
 
     return `
+      ${renderSavedTopFive(saved)}
       <section class="v2-card" id="v2SavedCandidateCard">
         <span class="v2-badge">저장 후보</span>
         <h3>저장 후보 목록</h3>
-        <p class="v2-note">브라우저 localStorage에 보관됩니다. TOP 5 자동랭킹은 다음 단계에서 붙입니다.</p>
+        <p class="v2-note">브라우저 localStorage에 보관됩니다. TOP 5는 기초 점수 기준으로 별도 표시됩니다.</p>
         <div class="v2-grid four">
           <div class="v2-info"><div class="k">저장 후보 수</div><div class="v">${saved.length}건</div></div>
           <div class="v2-info"><div class="k">최근 저장</div><div class="v">${esc(saved[0]?.caseNo || '-')}</div></div>
@@ -341,6 +389,7 @@
     const existing = document.getElementById('v2CandidateStackCard');
     document.getElementById('v2CandidateRankingCard')?.remove();
     document.getElementById('v2SavedCandidateCard')?.remove();
+    document.getElementById('v2SavedTopFiveCard')?.remove();
 
     if (!existing) {
       anchor.insertAdjacentHTML('afterend', renderCard());
