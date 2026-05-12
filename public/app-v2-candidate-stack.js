@@ -183,17 +183,37 @@
     const minBid = numberValue(item.minBid);
     const appraisal = numberValue(item.appraisal);
     const failCount = Number(item.failCount || 0);
-    if (minBid > 0) reasons.push(`최저가 ${formatWon(item.minBid)}`);
-    if (appraisal > 0 && minBid > 0) reasons.push(`최저가/감정가 ${percent(discountRate(item))}`);
-    if (failCount > 0) reasons.push(`유찰 ${failCount}회`);
-    if (isHousing(item)) reasons.push('주거형');
-    if (clean(item.memo || loadMemo(item.caseNo))) reasons.push('메모 있음');
-    return reasons.join(' · ') || '기초 정보 부족';
+    if (minBid > 0) reasons.push(`가격: 최저가 ${formatWon(item.minBid)}로 비교 기준에 포함됩니다.`);
+    if (appraisal > 0 && minBid > 0) reasons.push(`할인율: 감정가 대비 최저가 비율이 ${percent(discountRate(item))}입니다.`);
+    if (failCount > 0) reasons.push(`유찰: ${failCount}회 유찰되어 가격 조정 이력이 있습니다.`);
+    if (isHousing(item)) reasons.push('용도: 주거형으로 우선 검토군에 포함됩니다.');
+    if (clean(item.memo || loadMemo(item.caseNo))) reasons.push('메모: 별도 검토 메모가 있어 추적 필요성이 있습니다.');
+    return reasons;
+  }
+
+  function scoreReasonText(item) {
+    const reasons = scoreReasons(item);
+    return reasons.length ? reasons.join(' ') : '기초 정보가 부족해 점수 근거가 제한적입니다.';
+  }
+
+  function oneLineDecision(item, score) {
+    const minBid = numberValue(item.minBid);
+    const appraisal = numberValue(item.appraisal);
+    const failCount = Number(item.failCount || 0);
+    const hasMemo = clean(item.memo || loadMemo(item.caseNo)).length > 0;
+    const rate = discountRate(item);
+
+    if (score >= 70 && hasMemo) return '가격 조건과 검토 흔적이 모두 있어 우선 확인할 만한 후보입니다.';
+    if (appraisal > 0 && minBid > 0 && rate <= 60) return '감정가 대비 최저가 비율이 낮아 가격 관점에서 먼저 볼 만합니다.';
+    if (failCount >= 5) return '유찰 이력이 많아 가격 변동성과 사유 확인이 필요한 후보입니다.';
+    if (isHousing(item)) return '주거형 후보로 권리관계와 점유자를 확인해볼 만합니다.';
+    if (score >= 50) return '기초 조건이 비교 목록 안에서 상대적으로 양호한 후보입니다.';
+    return '정보가 제한적이므로 원본 조회 후 판단해야 합니다.';
   }
 
   function topCandidates(items, limit = 3) {
     return [...items]
-      .map((item) => ({ item, score: candidateScore(item), reasons: scoreReasons(item) }))
+      .map((item) => ({ item, score: candidateScore(item), reasons: scoreReasonText(item), decision: oneLineDecision(item, candidateScore(item)) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   }
@@ -236,7 +256,7 @@
         </div>
         <h4>우선 검토 후보 1~3순위</h4>
         <ol class="v2-list">
-          ${top.map(({ item, score }) => `<li>${esc(item.caseNo || '-')} · 점수 ${score} · ${esc(item.usage || '-')} · 최저가 ${esc(item.minBid || '-')}</li>`).join('')}
+          ${top.map(({ item, score, decision }) => `<li>${esc(item.caseNo || '-')} · 점수 ${score} · ${esc(decision)}</li>`).join('')}
         </ol>
       </div>
     `;
@@ -290,15 +310,14 @@
         <p class="v2-note">저장 후보를 최저가, 감정가 대비 할인율, 유찰횟수, 주거형 여부, 메모 여부 기준으로 단순 점수화한 목록입니다.</p>
         <div class="v2-detail-table-wrap">
           <table class="v2-detail-table">
-            <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>용도</th><th>최저가</th><th>근거</th></tr></thead>
+            <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>한 줄 판단</th><th>근거 설명</th></tr></thead>
             <tbody>
-              ${top.map(({ item, score, reasons }, index) => `
+              ${top.map(({ item, score, reasons, decision }, index) => `
                 <tr>
                   <td>${index + 1}</td>
                   <td>${esc(item.caseNo || '-')}</td>
                   <td>${score}</td>
-                  <td>${esc(item.usage || '-')}</td>
-                  <td>${esc(item.minBid || '-')}</td>
+                  <td>${esc(decision)}</td>
                   <td>${esc(reasons)}</td>
                 </tr>
               `).join('')}
