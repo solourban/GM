@@ -1,5 +1,6 @@
 (() => {
   const STORAGE_KEY = 'auction-note:v2:selected-date-candidate';
+  const MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function esc(value) {
@@ -14,6 +15,10 @@
 
   function compact(value) {
     return clean(value).replace(/\s+/g, '').replace(/[^0-9가-힣A-Za-z]/g, '');
+  }
+
+  function memoKey(candidate) {
+    return `${MEMO_PREFIX}${compact(candidate?.caseNo || 'unknown')}`;
   }
 
   function digits(value) {
@@ -124,6 +129,29 @@
     } catch (_) {}
   }
 
+  function loadMemo(candidate) {
+    try {
+      return sessionStorage.getItem(memoKey(candidate)) || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function saveMemo(candidate, value) {
+    try {
+      const key = memoKey(candidate);
+      const memo = String(value ?? '').slice(0, 500);
+      if (memo.trim()) sessionStorage.setItem(key, memo);
+      else sessionStorage.removeItem(key);
+    } catch (_) {}
+  }
+
+  function clearMemo(candidate) {
+    try {
+      sessionStorage.removeItem(memoKey(candidate));
+    } catch (_) {}
+  }
+
   function findSearchPanel() {
     return document.querySelector('.v2-panel[data-panel="search"]');
   }
@@ -137,6 +165,20 @@
         <div class="k">선택 후보-조회 결과 확인</div>
         <div class="v"><span class="v2-pill ${badgeClass}">${esc(result.title)}</span></div>
         <p class="v2-note">${esc(result.text)}</p>
+      </div>
+    `;
+  }
+
+  function renderMemo(candidate) {
+    const memo = loadMemo(candidate);
+    return `
+      <div class="v2-info wide">
+        <div class="k">후보 검토 메모</div>
+        <textarea id="v2DateCandidateMemo" rows="3" maxlength="500" placeholder="예: 최저가는 낮지만 유찰 사유와 점유자 확인 필요" style="width:100%; margin-top:8px; border:1px solid var(--line-2); border-radius:12px; padding:12px; font:inherit; resize:vertical;">${esc(memo)}</textarea>
+        <div class="v2-cta-row" style="margin-top:8px;">
+          <span class="v2-note" id="v2DateCandidateMemoStatus">${memo ? '메모 저장됨' : '메모를 입력하면 세션에 자동 저장됩니다.'}</span>
+          <button type="button" class="v2-small-btn" id="v2ClearDateCandidateMemoBtn">메모 삭제</button>
+        </div>
       </div>
     `;
   }
@@ -158,10 +200,33 @@
           <div class="v2-info"><div class="k">최저가</div><div class="v">${esc(candidate.minBid || '-')}</div></div>
           <div class="v2-info"><div class="k">감정가</div><div class="v">${esc(candidate.appraisal || '-')}</div></div>
           ${renderComparison(candidate)}
+          ${renderMemo(candidate)}
         </div>
         <p class="v2-note">유찰 ${esc(candidate.failCount || '-')} · 할인율 ${esc(candidate.discount || '-')} · ${esc(candidate.reason || '후보 사유 없음')}</p>
       </section>
     `;
+  }
+
+  function bindMemo(candidate) {
+    const memo = document.getElementById('v2DateCandidateMemo');
+    const status = document.getElementById('v2DateCandidateMemoStatus');
+    if (memo && !memo.dataset.bound) {
+      memo.dataset.bound = '1';
+      memo.addEventListener('input', () => {
+        saveMemo(candidate, memo.value);
+        if (status) status.textContent = memo.value.trim() ? '메모 저장됨' : '메모를 입력하면 세션에 자동 저장됩니다.';
+      });
+    }
+
+    const clearMemoButton = document.getElementById('v2ClearDateCandidateMemoBtn');
+    if (clearMemoButton && !clearMemoButton.dataset.bound) {
+      clearMemoButton.dataset.bound = '1';
+      clearMemoButton.addEventListener('click', () => {
+        clearMemo(candidate);
+        if (memo) memo.value = '';
+        if (status) status.textContent = '메모가 삭제되었습니다.';
+      });
+    }
   }
 
   function upsertSourceCard() {
@@ -176,9 +241,10 @@
       return;
     }
 
+    const activeMemo = document.activeElement?.id === 'v2DateCandidateMemo';
     if (!existing) {
       searchCard.insertAdjacentHTML('afterend', renderCard(candidate));
-    } else {
+    } else if (!activeMemo) {
       existing.outerHTML = renderCard(candidate);
     }
 
@@ -190,6 +256,8 @@
         document.getElementById('v2DateSourceCard')?.remove();
       });
     }
+
+    bindMemo(candidate);
   }
 
   document.addEventListener('click', (event) => {
