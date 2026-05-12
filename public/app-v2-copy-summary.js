@@ -1,6 +1,7 @@
 (() => {
   const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';
   const DATE_CANDIDATE_STORAGE_KEY = 'auction-note:v2:selected-date-candidate';
+  const DATE_CANDIDATE_STACK_KEY = 'auction-note:v2:date-candidate-stack';
   const DATE_CANDIDATE_MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -62,6 +63,16 @@
       return raw ? JSON.parse(raw) : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  function loadDateCandidateStack() {
+    try {
+      const raw = sessionStorage.getItem(DATE_CANDIDATE_STACK_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
     }
   }
 
@@ -133,6 +144,24 @@
     if (memo) lines.push(`- 검토 메모: ${memo}`);
   }
 
+  function appendCandidateStackSummary(lines) {
+    const stack = loadDateCandidateStack().slice(0, 5);
+    if (!stack.length) return;
+
+    lines.push('');
+    lines.push(`임시 비교 후보: ${stack.length}건`);
+    stack.forEach((candidate, index) => {
+      const memo = loadDateCandidateMemo(candidate);
+      lines.push(`${index + 1}. ${clean(candidate.caseNo || '사건번호 미확인')}`);
+      if (candidate.saleDate) lines.push(`   - 매각기일: ${clean(candidate.saleDate)}`);
+      if (candidate.usage) lines.push(`   - 용도: ${clean(candidate.usage)}`);
+      if (candidate.minBid) lines.push(`   - 최저가: ${clean(candidate.minBid)}`);
+      if (candidate.appraisal) lines.push(`   - 감정가: ${clean(candidate.appraisal)}`);
+      if (candidate.failCount || candidate.discount) lines.push(`   - 조건: 유찰 ${clean(candidate.failCount || '-')} / 할인율 ${clean(candidate.discount || '-')}`);
+      if (memo) lines.push(`   - 메모: ${memo}`);
+    });
+  }
+
   function buildSummaryText(report) {
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inheritedTotal = numberValue(report?.inherited?.total);
@@ -160,6 +189,7 @@
     lines.push(`최저가 기준 실질 부담: ${money(practicalBurden)}`);
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
     appendDateCandidateSummary(lines);
+    appendCandidateStackSummary(lines);
     if (plannedBid) {
       lines.push('');
       lines.push('내 입찰가 시뮬레이션:');
