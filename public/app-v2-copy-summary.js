@@ -132,17 +132,40 @@
     const minBid = numberValue(candidate?.minBid);
     const appraisal = numberValue(candidate?.appraisal);
     const failCount = Number(candidate?.failCount || 0);
-    if (minBid > 0) reasons.push(`최저가 ${clean(candidate.minBid)}`);
-    if (appraisal > 0 && minBid > 0) reasons.push(`최저가/감정가 ${percent(discountRate(candidate))}`);
-    if (failCount > 0) reasons.push(`유찰 ${failCount}회`);
-    if (isHousing(candidate)) reasons.push('주거형');
-    if (clean(candidate?.memo || loadDateCandidateMemo(candidate))) reasons.push('메모 있음');
-    return reasons.join(' · ') || '기초 정보 부족';
+    if (minBid > 0) reasons.push(`가격: 최저가 ${clean(candidate.minBid)}로 비교 기준에 포함됩니다.`);
+    if (appraisal > 0 && minBid > 0) reasons.push(`할인율: 감정가 대비 최저가 비율이 ${percent(discountRate(candidate))}입니다.`);
+    if (failCount > 0) reasons.push(`유찰: ${failCount}회 유찰되어 가격 조정 이력이 있습니다.`);
+    if (isHousing(candidate)) reasons.push('용도: 주거형으로 우선 검토군에 포함됩니다.');
+    if (clean(candidate?.memo || loadDateCandidateMemo(candidate))) reasons.push('메모: 별도 검토 메모가 있어 추적 필요성이 있습니다.');
+    return reasons;
+  }
+
+  function scoreReasonText(candidate) {
+    const reasons = scoreReasons(candidate);
+    return reasons.length ? reasons.join(' ') : '기초 정보가 부족해 점수 근거가 제한적입니다.';
+  }
+
+  function oneLineDecision(candidate, score) {
+    const minBid = numberValue(candidate?.minBid);
+    const appraisal = numberValue(candidate?.appraisal);
+    const failCount = Number(candidate?.failCount || 0);
+    const hasMemo = clean(candidate?.memo || loadDateCandidateMemo(candidate)).length > 0;
+    const rate = discountRate(candidate);
+
+    if (score >= 70 && hasMemo) return '가격 조건과 검토 흔적이 모두 있어 우선 확인할 만한 후보입니다.';
+    if (appraisal > 0 && minBid > 0 && rate <= 60) return '감정가 대비 최저가 비율이 낮아 가격 관점에서 먼저 볼 만합니다.';
+    if (failCount >= 5) return '유찰 이력이 많아 가격 변동성과 사유 확인이 필요한 후보입니다.';
+    if (isHousing(candidate)) return '주거형 후보로 권리관계와 점유자를 확인해볼 만합니다.';
+    if (score >= 50) return '기초 조건이 비교 목록 안에서 상대적으로 양호한 후보입니다.';
+    return '정보가 제한적이므로 원본 조회 후 판단해야 합니다.';
   }
 
   function topSavedCandidates(limit = 5) {
     return loadSavedCandidates()
-      .map((candidate) => ({ candidate, score: candidateScore(candidate), reasons: scoreReasons(candidate) }))
+      .map((candidate) => {
+        const score = candidateScore(candidate);
+        return { candidate, score, reasons: scoreReasonText(candidate), decision: oneLineDecision(candidate, score) };
+      })
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   }
@@ -230,14 +253,15 @@
 
     lines.push('');
     lines.push(`저장 후보 TOP 5: ${top.length}건`);
-    top.forEach(({ candidate, score, reasons }, index) => {
+    top.forEach(({ candidate, score, reasons, decision }, index) => {
       const memo = loadDateCandidateMemo(candidate);
       lines.push(`${index + 1}. ${clean(candidate.caseNo || '사건번호 미확인')} / 점수 ${score}`);
+      lines.push(`   - 한 줄 판단: ${decision}`);
       if (candidate.saleDate) lines.push(`   - 매각기일: ${clean(candidate.saleDate)}`);
       if (candidate.usage) lines.push(`   - 용도: ${clean(candidate.usage)}`);
       if (candidate.minBid) lines.push(`   - 최저가: ${clean(candidate.minBid)}`);
       if (candidate.appraisal) lines.push(`   - 감정가: ${clean(candidate.appraisal)}`);
-      lines.push(`   - 근거: ${reasons}`);
+      lines.push(`   - 근거 설명: ${reasons}`);
       if (memo) lines.push(`   - 메모: ${memo}`);
     });
   }
