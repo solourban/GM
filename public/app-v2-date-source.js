@@ -35,6 +35,20 @@
     return n ? `${n.toLocaleString('ko-KR')}원` : '-';
   }
 
+  function sourceLabel(candidate) {
+    const source = clean(candidate?.source);
+    if (source.includes('저장 후보')) return '저장 후보에서 불러옴';
+    if (source.includes('임시 비교')) return '임시 비교 목록에서 불러옴';
+    return '매각기일 선택 후보';
+  }
+
+  function sourceGuide(candidate) {
+    const source = sourceLabel(candidate);
+    if (source === '저장 후보에서 불러옴') return '저장 후보 목록 또는 TOP 5에서 다시 불러온 물건입니다. 기본정보 조회 후 권리분석으로 이어가세요.';
+    if (source === '임시 비교 목록에서 불러옴') return '임시 비교 목록에서 다시 불러온 물건입니다. 기본정보 조회 후 권리분석으로 이어가세요.';
+    return '매각기일 추천에서 선택한 후보입니다. 아래 물건 기본정보 조회 후 권리분석으로 이어가세요.';
+  }
+
   function getFetchedCase() {
     const raw = appState()?.raw;
     if (!raw) return null;
@@ -131,9 +145,9 @@
 
   function loadMemo(candidate) {
     try {
-      return sessionStorage.getItem(memoKey(candidate)) || '';
+      return sessionStorage.getItem(memoKey(candidate)) || localStorage.getItem(memoKey(candidate)) || candidate?.memo || '';
     } catch (_) {
-      return '';
+      return candidate?.memo || '';
     }
   }
 
@@ -141,14 +155,19 @@
     try {
       const key = memoKey(candidate);
       const memo = String(value ?? '').slice(0, 500);
-      if (memo.trim()) sessionStorage.setItem(key, memo);
-      else sessionStorage.removeItem(key);
+      if (memo.trim()) {
+        sessionStorage.setItem(key, memo);
+        if (sourceLabel(candidate) === '저장 후보에서 불러옴') localStorage.setItem(key, memo);
+      } else {
+        sessionStorage.removeItem(key);
+      }
     } catch (_) {}
   }
 
   function clearMemo(candidate) {
     try {
       sessionStorage.removeItem(memoKey(candidate));
+      if (sourceLabel(candidate) === '저장 후보에서 불러옴') localStorage.removeItem(memoKey(candidate));
     } catch (_) {}
   }
 
@@ -184,17 +203,19 @@
   }
 
   function renderCard(candidate) {
+    const label = sourceLabel(candidate);
     return `
       <section class="v2-card" id="v2DateSourceCard">
         <div class="v2-result-head">
           <div>
-            <span class="v2-badge">매각기일 선택 후보</span>
+            <span class="v2-badge">${esc(label)}</span>
             <h3>${esc(candidate.caseNo || '사건번호 미확인')}</h3>
-            <p class="v2-note">매각기일 추천에서 선택한 후보입니다. 아래 물건 기본정보 조회 후 권리분석으로 이어가세요.</p>
+            <p class="v2-note">${esc(sourceGuide(candidate))}</p>
           </div>
           <button type="button" class="v2-small-btn" id="v2ClearDateSourceBtn">안내 지우기</button>
         </div>
         <div class="v2-grid four">
+          <div class="v2-info"><div class="k">출처</div><div class="v">${esc(label)}</div></div>
           <div class="v2-info"><div class="k">매각기일</div><div class="v">${esc(candidate.saleDate || '-')}</div></div>
           <div class="v2-info"><div class="k">용도</div><div class="v">${esc(candidate.usage || '-')}</div></div>
           <div class="v2-info"><div class="k">최저가</div><div class="v">${esc(candidate.minBid || '-')}</div></div>
