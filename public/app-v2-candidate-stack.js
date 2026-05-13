@@ -234,6 +234,41 @@
     return panel?.querySelector('.v2-card') || null;
   }
 
+  function findCandidateByCase(caseNo) {
+    const key = stackKey(caseNo);
+    return loadSavedCandidates().find((item) => stackKey(item.caseNo) === key)
+      || loadStack().find((item) => stackKey(item.caseNo) === key)
+      || null;
+  }
+
+  function fillSearchFromCandidate(caseNo) {
+    const candidate = findCandidateByCase(caseNo);
+    const value = clean(candidate?.caseNo || caseNo);
+    if (!value) return;
+
+    const input = document.querySelector('#caseNo, input[name="caseNo"], input[data-field="caseNo"]');
+    if (input) {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    try {
+      sessionStorage.setItem('auction-note:v2:selected-date-candidate', JSON.stringify({
+        ...(candidate || {}),
+        caseNo: value,
+        source: candidate?.source || '저장 후보',
+        selectedAt: new Date().toISOString(),
+      }));
+    } catch (_) {}
+
+    const searchTab = document.querySelector('[data-tab="search"], [data-panel-target="search"], button[value="search"]');
+    searchTab?.click?.();
+
+    const searchPanel = findSearchPanel();
+    searchPanel?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
   function renderRanking(items) {
     if (!items.length) return '';
 
@@ -288,6 +323,7 @@
                   <td>${esc(item.failCount || '-')}</td>
                   <td>${esc(memo || '-')}</td>
                   <td>
+                    <button type="button" class="v2-small-btn" data-search-saved-candidate="${esc(item.caseNo || '')}">조회하기</button>
                     <button type="button" class="v2-small-btn" data-save-candidate="${esc(item.caseNo || '')}" ${saved ? 'disabled' : ''}>${saved ? '저장됨' : '저장 후보 추가'}</button>
                     <button type="button" class="v2-small-btn" data-remove-candidate="${esc(item.caseNo || '')}">삭제</button>
                   </td>
@@ -310,7 +346,7 @@
         <p class="v2-note">저장 후보를 최저가, 감정가 대비 할인율, 유찰횟수, 주거형 여부, 메모 여부 기준으로 단순 점수화한 목록입니다.</p>
         <div class="v2-detail-table-wrap">
           <table class="v2-detail-table">
-            <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>한 줄 판단</th><th>근거 설명</th></tr></thead>
+            <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>한 줄 판단</th><th>근거 설명</th><th>조회</th></tr></thead>
             <tbody>
               ${top.map(({ item, score, reasons, decision }, index) => `
                 <tr>
@@ -319,6 +355,7 @@
                   <td>${score}</td>
                   <td>${esc(decision)}</td>
                   <td>${esc(reasons)}</td>
+                  <td><button type="button" class="v2-small-btn" data-search-saved-candidate="${esc(item.caseNo || '')}">조회하기</button></td>
                 </tr>
               `).join('')}
             </tbody>
@@ -365,7 +402,10 @@
                   <td>${esc(item.minBid || '-')}</td>
                   <td>${esc(item.appraisal || '-')}</td>
                   <td>${esc(clean(item.memo || loadMemo(item.caseNo)) || '-')}</td>
-                  <td><button type="button" class="v2-small-btn" data-remove-saved-candidate="${esc(item.caseNo || '')}">저장 삭제</button></td>
+                  <td>
+                    <button type="button" class="v2-small-btn" data-search-saved-candidate="${esc(item.caseNo || '')}">조회하기</button>
+                    <button type="button" class="v2-small-btn" data-remove-saved-candidate="${esc(item.caseNo || '')}">저장 삭제</button>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -428,6 +468,15 @@
         upsertCard();
       });
     }
+
+    document.querySelectorAll('[data-search-saved-candidate]').forEach((button) => {
+      if (button.dataset.bound) return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', () => {
+        fillSearchFromCandidate(button.dataset.searchSavedCandidate);
+        upsertCard();
+      });
+    });
 
     document.querySelectorAll('[data-save-candidate]').forEach((button) => {
       if (button.dataset.bound) return;
