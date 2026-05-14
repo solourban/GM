@@ -5,6 +5,7 @@
   const SAVED_CANDIDATES_KEY = 'auction-note:v2:saved-candidates';
   const DATE_CANDIDATE_MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
+  const TRADE_STORAGE_KEY = 'auction-note:v2:molit-trades';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -91,6 +92,15 @@
   function loadLocationBasics() {
     try {
       const raw = sessionStorage.getItem(LOCATION_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function loadMolitTradeBasics() {
+    try {
+      const raw = sessionStorage.getItem(TRADE_STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (_) {
       return null;
@@ -293,6 +303,50 @@
     if (location.kakaoMapUrl) lines.push(`- 카카오맵: ${clean(location.kakaoMapUrl)}`);
   }
 
+  function tradeDate(trade) {
+    const y = clean(trade?.dealYear);
+    const m = clean(trade?.dealMonth).padStart(2, '0');
+    const d = clean(trade?.dealDay).padStart(2, '0');
+    return [y, m, d].filter(Boolean).join('.');
+  }
+
+  function appendMolitTradeSummary(lines) {
+    const result = loadMolitTradeBasics();
+    if (!result?.lawdCd) return;
+    const trades = Array.isArray(result.trades) ? result.trades.slice(0, 5) : [];
+
+    lines.push('');
+    lines.push('실거래가 기초정보:');
+    lines.push(`- LAWD_CD: ${clean(result.lawdCd)}`);
+    if (result.dealYmd) lines.push(`- 조회 계약월: ${clean(result.dealYmd)}`);
+    lines.push(`- 단지명 필터: ${clean(result.aptName || '미적용')}`);
+    lines.push(`- 표시 결과: ${Number(result.count || 0)}건 / 원자료 ${Number(result.rawCount || 0)}건`);
+    if (Array.isArray(result.tradeTypes) && result.tradeTypes.length) {
+      const typeSummary = result.tradeTypes.map((t) => `${clean(t.label || t.type)} ${Number(t.filteredCount || 0)}건`).join(' / ');
+      lines.push(`- 유형별 결과: ${typeSummary}`);
+    }
+
+    if (!trades.length) {
+      lines.push('- 거래 목록: 최근 조회 범위 내 표시 가능한 거래 없음');
+      lines.push('- 확인 필요: 단지명 필터 해제, 계약월 확대, 동일 면적·층 여부 별도 확인');
+      return;
+    }
+
+    lines.push('- 주요 거래:');
+    trades.forEach((trade, index) => {
+      const parts = [
+        clean(trade.tradeTypeLabel || trade.tradeType || ''),
+        clean(trade.aptName || ''),
+        tradeDate(trade),
+        clean(trade.dealAmount ? `${trade.dealAmount}만원` : ''),
+        clean(trade.area ? `전용 ${trade.area}㎡` : ''),
+        clean(trade.floor ? `${trade.floor}층` : ''),
+      ].filter(Boolean);
+      lines.push(`  ${index + 1}. ${parts.join(' / ')}`);
+    });
+    lines.push('- 주의: 실거래가는 참고용이며 동일 단지·동·층·면적, 계약해제 여부, 거래시점 차이를 별도 확인해야 합니다.');
+  }
+
   function buildSummaryText(report) {
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inheritedTotal = numberValue(report?.inherited?.total);
@@ -320,6 +374,7 @@
     lines.push(`최저가 기준 실질 부담: ${money(practicalBurden)}`);
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
     appendLocationSummary(lines);
+    appendMolitTradeSummary(lines);
     appendDateCandidateSummary(lines);
     appendCandidateStackSummary(lines);
     appendSavedTopFiveSummary(lines);
