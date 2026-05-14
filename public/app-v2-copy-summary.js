@@ -31,9 +31,19 @@
     return n ? `${n.toLocaleString('ko-KR')}원` : '0원';
   }
 
+  function won(value) {
+    const n = Number(value || 0);
+    return n ? `${Math.round(n).toLocaleString('ko-KR')}원` : '-';
+  }
+
   function manwon(value) {
     const n = Number(value || 0);
     return n ? `${Math.round(n).toLocaleString('ko-KR')}만원` : '-';
+  }
+
+  function ratio(value) {
+    const n = Number(value || 0);
+    return n ? `${n.toFixed(1)}%` : '-';
   }
 
   function riskLabel(level) {
@@ -320,6 +330,7 @@
     if (!result?.lawdCd) return;
     const trades = Array.isArray(result.trades) ? result.trades.slice(0, 5) : [];
     const stats = result.stats || {};
+    const comparison = result.comparison || {};
 
     lines.push('');
     lines.push('실거래가 기초정보:');
@@ -328,6 +339,12 @@
     lines.push(`- 단지명 필터: ${clean(result.aptName || '미적용')}`);
     lines.push(`- 표시 결과: ${Number(result.count || 0)}건 / 원자료 ${Number(result.rawCount || 0)}건`);
     if (result.judgment) lines.push(`- 거래 판단: ${clean(result.judgment)}`);
+    if (comparison.judgment) lines.push(`- 가격 비교 판단: ${clean(comparison.judgment)}`);
+    if (comparison.minBidWon) lines.push(`- 경매 최저가: ${won(comparison.minBidWon)}`);
+    if (comparison.avgTradeWon) lines.push(`- 평균 실거래가: ${won(comparison.avgTradeWon)}`);
+    if (comparison.minTradeWon) lines.push(`- 최저 실거래가: ${won(comparison.minTradeWon)}`);
+    if (comparison.avgRatio) lines.push(`- 최저가/평균가: ${ratio(comparison.avgRatio)}`);
+    if (comparison.minRatio) lines.push(`- 최저가/최저실거래: ${ratio(comparison.minRatio)}`);
     if (stats.count !== undefined) lines.push(`- 거래 건수: ${Number(stats.count || 0)}건`);
     if (stats.minPrice) lines.push(`- 최저 거래금액: ${manwon(stats.minPrice)}`);
     if (stats.maxPrice) lines.push(`- 최고 거래금액: ${manwon(stats.maxPrice)}`);
