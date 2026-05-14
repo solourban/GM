@@ -31,6 +31,11 @@
     return n ? `${n.toLocaleString('ko-KR')}원` : '0원';
   }
 
+  function manwon(value) {
+    const n = Number(value || 0);
+    return n ? `${Math.round(n).toLocaleString('ko-KR')}만원` : '-';
+  }
+
   function riskLabel(level) {
     if (level === 'danger') return '높음';
     if (level === 'warn') return '주의';
@@ -314,6 +319,7 @@
     const result = loadMolitTradeBasics();
     if (!result?.lawdCd) return;
     const trades = Array.isArray(result.trades) ? result.trades.slice(0, 5) : [];
+    const stats = result.stats || {};
 
     lines.push('');
     lines.push('실거래가 기초정보:');
@@ -321,6 +327,12 @@
     if (result.dealYmd) lines.push(`- 조회 계약월: ${clean(result.dealYmd)}`);
     lines.push(`- 단지명 필터: ${clean(result.aptName || '미적용')}`);
     lines.push(`- 표시 결과: ${Number(result.count || 0)}건 / 원자료 ${Number(result.rawCount || 0)}건`);
+    if (result.judgment) lines.push(`- 거래 판단: ${clean(result.judgment)}`);
+    if (stats.count !== undefined) lines.push(`- 거래 건수: ${Number(stats.count || 0)}건`);
+    if (stats.minPrice) lines.push(`- 최저 거래금액: ${manwon(stats.minPrice)}`);
+    if (stats.maxPrice) lines.push(`- 최고 거래금액: ${manwon(stats.maxPrice)}`);
+    if (stats.avgPrice) lines.push(`- 평균 거래금액: ${manwon(stats.avgPrice)}`);
+    if (stats.minArea && stats.maxArea) lines.push(`- 전용면적 범위: ${Number(stats.minArea).toFixed(2)}㎡ ~ ${Number(stats.maxArea).toFixed(2)}㎡`);
     if (Array.isArray(result.tradeTypes) && result.tradeTypes.length) {
       const typeSummary = result.tradeTypes.map((t) => `${clean(t.label || t.type)} ${Number(t.filteredCount || 0)}건`).join(' / ');
       lines.push(`- 유형별 결과: ${typeSummary}`);
