@@ -102,6 +102,53 @@
     return `<div class="v2-info ${extra}"><div class="k">${esc(k)}</div><div class="v">${esc(clean(v) || '-')}</div></div>`;
   }
 
+  function moneyNumber(value) {
+    const n = Number(clean(value).replace(/[^0-9]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatManwon(value) {
+    const n = Number(value || 0);
+    return n ? `${Math.round(n).toLocaleString('ko-KR')}만원` : '-';
+  }
+
+  function areaNumber(value) {
+    const n = Number(clean(value).replace(/[^0-9.]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function tradeStats(trades) {
+    const prices = trades.map((trade) => moneyNumber(trade.dealAmount)).filter((n) => n > 0);
+    const areas = trades.map((trade) => areaNumber(trade.area)).filter((n) => n > 0);
+    const minPrice = prices.length ? Math.min(...prices) : 0;
+    const maxPrice = prices.length ? Math.max(...prices) : 0;
+    const avgPrice = prices.length ? prices.reduce((sum, n) => sum + n, 0) / prices.length : 0;
+    const minArea = areas.length ? Math.min(...areas) : 0;
+    const maxArea = areas.length ? Math.max(...areas) : 0;
+    return { count: trades.length, minPrice, maxPrice, avgPrice, minArea, maxArea };
+  }
+
+  function judgmentText(stats, result) {
+    if (!stats.count) return '최근 조회 범위에서 표시 가능한 거래가 없어 단지명 필터 해제 또는 계약월 확대가 필요합니다.';
+    if (stats.count >= 5) return '동일 법정동 기준 거래가 여러 건 확인되어 시세 참고자료로 활용할 수 있습니다.';
+    if (stats.count >= 2) return '거래가 일부 확인되지만 표본이 적어 동일 단지·면적 여부 확인이 필요합니다.';
+    return '거래가 1건만 확인되어 시세 판단 근거로는 부족합니다.';
+  }
+
+  function renderStatsSummary(trades, result) {
+    const stats = tradeStats(trades);
+    return `
+      <div class="v2-grid compact">
+        ${info('거래 판단', judgmentText(stats, result), 'wide')}
+        ${info('거래 건수', `${stats.count}건`)}
+        ${info('최저 거래금액', formatManwon(stats.minPrice))}
+        ${info('최고 거래금액', formatManwon(stats.maxPrice))}
+        ${info('평균 거래금액', formatManwon(stats.avgPrice))}
+        ${info('전용면적 범위', stats.minArea && stats.maxArea ? `${stats.minArea.toFixed(2)}㎡ ~ ${stats.maxArea.toFixed(2)}㎡` : '-')}
+      </div>
+    `;
+  }
+
   function renderLoading(location) {
     return `
       <section class="v2-result-card" id="${CARD_ID}">
@@ -163,6 +210,7 @@
 
   function renderSuccess(result, location) {
     const trades = Array.isArray(result.data?.trades) ? result.data.trades : [];
+    const stats = tradeStats(trades);
     saveTradeResult({
       lawdCd: result.lawdCd,
       dealYmd: result.dealYmd,
@@ -171,6 +219,8 @@
       count: Number(result.data?.count || 0),
       rawCount: Number(result.data?.rawCount || 0),
       tradeTypes: result.data?.tradeTypes || [],
+      stats,
+      judgment: judgmentText(stats, result),
       trades: trades.slice(0, 20),
       attempts: result.attempts || [],
     });
@@ -184,6 +234,7 @@
             <p class="v2-note">법정동코드 기준 최근 계약월을 순차 조회했습니다. API 키는 브라우저에 노출되지 않습니다.</p>
           </div>
         </div>
+        ${renderStatsSummary(trades, result)}
         <div class="v2-grid compact">
           ${info('LAWD_CD', result.lawdCd)}
           ${info('조회 계약월', result.dealYmd)}
