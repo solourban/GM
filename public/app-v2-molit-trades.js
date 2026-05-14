@@ -112,9 +112,19 @@
     return n ? `${Math.round(n).toLocaleString('ko-KR')}만원` : '-';
   }
 
+  function formatWon(value) {
+    const n = Number(value || 0);
+    return n ? `${Math.round(n).toLocaleString('ko-KR')}원` : '-';
+  }
+
   function areaNumber(value) {
     const n = Number(clean(value).replace(/[^0-9.]/g, ''));
     return Number.isFinite(n) ? n : 0;
+  }
+
+  function auctionMinBidWon() {
+    const basic = basicInfo();
+    return moneyNumber(basic['최저매각가격'] || basic['최저가'] || basic['최저입찰가'] || '');
   }
 
   function tradeStats(trades) {
@@ -128,6 +138,36 @@
     return { count: trades.length, minPrice, maxPrice, avgPrice, minArea, maxArea };
   }
 
+  function ratioText(wonValue, manwonValue) {
+    const baseWon = Number(manwonValue || 0) * 10000;
+    if (!wonValue || !baseWon) return '-';
+    return `${((wonValue / baseWon) * 100).toFixed(1)}%`;
+  }
+
+  function auctionTradeComparison(stats) {
+    const minBidWon = auctionMinBidWon();
+    const avgTradeWon = Number(stats.avgPrice || 0) * 10000;
+    const minTradeWon = Number(stats.minPrice || 0) * 10000;
+    const avgRatio = minBidWon && avgTradeWon ? (minBidWon / avgTradeWon) * 100 : 0;
+    const minRatio = minBidWon && minTradeWon ? (minBidWon / minTradeWon) * 100 : 0;
+
+    let judgment = '실거래 표본 또는 경매 최저가가 부족해 가격 비교 판단을 보류합니다.';
+    if (minBidWon && avgRatio > 0) {
+      if (avgRatio <= 70) judgment = '경매 최저가가 평균 실거래가 대비 낮은 편입니다. 권리·명도·수리비를 반영해 추가 검토할 만합니다.';
+      else if (avgRatio <= 90) judgment = '경매 최저가가 평균 실거래가 대비 보통 범위입니다. 비용 반영 후 입찰가를 신중히 정해야 합니다.';
+      else judgment = '경매 최저가가 평균 실거래가에 근접하거나 높습니다. 추가 비용 반영 시 가격 매력이 낮을 수 있습니다.';
+    }
+
+    return {
+      minBidWon,
+      avgTradeWon,
+      minTradeWon,
+      avgRatio,
+      minRatio,
+      judgment,
+    };
+  }
+
   function judgmentText(stats, result) {
     if (!stats.count) return '최근 조회 범위에서 표시 가능한 거래가 없어 단지명 필터 해제 또는 계약월 확대가 필요합니다.';
     if (stats.count >= 5) return '동일 법정동 기준 거래가 여러 건 확인되어 시세 참고자료로 활용할 수 있습니다.';
@@ -137,9 +177,15 @@
 
   function renderStatsSummary(trades, result) {
     const stats = tradeStats(trades);
+    const comparison = auctionTradeComparison(stats);
     return `
       <div class="v2-grid compact">
         ${info('거래 판단', judgmentText(stats, result), 'wide')}
+        ${info('가격 비교 판단', comparison.judgment, 'wide')}
+        ${info('경매 최저가', formatWon(comparison.minBidWon))}
+        ${info('평균 실거래가', comparison.avgTradeWon ? formatWon(comparison.avgTradeWon) : '-')}
+        ${info('최저가/평균가', comparison.avgRatio ? `${comparison.avgRatio.toFixed(1)}%` : '-')}
+        ${info('최저가/최저실거래', comparison.minRatio ? `${comparison.minRatio.toFixed(1)}%` : '-')}
         ${info('거래 건수', `${stats.count}건`)}
         ${info('최저 거래금액', formatManwon(stats.minPrice))}
         ${info('최고 거래금액', formatManwon(stats.maxPrice))}
@@ -211,6 +257,7 @@
   function renderSuccess(result, location) {
     const trades = Array.isArray(result.data?.trades) ? result.data.trades : [];
     const stats = tradeStats(trades);
+    const comparison = auctionTradeComparison(stats);
     saveTradeResult({
       lawdCd: result.lawdCd,
       dealYmd: result.dealYmd,
@@ -220,6 +267,7 @@
       rawCount: Number(result.data?.rawCount || 0),
       tradeTypes: result.data?.tradeTypes || [],
       stats,
+      comparison,
       judgment: judgmentText(stats, result),
       trades: trades.slice(0, 20),
       attempts: result.attempts || [],
