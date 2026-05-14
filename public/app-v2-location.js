@@ -1,0 +1,151 @@
+(() => {
+  const CARD_ID = 'v2LocationCard';
+  const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function appState() {
+    return window.__auctionV2?.state || null;
+  }
+
+  function basicInfo() {
+    return appState()?.raw?.basic || {};
+  }
+
+  function rawCaseKey() {
+    const state = appState();
+    const raw = state?.raw || {};
+    return clean(raw.caseNo || basicInfo()['사건번호'] || 'unknown');
+  }
+
+  function extractAddress() {
+    const basic = basicInfo();
+    const raw = clean(basic['소재지'] || basic['주소'] || basic['물건소재지'] || '');
+    if (!raw) return '';
+
+    return raw
+      .replace(/\([^()]*\)\s*$/g, '')
+      .split(',')[0]
+      .replace(/\s+외\s*\d+.*$/g, '')
+      .trim();
+  }
+
+  async function fetchGeocode(address) {
+    const res = await fetch(`/api/location/geocode?address=${encodeURIComponent(address)}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || data.detail || '주소 좌표 변환에 실패했습니다.');
+    return data;
+  }
+
+  function findAnchor() {
+    const cards = Array.from(document.querySelectorAll('.v2-result-card'));
+    return cards.find((card) => card.textContent.includes('물건 기본정보')) || cards[0] || null;
+  }
+
+  function info(k, v, extra = '') {
+    return `<div class="v2-info ${extra}"><div class="k">${esc(k)}</div><div class="v">${esc(clean(v) || '-')}</div></div>`;
+  }
+
+  function renderLoading(address) {
+    return `
+      <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
+        <div class="v2-loading"><span class="v2-spinner"></span><div><h3>입지 기초정보 조회 중</h3><p class="v2-note">카카오 주소검색 API로 좌표를 확인하고 있습니다. API 키는 서버에서만 사용됩니다.</p></div></div>
+        <p class="v2-note">조회 주소: ${esc(address)}</p>
+      </section>
+    `;
+  }
+
+  function renderError(address, message) {
+    return `
+      <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
+        <span class="v2-badge">입지 기초정보</span>
+        <h3>좌표 변환 확인 필요</h3>
+        <p class="v2-note">${esc(message)}</p>
+        <div class="v2-grid compact">
+          ${info('조회 주소', address)}
+          ${info('API 상태', '확인 필요')}
+          ${info('보안 구조', '서버 프록시 사용')}
+        </div>
+      </section>
+    `;
+  }
+
+  function renderSuccess(address, data) {
+    const doc = Array.isArray(data.documents) ? data.documents[0] : null;
+    if (!doc) return renderError(address, '해당 주소로 변환 가능한 좌표를 찾지 못했습니다. 소재지 표기를 확인해주세요.');
+
+    return `
+      <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
+        <div class="v2-result-head">
+          <div>
+            <span class="v2-badge">입지 기초정보</span>
+            <h3>주소 좌표 변환 완료</h3>
+            <p class="v2-note">카카오 REST API를 서버 프록시로 호출했습니다. API 키는 브라우저에 노출되지 않습니다.</p>
+          </div>
+        </div>
+        <div class="v2-grid">
+          ${info('조회 주소', address, 'wide')}
+          ${info('지번주소', doc.addressName)}
+          ${info('도로명주소', doc.roadAddress || '-')}
+          ${info('건물명', doc.buildingName || '-')}
+          ${info('좌표 X', doc.x)}
+          ${info('좌표 Y', doc.y)}
+          ${info('시도', doc.region1)}
+          ${info('시군구', doc.region2)}
+          ${info('읍면동', doc.region3)}
+          ${info('법정동코드', doc.bCode)}
+          ${info('행정동코드', doc.hCode)}
+          ${info('우편번호', doc.zoneNo || '-')}
+        </div>
+        <p class="v2-note">다음 단계에서 이 좌표를 기준으로 지도, 주변시설, 실거래가 보조 검토를 연결합니다.</p>
+      </section>
+    `;
+  }
+
+  function insertAfterAnchor(html) {
+    const anchor = findAnchor();
+    if (!anchor) return;
+    const existing = document.getElementById(CARD_ID);
+    if (existing) existing.outerHTML = html;
+    else anchor.insertAdjacentHTML('afterend', html);
+  }
+
+  let lastKey = '';
+  let pendingKey = '';
+
+  async function upsertLocationCard() {
+    const state = appState();
+    const address = extractAddress();
+    const key = `${rawCaseKey()}::${address}`;
+    const existing = document.getElementById(CARD_ID);
+
+    if (!state?.raw || !address) {
+      existing?.remove();
+      lastKey = '';
+      return;
+    }
+
+    if (key === lastKey || key === pendingKey) return;
+    pendingKey = key;
+    insertAfterAnchor(renderLoading(address));
+
+    try {
+      const data = await fetchGeocode(address);
+      if (pendingKey !== key) return;
+      insertAfterAnchor(renderSuccess(address, data));
+      lastKey = key;
+    } catch (e) {
+      if (pendingKey !== key) return;
+      insertAfterAnchor(renderError(address, e.message || String(e)));
+      lastKey = key;
+    } finally {
+      if (pendingKey === key) pendingKey = '';
+    }
+  }
+
+  setInterval(upsertLocationCard, 1200);
+})();
