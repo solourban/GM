@@ -1,5 +1,6 @@
 (() => {
   const CARD_ID = 'v2LocationCard';
+  const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function esc(value) {
@@ -63,6 +64,36 @@
     return `https://map.kakao.com/link/map/${label},${y},${x}`;
   }
 
+  function saveLocationResult(address, doc) {
+    try {
+      if (!doc) return;
+      sessionStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({
+        caseKey: rawCaseKey(),
+        queryAddress: address,
+        addressName: clean(doc.addressName),
+        roadAddress: clean(doc.roadAddress),
+        buildingName: clean(doc.buildingName),
+        x: clean(doc.x),
+        y: clean(doc.y),
+        region1: clean(doc.region1),
+        region2: clean(doc.region2),
+        region3: clean(doc.region3),
+        bCode: clean(doc.bCode),
+        hCode: clean(doc.hCode),
+        zoneNo: clean(doc.zoneNo),
+        kakaoMapUrl: mapCoordUrl(doc, address),
+        kakaoSearchUrl: mapSearchUrl(doc, address),
+        savedAt: new Date().toISOString(),
+      }));
+    } catch (_) {}
+  }
+
+  function clearLocationResult() {
+    try {
+      sessionStorage.removeItem(LOCATION_STORAGE_KEY);
+    } catch (_) {}
+  }
+
   function renderLoading(address) {
     return `
       <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
@@ -91,6 +122,7 @@
     const doc = Array.isArray(data.documents) ? data.documents[0] : null;
     if (!doc) return renderError(address, '해당 주소로 변환 가능한 좌표를 찾지 못했습니다. 소재지 표기를 확인해주세요.');
 
+    saveLocationResult(address, doc);
     const kakaoMapUrl = mapCoordUrl(doc, address);
     const kakaoSearchUrl = mapSearchUrl(doc, address);
 
@@ -145,6 +177,7 @@
 
     if (!state?.raw || !address) {
       existing?.remove();
+      clearLocationResult();
       lastKey = '';
       return;
     }
@@ -160,6 +193,7 @@
       lastKey = key;
     } catch (e) {
       if (pendingKey !== key) return;
+      clearLocationResult();
       insertAfterAnchor(renderError(address, e.message || String(e)));
       lastKey = key;
     } finally {
