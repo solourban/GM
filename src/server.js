@@ -89,15 +89,106 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api', rateLimit);
 
+function hasEnv(name) {
+  return Boolean(String(process.env[name] || '').trim());
+}
+
+function externalApiConfig() {
+  return {
+    kakaoRestKey: process.env.KAKAO_REST_API_KEY || process.env.KAKAO_LOCAL_API_KEY || '',
+    kakaoMapKey: process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '',
+    molitKey: process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '',
+  };
+}
+
 app.get('/api/config', (req, res) => {
-  const kakaoKey = process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '';
-  const molitKey = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
+  const keys = externalApiConfig();
   res.json({
     ok: true,
-    kakaoJsKey: kakaoKey,
-    hasKakaoMap: Boolean(kakaoKey),
-    hasMolit: Boolean(molitKey),
+    hasKakaoRest: Boolean(keys.kakaoRestKey),
+    hasKakaoMap: Boolean(keys.kakaoMapKey),
+    hasMolit: Boolean(keys.molitKey),
+    envNames: {
+      kakaoRest: 'KAKAO_REST_API_KEY',
+      kakaoMap: 'KAKAO_JS_KEY',
+      molit: 'MOLIT_API_KEY',
+    },
   });
+});
+
+function validateAddressInput(address) {
+  const value = String(address || '').trim();
+  if (!value) return { error: '주소를 입력해주세요.' };
+  if (value.length < 2) return { error: '주소는 2자 이상 입력해주세요.' };
+  if (value.length > 120) return { error: '주소는 120자 이하로 입력해주세요.' };
+  if (/[<>`{}]/.test(value)) return { error: '주소에 허용되지 않는 문자가 포함되어 있습니다.' };
+  return { value };
+}
+
+function normalizeKakaoAddressDocument(doc) {
+  const address = doc?.address || {};
+  const road = doc?.road_address || {};
+  return {
+    addressName: doc?.address_name || '',
+    x: doc?.x || '',
+    y: doc?.y || '',
+    type: doc?.address_type || '',
+    region1: address.region_1depth_name || road.region_1depth_name || '',
+    region2: address.region_2depth_name || road.region_2depth_name || '',
+    region3: address.region_3depth_name || road.region_3depth_name || '',
+    roadAddress: road.address_name || '',
+    buildingName: road.building_name || '',
+    zoneNo: road.zone_no || '',
+    bCode: address.b_code || '',
+    hCode: address.h_code || '',
+  };
+}
+
+app.get('/api/location/geocode', async (req, res) => {
+  try {
+    const keys = externalApiConfig();
+    if (!keys.kakaoRestKey) return res.status(400).json({ ok: false, error: 'KAKAO_REST_API_KEY 환경변수가 필요합니다.' });
+
+    const input = validateAddressInput(req.query.address);
+    if (input.error) return res.status(400).json({ ok: false, error: input.error });
+
+    const url = new URL('https://dapi.kakao.com/v2/local/search/address.json');
+    url.searchParams.set('query', input.value);
+    url.searchParams.set('size', '5');
+
+    const apiRes = await fetch(url.toString(), {
+      headers: {
+        Authorization: `KakaoAK ${keys.kakaoRestKey}`,
+        Accept: 'application/json',
+      },
+    });
+    const data = await apiRes.json().catch(() => null);
+
+    if (!apiRes.ok) {
+      return res.status(apiRes.status).json({
+        ok: false,
+        error: '카카오 주소검색 API 응답 오류가 발생했습니다.',
+        status: apiRes.status,
+        detail: data?.message || data?.errorType || null,
+      });
+    }
+
+    const documents = Array.isArray(data?.documents) ? data.documents.map(normalizeKakaoAddressDocument) : [];
+    return res.json({
+      ok: true,
+      query: input.value,
+      count: documents.length,
+      documents,
+      meta: {
+        totalCount: data?.meta?.total_count || 0,
+        pageableCount: data?.meta?.pageable_count || 0,
+        isEnd: Boolean(data?.meta?.is_end),
+      },
+    });
+  } catch (e) {
+    console.error('[location/geocode] exception:', e);
+    return res.status(500).json({ ok: false, error: '주소 좌표 변환 중 오류가 발생했습니다.', detail: e.message || String(e) });
+  }
 });
 
 app.get('/api/courts', (req, res) => {
