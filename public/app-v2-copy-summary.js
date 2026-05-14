@@ -4,6 +4,7 @@
   const DATE_CANDIDATE_STACK_KEY = 'auction-note:v2:date-candidate-stack';
   const SAVED_CANDIDATES_KEY = 'auction-note:v2:saved-candidates';
   const DATE_CANDIDATE_MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
+  const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -84,6 +85,15 @@
       return Array.isArray(parsed) ? parsed : [];
     } catch (_) {
       return [];
+    }
+  }
+
+  function loadLocationBasics() {
+    try {
+      const raw = sessionStorage.getItem(LOCATION_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -266,6 +276,23 @@
     });
   }
 
+  function appendLocationSummary(lines) {
+    const location = loadLocationBasics();
+    if (!location?.queryAddress) return;
+
+    lines.push('');
+    lines.push('입지 기초정보:');
+    lines.push(`- 조회 주소: ${clean(location.queryAddress)}`);
+    if (location.addressName) lines.push(`- 지번주소: ${clean(location.addressName)}`);
+    if (location.roadAddress) lines.push(`- 도로명주소: ${clean(location.roadAddress)}`);
+    if (location.buildingName) lines.push(`- 건물명: ${clean(location.buildingName)}`);
+    if (location.x && location.y) lines.push(`- 좌표: X ${clean(location.x)} / Y ${clean(location.y)}`);
+    if (location.region1 || location.region2 || location.region3) lines.push(`- 행정구역: ${[location.region1, location.region2, location.region3].map(clean).filter(Boolean).join(' ')}`);
+    if (location.bCode) lines.push(`- 법정동코드: ${clean(location.bCode)}`);
+    if (location.hCode) lines.push(`- 행정동코드: ${clean(location.hCode)}`);
+    if (location.kakaoMapUrl) lines.push(`- 카카오맵: ${clean(location.kakaoMapUrl)}`);
+  }
+
   function buildSummaryText(report) {
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inheritedTotal = numberValue(report?.inherited?.total);
@@ -292,6 +319,7 @@
     lines.push(`인수 추정금액: ${money(inheritedTotal)}`);
     lines.push(`최저가 기준 실질 부담: ${money(practicalBurden)}`);
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
+    appendLocationSummary(lines);
     appendDateCandidateSummary(lines);
     appendCandidateStackSummary(lines);
     appendSavedTopFiveSummary(lines);
