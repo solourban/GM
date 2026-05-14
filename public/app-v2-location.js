@@ -50,6 +50,19 @@
     return `<div class="v2-info ${extra}"><div class="k">${esc(k)}</div><div class="v">${esc(clean(v) || '-')}</div></div>`;
   }
 
+  function mapSearchUrl(doc, address) {
+    const query = clean(doc?.roadAddress || doc?.addressName || address);
+    return `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
+  }
+
+  function mapCoordUrl(doc, address) {
+    const x = clean(doc?.x);
+    const y = clean(doc?.y);
+    const label = encodeURIComponent(clean(doc?.buildingName || doc?.roadAddress || doc?.addressName || address || '경매 물건 위치'));
+    if (!x || !y) return mapSearchUrl(doc, address);
+    return `https://map.kakao.com/link/map/${label},${y},${x}`;
+  }
+
   function renderLoading(address) {
     return `
       <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
@@ -78,6 +91,9 @@
     const doc = Array.isArray(data.documents) ? data.documents[0] : null;
     if (!doc) return renderError(address, '해당 주소로 변환 가능한 좌표를 찾지 못했습니다. 소재지 표기를 확인해주세요.');
 
+    const kakaoMapUrl = mapCoordUrl(doc, address);
+    const kakaoSearchUrl = mapSearchUrl(doc, address);
+
     return `
       <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
         <div class="v2-result-head">
@@ -85,6 +101,10 @@
             <span class="v2-badge">입지 기초정보</span>
             <h3>주소 좌표 변환 완료</h3>
             <p class="v2-note">카카오 REST API를 서버 프록시로 호출했습니다. API 키는 브라우저에 노출되지 않습니다.</p>
+          </div>
+          <div class="v2-cta-row" style="margin-top:0;">
+            <a class="v2-secondary-btn" href="${esc(kakaoMapUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">카카오맵에서 보기</a>
+            <a class="v2-small-btn" href="${esc(kakaoSearchUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">주소 검색</a>
           </div>
         </div>
         <div class="v2-grid">
@@ -101,7 +121,7 @@
           ${info('행정동코드', doc.hCode)}
           ${info('우편번호', doc.zoneNo || '-')}
         </div>
-        <p class="v2-note">다음 단계에서 이 좌표를 기준으로 지도, 주변시설, 실거래가 보조 검토를 연결합니다.</p>
+        <p class="v2-note">지도 링크는 API 키 없이 외부 카카오맵 페이지를 여는 방식입니다. 다음 단계에서 주변시설·실거래가 보조 검토를 연결합니다.</p>
       </section>
     `;
   }
