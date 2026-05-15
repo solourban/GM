@@ -24,8 +24,34 @@ if (allowedOrigins.length) {
   }));
 }
 
+function createRequestId() {
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function errorBody(req, message, extra = {}) {
+  return {
+    ok: false,
+    error: message,
+    requestId: req.requestId || null,
+    ...extra,
+  };
+}
+
+function logException(scope, req, error, extra = {}) {
+  console.error(`[${scope}]`, {
+    requestId: req.requestId || null,
+    method: req.method,
+    path: req.path,
+    message: error?.message || String(error),
+    stack: error?.stack || null,
+    ...extra,
+  });
+}
+
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => {
+  req.requestId = req.headers['x-request-id'] || createRequestId();
+  res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
   res.setHeader('Cache-Control', 'no-store');
@@ -63,7 +89,9 @@ function rateLimit(req, res, next) {
   recent.push(now);
   apiHits.set(ip, recent);
 
-  if (recent.length > RATE_LIMIT_MAX) return res.status(429).json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' });
+  if (recent.length > RATE_LIMIT_MAX) {
+    return res.status(429).json(errorBody(req, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'));
+  }
   return next();
 }
 
@@ -84,14 +112,11 @@ app.get('/api/health', (req, res) => {
     startedAt: startedAt.toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
+    requestId: req.requestId,
   });
 });
 
 app.use('/api', rateLimit);
-
-function hasEnv(name) {
-  return Boolean(String(process.env[name] || '').trim());
-}
 
 function externalApiConfig() {
   return {
@@ -113,6 +138,7 @@ app.get('/api/config', (req, res) => {
       kakaoMap: 'KAKAO_JS_KEY',
       molit: 'MOLIT_API_KEY',
     },
+    requestId: req.requestId,
   });
 });
 
@@ -147,10 +173,10 @@ function normalizeKakaoAddressDocument(doc) {
 app.get('/api/location/geocode', async (req, res) => {
   try {
     const keys = externalApiConfig();
-    if (!keys.kakaoRestKey) return res.status(400).json({ ok: false, error: 'KAKAO_REST_API_KEY 환경변수가 필요합니다.' });
+    if (!keys.kakaoRestKey) return res.status(400).json(errorBody(req, '카카오 주소검색 환경설정이 필요합니다.'));
 
     const input = validateAddressInput(req.query.address);
-    if (input.error) return res.status(400).json({ ok: false, error: input.error });
+    if (input.error) return res.status(400).json(errorBody(req, input.error));
 
     const url = new URL('https://dapi.kakao.com/v2/local/search/address.json');
     url.searchParams.set('query', input.value);
@@ -165,12 +191,8 @@ app.get('/api/location/geocode', async (req, res) => {
     const data = await apiRes.json().catch(() => null);
 
     if (!apiRes.ok) {
-      return res.status(apiRes.status).json({
-        ok: false,
-        error: '카카오 주소검색 API 응답 오류가 발생했습니다.',
-        status: apiRes.status,
-        detail: data?.message || data?.errorType || null,
-      });
+      logException('location/geocode:upstream', req, new Error('Kakao API response error'), { status: apiRes.status, upstream: data?.message || data?.errorType || null });
+      return res.status(apiRes.status).json(errorBody(req, '카카오 주소검색 API 응답 오류가 발생했습니다.', { status: apiRes.status }));
     }
 
     const documents = Array.isArray(data?.documents) ? data.documents.map(normalizeKakaoAddressDocument) : [];
@@ -184,15 +206,16 @@ app.get('/api/location/geocode', async (req, res) => {
         pageableCount: data?.meta?.pageable_count || 0,
         isEnd: Boolean(data?.meta?.is_end),
       },
+      requestId: req.requestId,
     });
   } catch (e) {
-    console.error('[location/geocode] exception:', e);
-    return res.status(500).json({ ok: false, error: '주소 좌표 변환 중 오류가 발생했습니다.', detail: e.message || String(e) });
+    logException('location/geocode', req, e);
+    return res.status(500).json(errorBody(req, '주소 좌표 변환 중 오류가 발생했습니다.'));
   }
 });
 
 app.get('/api/courts', (req, res) => {
-  res.json({ ok: true, courts: listCourts() });
+  res.json({ ok: true, courts: listCourts(), requestId: req.requestId });
 });
 
 app.get('/api/recommendations/by-date', async (req, res) => {
@@ -206,10 +229,10 @@ app.get('/api/recommendations/by-date', async (req, res) => {
       limit: req.query.limit || 20,
     });
     const status = result.ok ? 200 : 502;
-    return res.status(status).json(result);
+    return res.status(status).json({ ...result, requestId: req.requestId });
   } catch (e) {
-    console.error('[recommendations/by-date] exception:', e);
-    return res.status(500).json({ ok: false, error: '매각기일 추천 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
+    logException('recommendations/by-date', req, e);
+    return res.status(500).json(errorBody(req, '매각기일 추천 조회 중 오류가 발생했습니다.'));
   }
 });
 
@@ -295,9 +318,9 @@ async function fetchMolitType({ key, lawdCd, dealYmd, aptName, tradeType }) {
 
 async function lookupMolitTrades({ lawdCd, dealYmd, aptName, tradeType }) {
   const key = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
-  if (!key) return { status: 400, body: { error: 'MOLIT_API_KEY 환경변수가 필요합니다.' } };
-  if (!/^\d{5}$/.test(lawdCd)) return { status: 400, body: { error: '법정동코드 앞 5자리(LAWD_CD)를 입력해주세요.' } };
-  if (!/^\d{6}$/.test(dealYmd)) return { status: 400, body: { error: '계약월(DEAL_YMD)은 YYYYMM 6자리로 입력해주세요.' } };
+  if (!key) return { status: 400, body: { ok: false, error: '국토부 실거래가 환경설정이 필요합니다.' } };
+  if (!/^\d{5}$/.test(lawdCd)) return { status: 400, body: { ok: false, error: '법정동코드 앞 5자리(LAWD_CD)를 입력해주세요.' } };
+  if (!/^\d{6}$/.test(dealYmd)) return { status: 400, body: { ok: false, error: '계약월(DEAL_YMD)은 YYYYMM 6자리로 입력해주세요.' } };
 
   const types = tradeType && tradeType !== 'auto' ? [tradeType] : ['apt', 'offi', 'rh'];
   const results = [];
@@ -306,7 +329,7 @@ async function lookupMolitTrades({ lawdCd, dealYmd, aptName, tradeType }) {
     try {
       results.push(await fetchMolitType({ key, lawdCd, dealYmd, aptName, tradeType: type }));
     } catch (e) {
-      errors.push({ type, error: e.message || String(e) });
+      errors.push({ type, error: '조회 실패' });
     }
   }
 
@@ -339,10 +362,10 @@ app.get('/api/molit/trades', async (req, res) => {
       aptName: String(req.query.aptName || '').trim(),
       tradeType: String(req.query.tradeType || 'auto').trim(),
     });
-    return res.status(result.status).json(result.body);
+    return res.status(result.status).json({ ...result.body, requestId: req.requestId });
   } catch (e) {
-    console.error('[molit/trades] exception:', e);
-    return res.status(500).json({ error: '실거래가 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
+    logException('molit/trades', req, e);
+    return res.status(500).json(errorBody(req, '실거래가 조회 중 오류가 발생했습니다.'));
   }
 });
 
@@ -354,10 +377,10 @@ app.get('/api/molit/apt-trades', async (req, res) => {
       aptName: String(req.query.aptName || '').trim(),
       tradeType: 'apt',
     });
-    return res.status(result.status).json(result.body);
+    return res.status(result.status).json({ ...result.body, requestId: req.requestId });
   } catch (e) {
-    console.error('[molit] exception:', e);
-    return res.status(500).json({ error: '실거래가 조회 중 오류가 발생했습니다.', detail: e.message || String(e) });
+    logException('molit/apt-trades', req, e);
+    return res.status(500).json(errorBody(req, '실거래가 조회 중 오류가 발생했습니다.'));
   }
 });
 
@@ -377,35 +400,34 @@ app.post('/api/fetch', async (req, res) => {
   try {
     const { saYear, saSer, jiwonNm } = req.body;
     const inputError = validateFetchInput({ saYear, saSer, jiwonNm });
-    if (inputError) return res.status(400).json({ error: inputError });
+    if (inputError) return res.status(400).json(errorBody(req, inputError));
 
     const year = String(saYear).trim();
     const serial = String(saSer).trim();
     const court = String(jiwonNm).trim();
 
-    console.log(`[fetch] ${court} ${year}타경${serial}`);
+    console.log(`[fetch] ${court} ${year}타경${serial} requestId=${req.requestId}`);
     const raw = await fetchCase(year, serial, court);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
     if (raw.status !== 'ok') {
-      return res.status(502).json({
-        error: raw.error || '법원경매정보 조회에 실패했습니다.',
+      console.warn('[fetch] crawler failed', { requestId: req.requestId, diagnosis: raw.diagnosis || null, debug: raw.debug || null });
+      return res.status(502).json(errorBody(req, raw.error || '법원경매정보 조회에 실패했습니다.', {
         diagnosis: raw.diagnosis || null,
-        debug: raw.debug,
         elapsed: `${elapsed}s`,
-      });
+      }));
     }
-    return res.json({ ok: true, raw, elapsed: `${elapsed}s` });
+    return res.json({ ok: true, raw, elapsed: `${elapsed}s`, requestId: req.requestId });
   } catch (e) {
-    console.error('[fetch] exception:', e);
-    return res.status(500).json({ error: '서버 처리 중 오류가 발생했습니다.', detail: e.message || String(e) });
+    logException('fetch', req, e);
+    return res.status(500).json(errorBody(req, '서버 처리 중 오류가 발생했습니다.'));
   }
 });
 
 app.post('/api/analyze', async (req, res) => {
   try {
     const { raw, manual, region = 'other' } = req.body;
-    if (!raw || !manual) return res.status(400).json({ error: '필수 파라미터 누락 (raw, manual)' });
+    if (!raw || !manual) return res.status(400).json(errorBody(req, '필수 파라미터 누락 (raw, manual)'));
 
     const merged = { ...raw };
     merged.rights = manual.rights || [];
@@ -438,11 +460,17 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     const report = analyzeCase(merged, region);
-    return res.json({ ok: true, report });
+    return res.json({ ok: true, report, requestId: req.requestId });
   } catch (e) {
-    console.error('[analyze] exception:', e);
-    return res.status(500).json({ error: '분석 처리 중 오류가 발생했습니다.', detail: e.message || String(e) });
+    logException('analyze', req, e);
+    return res.status(500).json(errorBody(req, '분석 처리 중 오류가 발생했습니다.'));
   }
+});
+
+app.use((err, req, res, next) => {
+  logException('express', req, err);
+  if (res.headersSent) return next(err);
+  return res.status(500).json(errorBody(req, '서버 처리 중 오류가 발생했습니다.'));
 });
 
 app.listen(PORT, '0.0.0.0', () => {
