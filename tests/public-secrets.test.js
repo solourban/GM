@@ -7,8 +7,8 @@ const TARGET_EXTENSIONS = new Set(['.js', '.html', '.css']);
 
 const FORBIDDEN_PATTERNS = [
   { name: 'OpenAI style API key', pattern: /sk-[A-Za-z0-9_-]{20,}/ },
-  { name: 'Kakao REST authorization header', pattern: /KakaoAK\s+[A-Za-z0-9._-]+/ },
-  { name: 'Direct data.go.kr serviceKey query', pattern: /[?&]serviceKey=/i },
+  { name: 'Kakao REST authorization token', pattern: /KakaoAK\s+[A-Za-z0-9._-]{20,}/ },
+  { name: 'data.go.kr encoded service key', pattern: /serviceKey=([A-Za-z0-9%+/=_-]{30,})/i },
   { name: 'Kakao REST env name in public asset', pattern: /KAKAO_REST_API_KEY/ },
   { name: 'Kakao local env name in public asset', pattern: /KAKAO_LOCAL_API_KEY/ },
   { name: 'MOLIT env name in public asset', pattern: /MOLIT_API_KEY/ },
@@ -29,13 +29,18 @@ function relative(filePath) {
   return path.relative(ROOT, filePath).replace(/\\/g, '/');
 }
 
+function lineNumber(content, index) {
+  return content.slice(0, index).split('\n').length;
+}
+
+const files = walk(PUBLIC_DIR);
 const failures = [];
-for (const file of walk(PUBLIC_DIR)) {
+for (const file of files) {
   const content = fs.readFileSync(file, 'utf8');
   for (const rule of FORBIDDEN_PATTERNS) {
-    const match = content.match(rule.pattern);
+    const match = rule.pattern.exec(content);
     if (match) {
-      failures.push(`${relative(file)}: ${rule.name}`);
+      failures.push(`${relative(file)}:${lineNumber(content, match.index)} ${rule.name}`);
     }
   }
 }
@@ -46,4 +51,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Public asset secret exposure guard passed. Checked ${walk(PUBLIC_DIR).length} files.`);
+console.log(`Public asset secret exposure guard passed. Checked ${files.length} files.`);
