@@ -2,6 +2,7 @@
   const CARD_ID = 'v2FinalJudgmentCard';
   const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
   const TRADE_STORAGE_KEY = 'auction-note:v2:molit-trades';
+  const FINAL_JUDGMENT_STORAGE_KEY = 'auction-note:v2:final-judgment';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function esc(value) {
@@ -25,6 +26,21 @@
     } catch (_) {
       return null;
     }
+  }
+
+  function saveFinalJudgment(payload) {
+    try {
+      sessionStorage.setItem(FINAL_JUDGMENT_STORAGE_KEY, JSON.stringify({
+        ...payload,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch (_) {}
+  }
+
+  function clearFinalJudgment() {
+    try {
+      sessionStorage.removeItem(FINAL_JUDGMENT_STORAGE_KEY);
+    } catch (_) {}
   }
 
   function numberValue(value) {
@@ -111,6 +127,25 @@
     return list.slice(0, 6);
   }
 
+  function buildSnapshot(currentReport, location, trades) {
+    const decision = finalDecision(currentReport, location, trades);
+    const comparison = trades?.comparison || {};
+    const inheritedTotal = numberValue(currentReport?.inherited?.total);
+    const tradeCount = Number(trades?.count || trades?.stats?.count || 0);
+    return {
+      decision,
+      reasons: reasons(currentReport, location, trades),
+      riskLevel: currentReport?.risk?.level || 'ok',
+      riskText: riskText(currentReport?.risk?.level || 'ok'),
+      inheritedTotal,
+      inheritedTotalText: money(inheritedTotal),
+      tradeCount,
+      avgRatio: Number(comparison.avgRatio || 0),
+      comparisonJudgment: clean(comparison.judgment || ''),
+      hasLocation: Boolean(location?.x && location?.y),
+    };
+  }
+
   function findAnchor() {
     return document.getElementById('v2MolitTradeCard')
       || document.getElementById('v2LocationCard')
@@ -126,10 +161,8 @@
   }
 
   function renderCard(currentReport, location, trades) {
-    const decision = finalDecision(currentReport, location, trades);
-    const comparison = trades?.comparison || {};
-    const inheritedTotal = numberValue(currentReport?.inherited?.total);
-    const tradeCount = Number(trades?.count || trades?.stats?.count || 0);
+    const snapshot = buildSnapshot(currentReport, location, trades);
+    const decision = snapshot.decision;
 
     return `
       <section class="v2-card" id="${CARD_ID}">
@@ -138,13 +171,13 @@
         <p class="v2-note">권리위험, 인수금액, 입지 확인, 실거래가 표본, 가격 비교를 묶어 현재 검토 방향을 정리합니다.</p>
         <div class="v2-grid compact">
           <div class="v2-info wide"><div class="k">최종 검토 방향</div><div class="v"><span class="v2-pill ${pillClass(decision.tone)}">${esc(decision.label)}</span></div><p class="v2-note">${esc(decision.text)}</p></div>
-          <div class="v2-info"><div class="k">권리 위험도</div><div class="v">${esc(riskText(currentReport?.risk?.level || 'ok'))}</div></div>
-          <div class="v2-info"><div class="k">인수 추정금액</div><div class="v">${esc(money(inheritedTotal))}</div></div>
-          <div class="v2-info"><div class="k">실거래가 표본</div><div class="v">${esc(`${tradeCount}건`)}</div></div>
-          <div class="v2-info"><div class="k">최저가/평균가</div><div class="v">${esc(comparison.avgRatio ? `${Number(comparison.avgRatio).toFixed(1)}%` : '-')}</div></div>
+          <div class="v2-info"><div class="k">권리 위험도</div><div class="v">${esc(snapshot.riskText)}</div></div>
+          <div class="v2-info"><div class="k">인수 추정금액</div><div class="v">${esc(snapshot.inheritedTotalText)}</div></div>
+          <div class="v2-info"><div class="k">실거래가 표본</div><div class="v">${esc(`${snapshot.tradeCount}건`)}</div></div>
+          <div class="v2-info"><div class="k">최저가/평균가</div><div class="v">${esc(snapshot.avgRatio ? `${snapshot.avgRatio.toFixed(1)}%` : '-')}</div></div>
         </div>
         <ul class="v2-check-list">
-          ${reasons(currentReport, location, trades).map((item) => `<li>${esc(item)}</li>`).join('')}
+          ${snapshot.reasons.map((item) => `<li>${esc(item)}</li>`).join('')}
         </ul>
         <p class="v2-note">이 판단은 입력값 기반 참고용입니다. 실제 입찰 전 등기부, 매각물건명세서, 점유관계, 현장조사, 추가비용을 반드시 재확인해야 합니다.</p>
       </section>
@@ -158,11 +191,14 @@
 
     if (!currentReport || !anchor) {
       existing?.remove();
+      clearFinalJudgment();
       return;
     }
 
     const location = loadJson(LOCATION_STORAGE_KEY);
     const trades = loadJson(TRADE_STORAGE_KEY);
+    const snapshot = buildSnapshot(currentReport, location, trades);
+    saveFinalJudgment(snapshot);
     const html = renderCard(currentReport, location, trades);
 
     if (existing) existing.outerHTML = html;
