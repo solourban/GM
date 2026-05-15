@@ -1,6 +1,12 @@
 (() => {
   const STORAGE_PREFIX = 'auction-note:v2.2:case:';
   const SCHEMA_VERSION = 3;
+  const ACTIVE_CASE_SESSION_KEY = 'auction-note:v2:active-case-key';
+  const TRANSIENT_SESSION_KEYS = [
+    'auction-note:v2:location-geocode',
+    'auction-note:v2:molit-trades',
+    'auction-note:v2:final-judgment',
+  ];
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -51,6 +57,26 @@
     return { court, year, caseNo, key: `${STORAGE_PREFIX}${court}:${year || 'no-year'}:${caseNo}` };
   }
 
+  function clearTransientCaseData() {
+    try {
+      TRANSIENT_SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    } catch (_) {}
+    document.getElementById('v2LocationCard')?.remove();
+    document.getElementById('v2MolitTradeCard')?.remove();
+    document.getElementById('v2FinalJudgmentCard')?.remove();
+    document.getElementById('v2DecisionConfidenceCard')?.remove();
+    document.getElementById('v2FinalCopyCard')?.remove();
+  }
+
+  function syncActiveCaseSession(identity) {
+    if (!identity?.key) return;
+    try {
+      const previous = sessionStorage.getItem(ACTIVE_CASE_SESSION_KEY) || '';
+      if (previous && previous !== identity.key) clearTransientCaseData();
+      sessionStorage.setItem(ACTIVE_CASE_SESSION_KEY, identity.key);
+    } catch (_) {}
+  }
+
   function safeManual(manual) {
     const src = manual || {};
     const tenants = Array.isArray(src.tenants) && src.tenants.length
@@ -97,6 +123,9 @@
     const api = app();
     if (!s || !identity?.key) return;
 
+    clearTransientCaseData();
+    syncActiveCaseSession(identity);
+
     const saved = loadSavedCase(identity.key);
     s.__persistSwitchingCase = true;
     s.manual = saved?.manual ? safeManual(saved.manual) : defaultManual();
@@ -120,6 +149,7 @@
 
     if (!s.__coreCaseResetActiveKey) {
       s.__coreCaseResetActiveKey = identity.key;
+      syncActiveCaseSession(identity);
       return;
     }
 
