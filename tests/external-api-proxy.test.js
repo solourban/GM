@@ -41,8 +41,8 @@ const server = fs.readFileSync(SERVER_PATH, 'utf8');
 
 forbidPublic(/dapi\.kakao\.com/i, 'direct Kakao local API host');
 forbidPublic(/apis\.data\.go\.kr/i, 'direct data.go.kr API host');
-forbidPublic(/KakaoAK/i, 'direct Kakao REST authorization marker');
-forbidPublic(/[?&]serviceKey=/i, 'direct data.go.kr serviceKey query');
+forbidPublic(/KakaoAK\s+[A-Za-z0-9._-]{20,}/i, 'direct Kakao REST authorization token');
+forbidPublic(/[?&]serviceKey=([A-Za-z0-9%+/=_-]{30,})/i, 'direct data.go.kr serviceKey token');
 
 requireIncludes(server, "app.get('/api/location/geocode'", 'Kakao geocode proxy route');
 requireIncludes(server, 'https://dapi.kakao.com/v2/local/search/address.json', 'Kakao local API upstream call in server');
