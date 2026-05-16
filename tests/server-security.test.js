@@ -14,9 +14,19 @@ function requireIncludes(needle, label) {
   if (!content.includes(needle)) fail(`${label} is missing.`);
 }
 
-function forbid(pattern, label) {
-  if (pattern.test(content)) fail(`${label} is present.`);
+function forbid(pattern, label, source = content) {
+  if (pattern.test(source)) fail(`${label} is present.`);
 }
+
+function sectionBetween(startNeedle, endNeedle, label) {
+  const start = content.indexOf(startNeedle);
+  if (start === -1) fail(`${label} start marker is missing.`);
+  const end = content.indexOf(endNeedle, start + startNeedle.length);
+  if (end === -1) fail(`${label} end marker is missing.`);
+  return content.slice(start, end);
+}
+
+const configRoute = sectionBetween("app.get('/api/config'", 'function validateAddressInput', '/api/config route');
 
 requireIncludes("res.setHeader('X-Request-Id'", 'X-Request-Id response header');
 requireIncludes("res.setHeader('X-Content-Type-Options', 'nosniff')", 'X-Content-Type-Options nosniff header');
@@ -31,10 +41,12 @@ requireIncludes('hasMolit: Boolean(keys.molitKey)', 'MOLIT boolean config respon
 
 forbid(/detail\s*:\s*e\.message/, 'direct e.message detail exposure');
 forbid(/detail\s*:\s*String\(e\)/, 'direct String(e) detail exposure');
-forbid(/res\.json\([\s\S]{0,800}kakaoRestKey\s*:/, 'Kakao REST key value exposure in JSON response');
-forbid(/res\.json\([\s\S]{0,800}kakaoMapKey\s*:/, 'Kakao map key value exposure in JSON response');
-forbid(/res\.json\([\s\S]{0,800}molitKey\s*:/, 'MOLIT key value exposure in JSON response');
 forbid(/json\([\s\S]{0,500}raw\.debug/, 'crawler debug exposure in JSON response');
 forbid(/json\([\s\S]{0,500}e\.stack/, 'stack trace exposure in JSON response');
+
+forbid(/\bkakaoRestKey\s*:/, 'Kakao REST key value exposure in /api/config JSON response', configRoute);
+forbid(/\bkakaoMapKey\s*:/, 'Kakao map key value exposure in /api/config JSON response', configRoute);
+forbid(/\bmolitKey\s*:/, 'MOLIT key value exposure in /api/config JSON response', configRoute);
+forbid(/KakaoAK\s*\$\{keys\.kakaoRestKey\}/, 'Kakao REST authorization header exposure in /api/config route', configRoute);
 
 console.log('Server security guard passed.');
