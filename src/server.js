@@ -388,6 +388,7 @@ app.get('/api/molit/apt-trades', async (req, res) => {
 });
 
 const ONBID_REAL_ESTATE_LIST_URL = 'http://apis.data.go.kr/B010003/OnbidRlstListSrvc/getRlstCltrList';
+const ONBID_PROPERTY_DETAIL_URL = 'http://apis.data.go.kr/B010003/OnbidPbancCltrDtlSrvc/getPbancCltrInf';
 
 function boundedInt(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value || ''), 10);
@@ -413,6 +414,14 @@ function normalizeOnbidItems(data) {
   if (Array.isArray(items)) return items;
   if (items && typeof items === 'object') return [items];
   return [];
+}
+
+function normalizeOnbidDetail(data) {
+  const body = data?.response?.body || data?.body || data;
+  const item = body?.item || body?.items?.item || body;
+  if (Array.isArray(item)) return item[0] || {};
+  if (item && typeof item === 'object') return item;
+  return {};
 }
 
 app.get('/api/onbid/items', async (req, res) => {
@@ -465,6 +474,44 @@ app.get('/api/onbid/items', async (req, res) => {
   } catch (e) {
     logException('onbid/items', req, e);
     return res.status(500).json(errorBody(req, '온비드 공매 물건 조회 중 오류가 발생했습니다.'));
+  }
+});
+
+app.get('/api/onbid/detail', async (req, res) => {
+  try {
+    const keys = externalApiConfig();
+    if (!keys.onbidKey) return res.status(400).json(errorBody(req, '온비드 공매 API 환경설정이 필요합니다.'));
+
+    const cltrMngNo = sanitizeOnbidText(req.query.cltrMngNo, 40);
+    const pbctCdtnNo = sanitizeOnbidText(req.query.pbctCdtnNo, 40);
+    if (!cltrMngNo) return res.status(400).json(errorBody(req, '물건관리번호(cltrMngNo)를 입력해주세요.'));
+
+    const url = new URL(ONBID_PROPERTY_DETAIL_URL);
+    url.searchParams.set('serviceKey', keys.onbidKey);
+    url.searchParams.set('resultType', 'json');
+    url.searchParams.set('cltrMngNo', cltrMngNo);
+    if (pbctCdtnNo) url.searchParams.set('pbctCdtnNo', pbctCdtnNo);
+
+    const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/json,*/*' } });
+    const text = await apiRes.text();
+    const data = JSON.parse(text);
+
+    if (!apiRes.ok) {
+      logException('onbid/detail:upstream', req, new Error('Onbid detail API response error'), { status: apiRes.status });
+      return res.status(apiRes.status).json(errorBody(req, '온비드 공매 상세 API 응답 오류가 발생했습니다.', { status: apiRes.status }));
+    }
+
+    return res.json({
+      ok: true,
+      cltrMngNo,
+      pbctCdtnNo,
+      detail: normalizeOnbidDetail(data),
+      raw: data?.response || data,
+      requestId: req.requestId,
+    });
+  } catch (e) {
+    logException('onbid/detail', req, e);
+    return res.status(500).json(errorBody(req, '온비드 공매 상세 조회 중 오류가 발생했습니다.'));
   }
 });
 
