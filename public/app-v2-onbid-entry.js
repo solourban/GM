@@ -33,6 +33,50 @@
     return '';
   }
 
+  function formatMoney(value) {
+    const text = clean(value);
+    if (!text) return '-';
+    const numeric = text.replace(/[^0-9.-]/g, '');
+    const number = Number(numeric);
+    if (!Number.isFinite(number) || numeric === '') return text;
+    return `${Math.round(number).toLocaleString('ko-KR')}원`;
+  }
+
+  function formatDate(value) {
+    const text = clean(value);
+    if (!text) return '';
+    const digits = text.replace(/[^0-9]/g, '');
+    if (digits.length >= 12) return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)} ${digits.slice(8, 10)}:${digits.slice(10, 12)}`;
+    if (digits.length >= 8) return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
+    return text;
+  }
+
+  function normalizeItem(item) {
+    const name = itemValue(item, ['cltrNm', 'onbidCltrNm', 'CLTR_NM', 'ONBID_CLTR_NM', '물건명']);
+    const address = itemValue(item, ['lctnFullAddr', 'lctnDtlAddr', 'addr', 'LCTN_FULL_ADDR', 'LCTN_DTL_ADDR', '소재지']);
+    const price = itemValue(item, ['minBidPrc', 'lowstBidPrc', 'LOWST_BID_PRC', 'MIN_BID_PRC', '최저입찰가']);
+    const appraisal = itemValue(item, ['apslAsesAvgAmt', 'appraisalAmt', 'APSL_ASES_AVG_AMT', '감정평가액', '감정가']);
+    const bidStart = itemValue(item, ['bidStrtDtm', 'bidPrdYmdStart', 'BID_STRT_DTM', '입찰시작일']);
+    const bidEnd = itemValue(item, ['bidEndDtm', 'bidPrdYmdEnd', 'BID_END_DTM', '입찰종료일']);
+    const org = itemValue(item, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', 'RQST_ORG_NM', '공고기관']);
+    const cltrMngNo = itemValue(item, ['cltrMngNo', 'CLTR_MNG_NO', '물건관리번호']);
+    const pbctNo = itemValue(item, ['pbctNo', 'pbctCdtnNo', 'PBCT_NO', 'PBCT_CDTN_NO', '공고번호']);
+    const method = itemValue(item, ['dspsMthodNm', 'dspsMthodCdNm', 'DSPS_MTHOD_NM', '처분방식']);
+    const status = itemValue(item, ['bidStatNm', 'bidStatCdNm', 'BID_STAT_NM', '입찰상태']);
+    return {
+      name,
+      address,
+      price,
+      appraisal,
+      period: [formatDate(bidStart), formatDate(bidEnd)].filter(Boolean).join(' ~ '),
+      org,
+      cltrMngNo,
+      pbctNo,
+      method,
+      status,
+    };
+  }
+
   async function loadConfig() {
     try {
       const res = await fetch('/api/config', { headers: { Accept: 'application/json' } });
@@ -98,11 +142,11 @@
       return `<div class="v2-info wide"><div class="k">조회 중</div><div class="v">온비드 공매 물건을 조회하고 있습니다.</div></div>`;
     }
     if (onbidState.status === 'error') {
-      return `<div class="v2-info wide"><div class="k">조회 실패</div><div class="v">${esc(onbidState.error || '조회 실패')}</div></div>`;
+      return `<div class="v2-info wide"><div class="k">조회 실패</div><div class="v">${esc(onbidState.error || '조회 실패')}</div><p class="v2-note">조건을 줄이거나 ONBID_API_KEY 설정 상태를 확인하세요.</p></div>`;
     }
     if (onbidState.status !== 'success') return '';
     if (!onbidState.items.length) {
-      return `<div class="v2-info wide"><div class="k">조회 결과</div><div class="v">검색된 공매 물건이 없습니다.</div></div>`;
+      return `<div class="v2-info wide"><div class="k">조회 결과</div><div class="v">검색된 공매 물건이 없습니다.</div><p class="v2-note">지역을 넓히거나 키워드·입찰기간 조건을 비워 다시 조회하세요.</p></div>`;
     }
     return `
       <div class="v2-info wide">
@@ -112,16 +156,13 @@
       </div>
       <div class="v2-table-wrap" style="grid-column:1/-1">
         <table class="v2-table">
-          <thead><tr><th>물건명</th><th>소재지</th><th>최저입찰가</th><th>입찰기간</th><th>공고기관</th><th>관리번호</th></tr></thead>
+          <thead><tr><th>물건명</th><th>소재지</th><th>최저입찰가</th><th>감정가</th><th>입찰기간</th><th>상태/방식</th><th>공고기관</th><th>관리/공고번호</th></tr></thead>
           <tbody>
             ${onbidState.items.map((item) => {
-              const name = itemValue(item, ['cltrNm', 'CLTR_NM', '물건명']);
-              const address = itemValue(item, ['lctnFullAddr', 'lctnDtlAddr', 'LCTN_FULL_ADDR', '소재지']);
-              const price = itemValue(item, ['minBidPrc', 'lowstBidPrc', 'MIN_BID_PRC', '최저입찰가']);
-              const period = [itemValue(item, ['bidStrtDtm', 'bidPrdYmdStart', '입찰시작일']), itemValue(item, ['bidEndDtm', 'bidPrdYmdEnd', '입찰종료일'])].filter(Boolean).join(' ~ ');
-              const org = itemValue(item, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', '공고기관']);
-              const no = itemValue(item, ['cltrMngNo', 'CLTR_MNG_NO', '물건관리번호']);
-              return `<tr><td>${esc(name || '-')}</td><td>${esc(address || '-')}</td><td>${esc(price || '-')}</td><td>${esc(period || '-')}</td><td>${esc(org || '-')}</td><td>${esc(no || '-')}</td></tr>`;
+              const row = normalizeItem(item);
+              const statusMethod = [row.status, row.method].filter(Boolean).join(' / ');
+              const numbers = [row.cltrMngNo, row.pbctNo].filter(Boolean).join(' / ');
+              return `<tr><td>${esc(row.name || '-')}</td><td>${esc(row.address || '-')}</td><td>${esc(formatMoney(row.price))}</td><td>${esc(formatMoney(row.appraisal))}</td><td>${esc(row.period || '-')}</td><td>${esc(statusMethod || '-')}</td><td>${esc(row.org || '-')}</td><td>${esc(numbers || '-')}</td></tr>`;
             }).join('')}
           </tbody>
         </table>
@@ -142,8 +183,8 @@
           <div class="v2-grid compact">
             <div class="v2-info wide">
               <div class="k">현재 단계</div>
-              <div class="v">v2.1.8.x 공매 검색 카드</div>
-              <p class="v2-note">기존 법원경매 결과와 섞이지 않도록 온비드 탭 안에서만 검색·표시합니다. 상세 판단은 다음 단계에서 붙입니다.</p>
+              <div class="v">v2.1.8.x 공매 검색 결과 정리</div>
+              <p class="v2-note">온비드 탭 안에서 검색 결과의 핵심 필드를 정리해 표시합니다. 상세 판단은 다음 단계에서 붙입니다.</p>
             </div>
             <div class="v2-info"><div class="k">온비드 API</div><div class="v">${statusPill(ready)}</div></div>
             <div class="v2-info"><div class="k">기존 경매 데이터</div><div class="v">분리 유지</div></div>
