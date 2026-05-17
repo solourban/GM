@@ -123,6 +123,7 @@ function externalApiConfig() {
     kakaoRestKey: process.env.KAKAO_REST_API_KEY || process.env.KAKAO_LOCAL_API_KEY || '',
     kakaoMapKey: process.env.KAKAO_JS_KEY || process.env.KAKAO_MAP_KEY || '',
     molitKey: process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '',
+    onbidKey: process.env.ONBID_API_KEY || '',
   };
 }
 
@@ -133,10 +134,12 @@ app.get('/api/config', (req, res) => {
     hasKakaoRest: Boolean(keys.kakaoRestKey),
     hasKakaoMap: Boolean(keys.kakaoMapKey),
     hasMolit: Boolean(keys.molitKey),
+    hasOnbid: Boolean(keys.onbidKey),
     envNames: {
       kakaoRest: 'KAKAO_REST_API_KEY',
       kakaoMap: 'KAKAO_JS_KEY',
       molit: 'MOLIT_API_KEY',
+      onbid: 'ONBID_API_KEY',
     },
     requestId: req.requestId,
   });
@@ -381,6 +384,87 @@ app.get('/api/molit/apt-trades', async (req, res) => {
   } catch (e) {
     logException('molit/apt-trades', req, e);
     return res.status(500).json(errorBody(req, '실거래가 조회 중 오류가 발생했습니다.'));
+  }
+});
+
+const ONBID_REAL_ESTATE_LIST_URL = 'http://apis.data.go.kr/B010003/OnbidRlstListSrvc/getRlstCltrList';
+
+function boundedInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function sanitizeOnbidText(value, maxLength = 50) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.length > maxLength) return text.slice(0, maxLength);
+  return text;
+}
+
+function appendOnbidParam(url, name, value, maxLength = 50) {
+  const safe = sanitizeOnbidText(value, maxLength);
+  if (safe) url.searchParams.set(name, safe);
+}
+
+function normalizeOnbidItems(data) {
+  const body = data?.response?.body || data?.body || data;
+  const items = body?.items?.item || body?.item || [];
+  if (Array.isArray(items)) return items;
+  if (items && typeof items === 'object') return [items];
+  return [];
+}
+
+app.get('/api/onbid/items', async (req, res) => {
+  try {
+    const keys = externalApiConfig();
+    if (!keys.onbidKey) return res.status(400).json(errorBody(req, '온비드 공매 API 환경설정이 필요합니다.'));
+
+    const pageNo = boundedInt(req.query.pageNo, 1, 1, 1000);
+    const numOfRows = boundedInt(req.query.numOfRows, 10, 1, 100);
+    const url = new URL(ONBID_REAL_ESTATE_LIST_URL);
+    url.searchParams.set('serviceKey', keys.onbidKey);
+    url.searchParams.set('pageNo', String(pageNo));
+    url.searchParams.set('numOfRows', String(numOfRows));
+    url.searchParams.set('resultType', 'json');
+    url.searchParams.set('prptDivCd', sanitizeOnbidText(req.query.prptDivCd, 80) || '0007,0010,0005,0002,0006');
+    url.searchParams.set('dspsMthodCd', sanitizeOnbidText(req.query.dspsMthodCd, 20) || '0001');
+    url.searchParams.set('bidDivCd', sanitizeOnbidText(req.query.bidDivCd, 20) || '0001');
+    url.searchParams.set('pvctTrgtYn', sanitizeOnbidText(req.query.pvctTrgtYn, 1) || 'N');
+
+    appendOnbidParam(url, 'lctnSdnm', req.query.lctnSdnm);
+    appendOnbidParam(url, 'lctnSggnm', req.query.lctnSggnm);
+    appendOnbidParam(url, 'lctnEmdNm', req.query.lctnEmdNm);
+    appendOnbidParam(url, 'onbidCltrNm', req.query.keyword || req.query.onbidCltrNm, 80);
+    appendOnbidParam(url, 'rqstOrgNm', req.query.rqstOrgNm, 80);
+    appendOnbidParam(url, 'lowstBidPrcStart', req.query.lowstBidPrcStart, 20);
+    appendOnbidParam(url, 'lowstBidPrcEnd', req.query.lowstBidPrcEnd, 20);
+    appendOnbidParam(url, 'bidPrdYmdStart', req.query.bidPrdYmdStart, 8);
+    appendOnbidParam(url, 'bidPrdYmdEnd', req.query.bidPrdYmdEnd, 8);
+
+    const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/json,*/*' } });
+    const text = await apiRes.text();
+    const data = JSON.parse(text);
+
+    if (!apiRes.ok) {
+      logException('onbid/items:upstream', req, new Error('Onbid API response error'), { status: apiRes.status });
+      return res.status(apiRes.status).json(errorBody(req, '온비드 공매 API 응답 오류가 발생했습니다.', { status: apiRes.status }));
+    }
+
+    const body = data?.response?.body || data?.body || {};
+    const items = normalizeOnbidItems(data);
+    return res.json({
+      ok: true,
+      pageNo,
+      numOfRows,
+      totalCount: Number(body.totalCount || items.length || 0),
+      count: items.length,
+      items,
+      requestId: req.requestId,
+    });
+  } catch (e) {
+    logException('onbid/items', req, e);
+    return res.status(500).json(errorBody(req, '온비드 공매 물건 조회 중 오류가 발생했습니다.'));
   }
 });
 
