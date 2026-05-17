@@ -28,6 +28,7 @@
     const missing = [];
     if (!config?.hasKakaoRest) missing.push('카카오 주소검색');
     if (!config?.hasMolit) missing.push('국토부 실거래가');
+    if (!config?.hasOnbid) missing.push('온비드 공매');
     if (!missing.length) return '주요 외부 연동이 준비되어 있습니다.';
     return `${missing.join(', ')} 설정 확인이 필요합니다.`;
   }
@@ -50,7 +51,7 @@
       <section class="v2-card" id="${CARD_ID}">
         <span class="v2-badge">연동 상태</span>
         <h3>서비스 연동 상태</h3>
-        <p class="v2-note">서버, 카카오, 국토부 실거래가 연동 준비 상태를 확인합니다.</p>
+        <p class="v2-note">서버, 카카오, 국토부 실거래가, 온비드 공매 연동 준비 상태를 확인합니다.</p>
         <div class="v2-grid compact">
           <div class="v2-info wide">
             <div class="k">현재 상태</div>
@@ -61,6 +62,7 @@
           ${info('카카오 주소검색', statusPill(Boolean(config?.hasKakaoRest), '설정됨', '미설정'))}
           ${info('카카오맵', statusPill(Boolean(config?.hasKakaoMap), '설정됨', '미설정'))}
           ${info('국토부 실거래가', statusPill(Boolean(config?.hasMolit), '설정됨', '미설정'))}
+          ${info('온비드 공매', statusPill(Boolean(config?.hasOnbid), '설정됨', '미설정'))}
           ${info('서비스 버전', esc(clean(health?.version || '-')))}
           ${info('요청ID', esc(requestId || '-'))}
         </div>
