@@ -387,8 +387,8 @@ app.get('/api/molit/apt-trades', async (req, res) => {
   }
 });
 
-const ONBID_REAL_ESTATE_LIST_URL = 'http://apis.data.go.kr/B010003/OnbidRlstListSrvc/getRlstCltrList';
-const ONBID_PROPERTY_DETAIL_URL = 'http://apis.data.go.kr/B010003/OnbidPbancCltrDtlSrvc/getPbancCltrInf';
+const ONBID_REAL_ESTATE_LIST_URL = process.env.ONBID_LIST_URL || 'https://apis.data.go.kr/B010003/OnbidRlstListSrvc2/getRlstCltrList';
+const ONBID_PROPERTY_DETAIL_URL = process.env.ONBID_DETAIL_URL || 'http://apis.data.go.kr/B010003/OnbidPbancCltrDtlSrvc/getPbancCltrInf';
 
 function boundedInt(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value || ''), 10);
