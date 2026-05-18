@@ -1,9 +1,12 @@
 (() => {
   const CARD_ID = 'v2FinalCopyCard';
+  const TEXTAREA_ID = 'v2FinalCopyTextarea';
+  const STATUS_ID = 'v2FinalCopyStatus';
   const FINAL_KEY = 'auction-note:v2:final-judgment';
   const LOCATION_KEY = 'auction-note:v2:location-geocode';
   const TRADE_KEY = 'auction-note:v2:molit-trades';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+  const copyState = { status: '', statusTone: 'ok' };
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -45,6 +48,10 @@
     const court = clean(report?.court || report?.raw?.court || '');
     const caseNo = clean(report?.case || report?.caseNo || '');
     return [court, caseNo].filter(Boolean).join(' ') || '미확인';
+  }
+
+  function summarySignature(summary) {
+    return `${summary.length}:${summary.slice(0, 48)}:${summary.slice(-48)}`;
   }
 
   function buildSummary() {
@@ -121,15 +128,95 @@
       || null;
   }
 
+  function renderStatus() {
+    if (!copyState.status) return '';
+    return `<div class="v2-form-message show ${copyState.statusTone === 'warn' ? 'warn' : 'ok'}" id="${STATUS_ID}">${esc(copyState.status)}</div>`;
+  }
+
   function renderCard(summary) {
     return `
-      <section class="v2-card" id="${CARD_ID}">
+      <section class="v2-card" id="${CARD_ID}" data-summary-signature="${esc(summarySignature(summary))}">
         <span class="v2-badge">종합 요약</span>
         <h3>종합 판단 포함 요약</h3>
-        <p class="v2-note">아래 내용을 전체 선택해서 복사하면 권리·입지·실거래가·가격비교·최종 판단을 함께 기록할 수 있습니다.</p>
-        <textarea readonly style="width:100%;min-height:260px;border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:14px;font:13px/1.6 monospace;background:rgba(15,23,42,.03);">${esc(summary)}</textarea>
+        <p class="v2-note">버튼 한 번으로 권리·입지·실거래가·가격비교·최종 판단을 함께 복사합니다. 복사가 막히면 전체 선택 후 직접 복사하면 됩니다.</p>
+        <div class="v2-cta-row">
+          <button type="button" class="v2-btn" data-final-copy-action="copy">종합 요약 복사</button>
+          <button type="button" class="v2-secondary-btn" data-final-copy-action="select">전체 선택</button>
+          <span class="v2-note">카톡·메모장·노션에 바로 붙여넣기용</span>
+        </div>
+        ${renderStatus()}
+        <textarea id="${TEXTAREA_ID}" readonly style="width:100%;min-height:300px;border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:14px;font:13px/1.6 monospace;background:rgba(15,23,42,.03);white-space:pre-wrap;">${esc(summary)}</textarea>
       </section>
     `;
+  }
+
+  function updateStatus(message, tone = 'ok') {
+    copyState.status = message;
+    copyState.statusTone = tone;
+    const existing = document.getElementById(STATUS_ID);
+    if (existing) {
+      existing.className = `v2-form-message show ${tone === 'warn' ? 'warn' : 'ok'}`;
+      existing.textContent = message;
+    }
+  }
+
+  function selectSummary() {
+    const textarea = document.getElementById(TEXTAREA_ID);
+    if (!textarea) return false;
+    textarea.focus();
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+    return true;
+  }
+
+  function fallbackCopy(summary) {
+    const textarea = document.getElementById(TEXTAREA_ID);
+    if (textarea) {
+      textarea.value = summary;
+      selectSummary();
+      try {
+        if (document.execCommand && document.execCommand('copy')) return true;
+      } catch (_) {}
+    }
+
+    const temp = document.createElement('textarea');
+    temp.value = summary;
+    temp.setAttribute('readonly', '');
+    temp.style.position = 'fixed';
+    temp.style.opacity = '0';
+    temp.style.pointerEvents = 'none';
+    document.body.appendChild(temp);
+    temp.focus();
+    temp.select();
+    try {
+      return Boolean(document.execCommand && document.execCommand('copy'));
+    } catch (_) {
+      return false;
+    } finally {
+      temp.remove();
+    }
+  }
+
+  async function copySummary() {
+    const summary = buildSummary();
+    if (!summary) {
+      updateStatus('복사할 종합 요약이 없습니다. 먼저 권리분석을 실행하세요.', 'warn');
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(summary);
+        updateStatus('종합 요약을 클립보드에 복사했습니다. 원하는 곳에 붙여넣으세요.');
+        return;
+      }
+    } catch (_) {}
+
+    if (fallbackCopy(summary)) {
+      updateStatus('종합 요약을 복사했습니다. 붙여넣기가 안 되면 전체 선택 상태에서 직접 복사하세요.');
+    } else {
+      selectSummary();
+      updateStatus('브라우저가 자동 복사를 막았습니다. 아래 내용이 전체 선택되어 있으니 직접 복사하세요.', 'warn');
+    }
   }
 
   function upsertCard() {
@@ -141,10 +228,22 @@
     }
     const anchor = findAnchor();
     if (!anchor) return;
+    const signature = summarySignature(summary);
+    if (existing?.dataset.summarySignature === signature) return;
     const html = renderCard(summary);
     if (existing) existing.outerHTML = html;
     else anchor.insertAdjacentHTML('afterend', html);
   }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-final-copy-action]');
+    if (!button) return;
+    if (button.dataset.finalCopyAction === 'copy') copySummary();
+    if (button.dataset.finalCopyAction === 'select') {
+      if (selectSummary()) updateStatus('전체 선택했습니다. Ctrl+C 또는 길게 눌러 복사하세요.');
+      else updateStatus('선택할 종합 요약이 없습니다.', 'warn');
+    }
+  });
 
   setInterval(upsertCard, 1200);
 })();
