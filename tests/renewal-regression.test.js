@@ -27,6 +27,7 @@ const requiredServerRoutes = [
   ["app.get('/api/config'", 'config route'],
   ["app.post('/api/fetch'", 'court auction fetch route'],
   ["app.post('/api/analyze'", 'analysis route'],
+  ["app.get('/api/courts'", 'court list route'],
   ["app.get('/api/location/geocode'", 'Kakao geocode proxy route'],
   ["app.get('/api/molit/trades'", 'MOLIT trades proxy route'],
   ["app.get('/api/onbid/items'", 'Onbid list proxy route'],
@@ -52,6 +53,10 @@ const requiredScripts = [
   '/app-v2-core.js',
   '/app-v2-onbid-entry.js',
   '/app-v2-service-status.js',
+  '/app-v2-date-source.js',
+  '/app-v2-candidate-stack.js',
+  '/app-v2-saved-tab.js',
+  '/app-v2-bulk-tab.js',
   '/app-v2-location.js',
   '/app-v2-molit-trades.js',
   '/app-v2-final-judgment.js',
@@ -60,8 +65,15 @@ const requiredScripts = [
 ];
 
 requiredScripts.forEach((script) => requireIncludes(INDEX, script, `${script} load tag`));
+requireBefore(INDEX, '/app-v2-request-id-bridge.js', '/app-v2-core.js', 'request id bridge must load before core');
 requireBefore(INDEX, '/app-v2-core.js', '/app-v2-onbid-entry.js', 'Onbid entry must load after core');
 requireBefore(INDEX, '/app-v2-core.js', '/app-v2-service-status.js', 'service status must load after core');
+requireBefore(INDEX, '/app-v2-date-source.js', '/app-v2-candidate-stack.js', 'candidate stack must load after date source');
+requireBefore(INDEX, '/app-v2-candidate-stack.js', '/app-v2-saved-tab.js', 'saved tab must load after candidate stack');
+requireBefore(INDEX, '/app-v2-saved-tab.js', '/app-v2-bulk-tab.js', 'bulk tab must load after saved tab');
+requireBefore(INDEX, '/app-v2-bulk-tab.js', '/app-v2-location.js', 'location must load after renewed tab runtimes');
+requireBefore(INDEX, '/app-v2-location.js', '/app-v2-molit-trades.js', 'MOLIT must load after location');
+requireBefore(INDEX, '/app-v2-molit-trades.js', '/app-v2-final-judgment.js', 'final judgment must load after MOLIT');
 requireBefore(INDEX, '/app-v2-final-judgment.js', '/app-v2-confidence.js', 'confidence must load after final judgment');
 requireBefore(INDEX, '/app-v2-confidence.js', '/app-v2-final-copy-bridge.js', 'final copy bridge must load after confidence');
 
