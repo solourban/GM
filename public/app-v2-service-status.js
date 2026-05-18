@@ -23,14 +23,52 @@
     return `<div class="v2-info"><div class="k">${esc(label)}</div><div class="v">${value}</div></div>`;
   }
 
+  function missingServices(config) {
+    const env = config?.envNames || {};
+    const missing = [];
+    if (!config?.hasKakaoRest) {
+      missing.push({
+        label: '카카오 주소검색',
+        env: env.kakaoRest || 'KAKAO_REST_API_KEY',
+        note: '카카오맵 JS 키와 별개로 REST API 키가 필요합니다.',
+      });
+    }
+    if (!config?.hasMolit) {
+      missing.push({ label: '국토부 실거래가', env: env.molit || 'MOLIT_API_KEY', note: '공공데이터포털 실거래가 서비스키가 필요합니다.' });
+    }
+    if (!config?.hasOnbid) {
+      missing.push({ label: '온비드 공매', env: env.onbid || 'ONBID_API_KEY', note: '공공데이터포털 온비드 서비스키가 필요합니다.' });
+    }
+    return missing;
+  }
+
   function summaryMessage(health, config) {
     if (!health?.ok) return '서버 상태 확인이 필요합니다.';
-    const missing = [];
-    if (!config?.hasKakaoRest) missing.push('카카오 주소검색');
-    if (!config?.hasMolit) missing.push('국토부 실거래가');
-    if (!config?.hasOnbid) missing.push('온비드 공매');
+    const missing = missingServices(config).map((item) => item.label);
     if (!missing.length) return '주요 외부 연동이 준비되어 있습니다.';
     return `${missing.join(', ')} 설정 확인이 필요합니다.`;
+  }
+
+  function renderChecklist(config) {
+    const missing = missingServices(config);
+    if (!missing.length) {
+      return `
+        <div class="v2-info wide">
+          <div class="k">필요 조치</div>
+          <div class="v">추가 설정 없음</div>
+          <p class="v2-note">현재 등록된 외부 API 설정 기준으로 주요 기능을 사용할 수 있습니다.</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="v2-info wide">
+        <div class="k">필요 조치</div>
+        <div class="v">Railway Variables 확인</div>
+        <ul class="v2-note" style="margin:8px 0 0 18px; line-height:1.7">
+          ${missing.map((item) => `<li><b>${esc(item.env)}</b> 추가 필요 · ${esc(item.note)}</li>`).join('')}
+        </ul>
+      </div>
+    `;
   }
 
   function renderLoading() {
@@ -63,6 +101,7 @@
           ${info('카카오맵', statusPill(Boolean(config?.hasKakaoMap), '설정됨', '미설정'))}
           ${info('국토부 실거래가', statusPill(Boolean(config?.hasMolit), '설정됨', '미설정'))}
           ${info('온비드 공매', statusPill(Boolean(config?.hasOnbid), '설정됨', '미설정'))}
+          ${renderChecklist(config)}
           ${info('서비스 버전', esc(clean(health?.version || '-')))}
           ${info('요청ID', esc(requestId || '-'))}
         </div>
