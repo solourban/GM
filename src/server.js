@@ -424,6 +424,76 @@ function normalizeOnbidDetail(data) {
   return {};
 }
 
+function parseOnbidJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+}
+
+function redactedSnippet(text, secret) {
+  let value = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+  if (secret) value = value.split(secret).join('[REDACTED]');
+  return value;
+}
+
+function onbidHeader(data) {
+  return data?.response?.header || data?.header || data?.cmmMsgHeader || {};
+}
+
+function onbidErrorFromJson(data) {
+  const header = onbidHeader(data);
+  const code = String(header.resultCode || header.returnReasonCode || header.errMsg || '').trim();
+  const message = String(header.resultMsg || header.returnAuthMsg || header.errMsg || header.message || '').trim();
+  return { code, message };
+}
+
+function onbidErrorFromText(text) {
+  return {
+    code: xmlText(text, 'resultCode') || xmlText(text, 'returnReasonCode') || xmlText(text, 'errMsg'),
+    message: xmlText(text, 'resultMsg') || xmlText(text, 'returnAuthMsg') || xmlText(text, 'errMsg'),
+  };
+}
+
+function isOnbidSuccess(data) {
+  const { code } = onbidErrorFromJson(data);
+  return !code || code === '00' || code === '0' || /^normal/i.test(code);
+}
+
+function onbidDiagnostics({ apiRes, text, data, endpoint, secret }) {
+  const jsonError = data ? onbidErrorFromJson(data) : { code: '', message: '' };
+  const textError = onbidErrorFromText(text);
+  const upstreamUrl = new URL(endpoint);
+  return {
+    upstreamStatus: apiRes.status,
+    upstreamContentType: apiRes.headers.get('content-type') || '',
+    upstreamEndpoint: `${upstreamUrl.origin}${upstreamUrl.pathname}`,
+    upstreamCode: jsonError.code || textError.code || '',
+    upstreamMessage: jsonError.message || textError.message || '',
+    upstreamBodySample: redactedSnippet(text, secret),
+  };
+}
+
+async function fetchOnbidJson(url, req, scope, userMessage, secret) {
+  const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/json,*/*' } });
+  const text = await apiRes.text();
+  const data = parseOnbidJson(text);
+  const diag = onbidDiagnostics({ apiRes, text, data, endpoint: url.toString(), secret });
+
+  if (!apiRes.ok || !data || !isOnbidSuccess(data)) {
+    logException(scope, req, new Error('Onbid upstream response error'), {
+      upstreamStatus: diag.upstreamStatus,
+      upstreamContentType: diag.upstreamContentType,
+      upstreamEndpoint: diag.upstreamEndpoint,
+      upstreamCode: diag.upstreamCode,
+      upstreamMessage: diag.upstreamMessage,
+    });
+    return { ok: false, status: apiRes.ok ? 502 : apiRes.status, body: errorBody(req, userMessage, diag) };
+  }
+  return { ok: true, data };
+}
+
 app.get('/api/onbid/items', async (req, res) => {
   try {
     const keys = externalApiConfig();
@@ -451,15 +521,10 @@ app.get('/api/onbid/items', async (req, res) => {
     appendOnbidParam(url, 'bidPrdYmdStart', req.query.bidPrdYmdStart, 8);
     appendOnbidParam(url, 'bidPrdYmdEnd', req.query.bidPrdYmdEnd, 8);
 
-    const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/json,*/*' } });
-    const text = await apiRes.text();
-    const data = JSON.parse(text);
+    const upstream = await fetchOnbidJson(url, req, 'onbid/items:upstream', '온비드 upstream 응답을 확인하세요.', keys.onbidKey);
+    if (!upstream.ok) return res.status(upstream.status).json(upstream.body);
 
-    if (!apiRes.ok) {
-      logException('onbid/items:upstream', req, new Error('Onbid API response error'), { status: apiRes.status });
-      return res.status(apiRes.status).json(errorBody(req, '온비드 공매 API 응답 오류가 발생했습니다.', { status: apiRes.status }));
-    }
-
+    const data = upstream.data;
     const body = data?.response?.body || data?.body || {};
     const items = normalizeOnbidItems(data);
     return res.json({
@@ -492,15 +557,10 @@ app.get('/api/onbid/detail', async (req, res) => {
     url.searchParams.set('cltrMngNo', cltrMngNo);
     if (pbctCdtnNo) url.searchParams.set('pbctCdtnNo', pbctCdtnNo);
 
-    const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/json,*/*' } });
-    const text = await apiRes.text();
-    const data = JSON.parse(text);
+    const upstream = await fetchOnbidJson(url, req, 'onbid/detail:upstream', '온비드 상세 upstream 응답을 확인하세요.', keys.onbidKey);
+    if (!upstream.ok) return res.status(upstream.status).json(upstream.body);
 
-    if (!apiRes.ok) {
-      logException('onbid/detail:upstream', req, new Error('Onbid detail API response error'), { status: apiRes.status });
-      return res.status(apiRes.status).json(errorBody(req, '온비드 공매 상세 API 응답 오류가 발생했습니다.', { status: apiRes.status }));
-    }
-
+    const data = upstream.data;
     return res.json({
       ok: true,
       cltrMngNo,
