@@ -3,6 +3,7 @@
   const RESULT_ID = 'v2BulkResultCard';
   const STACK_KEY = 'auction-note:v2:date-candidate-stack';
   const SAVED_KEY = 'auction-note:v2:saved-candidates';
+  const BULK_STATE_KEY = 'auction-note:v2:bulk-lookup-state';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const state = {
@@ -11,6 +12,9 @@
     running: false,
     rows: [],
     message: '',
+    inputText: '',
+    selectedCourt: '',
+    restored: false,
   };
 
   function appState() {
@@ -56,6 +60,36 @@
     } catch (_) {}
   }
 
+  function loadBulkState() {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(BULK_STATE_KEY) || '{}');
+      if (!parsed || typeof parsed !== 'object') return;
+      state.inputText = String(parsed.inputText || '').slice(0, 3000);
+      state.selectedCourt = clean(parsed.selectedCourt);
+      state.rows = Array.isArray(parsed.rows) ? parsed.rows.slice(0, 10) : [];
+      state.message = clean(parsed.message);
+      state.restored = Boolean(state.inputText || state.rows.length);
+    } catch (_) {}
+  }
+
+  function persistBulkState() {
+    try {
+      sessionStorage.setItem(BULK_STATE_KEY, JSON.stringify({
+        inputText: state.inputText,
+        selectedCourt: state.selectedCourt,
+        rows: state.rows.slice(0, 10),
+        message: state.message,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch (_) {}
+  }
+
+  function clearBulkState() {
+    try {
+      sessionStorage.removeItem(BULK_STATE_KEY);
+    } catch (_) {}
+  }
+
   function candidateKey(candidate) {
     return compact(candidate?.caseNo || 'unknown');
   }
@@ -78,6 +112,7 @@
     } catch (_) {
       state.courts = fallback;
     }
+    if (!state.selectedCourt) state.selectedCourt = state.courts.includes('서울중앙지방법원') ? '서울중앙지방법원' : state.courts[0] || '';
     return state.courts;
   }
 
@@ -98,10 +133,15 @@
     };
   }
 
+  function readFormState() {
+    state.selectedCourt = clean(document.getElementById('v2BulkCourt')?.value) || state.selectedCourt || '서울중앙지방법원';
+    state.inputText = String(document.getElementById('v2BulkCases')?.value || state.inputText || '').slice(0, 3000);
+  }
+
   function parseInput() {
-    const defaultCourt = clean(document.getElementById('v2BulkCourt')?.value) || '서울중앙지방법원';
-    const text = document.getElementById('v2BulkCases')?.value || '';
-    const lines = text.split(/\n+/).map(clean).filter(Boolean);
+    readFormState();
+    const defaultCourt = state.selectedCourt || '서울중앙지방법원';
+    const lines = state.inputText.split(/\n+/).map(clean).filter(Boolean);
     const parsed = lines.map((line) => parseLine(line, defaultCourt)).filter(Boolean);
     const seen = new Set();
     return parsed.filter((item) => {
@@ -115,7 +155,8 @@
 
   function courtOptions() {
     const courts = state.courts.length ? state.courts : ['서울중앙지방법원', '천안지원'];
-    return courts.map((court) => `<option value="${esc(court)}" ${court === '서울중앙지방법원' ? 'selected' : ''}>${esc(court)}</option>`).join('');
+    const selected = state.selectedCourt || '서울중앙지방법원';
+    return courts.map((court) => `<option value="${esc(court)}" ${court === selected ? 'selected' : ''}>${esc(court)}</option>`).join('');
   }
 
   function rowCaseNo(row) {
@@ -209,6 +250,7 @@
           <div class="v2-info"><div class="k">성공</div><div class="v">${okCount}건</div></div>
           <div class="v2-info"><div class="k">실패</div><div class="v">${failCount}건</div></div>
           <div class="v2-info"><div class="k">상태</div><div class="v">${esc(state.running ? '조회 중' : '대기')}</div></div>
+          <div class="v2-info"><div class="k">보존</div><div class="v">세션 저장</div></div>
         </div>
         ${renderRows()}
       </section>
@@ -220,16 +262,17 @@
       <div class="v2-card" id="${CARD_ID}">
         <span class="v2-badge">일괄조회</span>
         <h3>여러 사건 일괄조회</h3>
-        <p class="v2-note">한 줄에 하나씩 사건번호를 넣어 기본정보를 순차 조회합니다. 첫 버전은 안정성을 위해 최대 10건만 처리합니다.</p>
+        <p class="v2-note">한 줄에 하나씩 사건번호를 넣어 기본정보를 순차 조회합니다. 입력값과 결과는 현재 브라우저 세션에 보존됩니다.</p>
         <div class="v2-input-grid">
           <label class="v2-field"><span>기본 법원</span><select id="v2BulkCourt">${courtOptions()}</select></label>
-          <label class="v2-field wide" style="grid-column:1/-1"><span>사건번호 목록</span><textarea id="v2BulkCases" rows="7" placeholder="예: 2024타경110754&#10;예: 천안지원 2024타경12345" style="width:100%; border:1px solid var(--line-2); border-radius:12px; padding:12px; font:inherit; resize:vertical;"></textarea></label>
+          <label class="v2-field wide" style="grid-column:1/-1"><span>사건번호 목록</span><textarea id="v2BulkCases" rows="7" placeholder="예: 2024타경110754&#10;예: 천안지원 2024타경12345" style="width:100%; border:1px solid var(--line-2); border-radius:12px; padding:12px; font:inherit; resize:vertical;">${esc(state.inputText)}</textarea></label>
         </div>
         <div class="v2-cta-row">
           <button type="button" class="v2-btn" id="v2BulkRunBtn" ${state.running ? 'disabled' : ''}>${state.running ? '조회 중...' : '일괄조회 실행'}</button>
           <button type="button" class="v2-secondary-btn" id="v2BulkClearBtn" ${state.running ? 'disabled' : ''}>결과 초기화</button>
           <span class="v2-note">형식: 2024타경110754 또는 천안지원 2024타경12345</span>
         </div>
+        ${state.restored ? '<p class="v2-note">이전 일괄조회 입력/결과를 복원했습니다.</p>' : ''}
         ${state.message ? `<div class="v2-form-message show warn">${esc(state.message)}</div>` : ''}
       </div>
       ${renderResults()}
@@ -240,18 +283,13 @@
     if (activeTab() !== 'bulk') return;
     const panel = findBulkPanel();
     if (!panel) return;
-    if (!panel.querySelector(`#${CARD_ID}`)) {
-      panel.innerHTML = renderCard();
-      bindEvents();
-      state.rendered = true;
-    } else {
-      const oldCases = document.getElementById('v2BulkCases')?.value || '';
-      const oldCourt = document.getElementById('v2BulkCourt')?.value || '';
-      panel.innerHTML = renderCard();
-      if (oldCases) document.getElementById('v2BulkCases').value = oldCases;
-      if (oldCourt) document.getElementById('v2BulkCourt').value = oldCourt;
-      bindEvents();
-    }
+    const input = document.getElementById('v2BulkCases');
+    const court = document.getElementById('v2BulkCourt');
+    if (input) state.inputText = String(input.value || '').slice(0, 3000);
+    if (court) state.selectedCourt = clean(court.value);
+    panel.innerHTML = renderCard();
+    bindEvents();
+    state.rendered = true;
   }
 
   async function runBulk() {
@@ -259,17 +297,20 @@
     const items = parseInput();
     if (!items.length) {
       state.message = '조회할 사건번호를 한 줄 이상 입력하세요.';
+      persistBulkState();
       upsert();
       return;
     }
     state.running = true;
     state.message = '';
     state.rows = [];
+    persistBulkState();
     upsert();
 
     for (const item of items) {
       if (item.error) {
         state.rows.push({ ok: false, court: item.court || '-', year: '', serial: '', error: item.error });
+        persistBulkState();
         upsert();
         continue;
       }
@@ -285,10 +326,13 @@
       } catch (error) {
         state.rows.push({ ok: false, court: item.court, year: item.year, serial: item.serial, error: clean(error.message || String(error)) });
       }
+      persistBulkState();
       upsert();
     }
 
     state.running = false;
+    state.restored = false;
+    persistBulkState();
     upsert();
   }
 
@@ -316,12 +360,22 @@
     if (button.dataset.bulkAction === 'save') {
       state.message = savePermanentCandidate(row) ? '저장 후보에 추가했습니다.' : '저장 후보 추가에 실패했습니다.';
     }
+    persistBulkState();
     upsert();
+  }
+
+  function syncFormPersistence() {
+    readFormState();
+    state.message = '';
+    state.restored = false;
+    persistBulkState();
   }
 
   function bindEvents() {
     const run = document.getElementById('v2BulkRunBtn');
     const clear = document.getElementById('v2BulkClearBtn');
+    const input = document.getElementById('v2BulkCases');
+    const court = document.getElementById('v2BulkCourt');
     if (run && !run.dataset.bound) {
       run.dataset.bound = '1';
       run.addEventListener('click', runBulk);
@@ -331,8 +385,19 @@
       clear.addEventListener('click', () => {
         state.rows = [];
         state.message = '';
+        state.inputText = '';
+        state.restored = false;
+        clearBulkState();
         upsert();
       });
+    }
+    if (input && !input.dataset.bound) {
+      input.dataset.bound = '1';
+      input.addEventListener('input', syncFormPersistence);
+    }
+    if (court && !court.dataset.bound) {
+      court.dataset.bound = '1';
+      court.addEventListener('change', syncFormPersistence);
     }
     document.querySelectorAll('[data-bulk-action]').forEach((button) => {
       if (button.dataset.bound) return;
@@ -345,6 +410,7 @@
   }
 
   async function boot() {
+    loadBulkState();
     await loadCourts();
     setInterval(upsert, 700);
   }
