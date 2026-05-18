@@ -16,6 +16,8 @@ function requireIncludes(content, needle, label) {
 
 requireIncludes(server, "app.get('/api/onbid/items'", 'Onbid items proxy route');
 requireIncludes(server, 'OnbidRlstListSrvc/getRlstCltrList', 'Onbid real estate list upstream call in server');
+requireIncludes(server, "app.get('/api/onbid/detail'", 'Onbid detail proxy route');
+requireIncludes(server, 'OnbidPbancCltrDtlSrvc/getPbancCltrInf', 'Onbid detail upstream call in server');
 requireIncludes(server, 'process.env.ONBID_API_KEY', 'Onbid server-side environment variable usage');
 requireIncludes(server, 'hasOnbid', 'Onbid config status flag');
 
