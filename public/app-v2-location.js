@@ -38,7 +38,12 @@
   async function fetchGeocode(address) {
     const res = await fetch(`/api/location/geocode?address=${encodeURIComponent(address)}`);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || data.detail || '주소 좌표 변환에 실패했습니다.');
+    if (!res.ok || !data.ok) {
+      const error = new Error(data.error || data.detail || '주소 좌표 변환에 실패했습니다.');
+      error.response = data;
+      error.status = res.status;
+      throw error;
+    }
     return data;
   }
 
@@ -103,6 +108,19 @@
     `;
   }
 
+  function renderSetupHint(message) {
+    const text = clean(message);
+    const needsKey = text.includes('환경설정') || text.includes('API') || text.includes('키');
+    if (!needsKey) return '';
+    return `
+      <div class="v2-info wide">
+        <div class="k">필요 조치</div>
+        <div class="v">Railway Variables에 KAKAO_REST_API_KEY 추가</div>
+        <p class="v2-note">KAKAO_JS_KEY는 지도 표시용이고, 주소검색 프록시는 별도의 REST API 키를 사용합니다.</p>
+      </div>
+    `;
+  }
+
   function renderError(address, message) {
     return `
       <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
@@ -113,6 +131,7 @@
           ${info('조회 주소', address)}
           ${info('API 상태', '확인 필요')}
           ${info('보안 구조', '서버 프록시 사용')}
+          ${renderSetupHint(message)}
         </div>
       </section>
     `;
