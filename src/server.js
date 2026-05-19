@@ -173,6 +173,17 @@ function normalizeKakaoAddressDocument(doc) {
   };
 }
 
+function safeKakaoDiagnostic(apiRes, data) {
+  const status = Number(apiRes?.status || 0);
+  const errorType = String(data?.errorType || data?.error || '').slice(0, 80);
+  const message = String(data?.message || data?.msg || '').slice(0, 180);
+  let hint = '카카오 REST 키 값, 앱 사용 상태, API 사용 가능 여부를 확인하세요.';
+  if (status === 401 || status === 403) hint = 'REST API 키가 잘못되었거나 앱/API 권한 문제가 있을 수 있습니다.';
+  if (status === 429) hint = '카카오 API 호출 한도를 초과했을 수 있습니다. 잠시 후 다시 시도하세요.';
+  if (status >= 500) hint = '카카오 API 또는 네트워크 일시 오류일 수 있습니다.';
+  return { status, errorType, message, hint };
+}
+
 app.get('/api/location/geocode', async (req, res) => {
   try {
     const keys = externalApiConfig();
@@ -194,8 +205,9 @@ app.get('/api/location/geocode', async (req, res) => {
     const data = await apiRes.json().catch(() => null);
 
     if (!apiRes.ok) {
-      logException('location/geocode:upstream', req, new Error('Kakao API response error'), { status: apiRes.status, upstream: data?.message || data?.errorType || null });
-      return res.status(apiRes.status).json(errorBody(req, '카카오 주소검색 API 응답 오류가 발생했습니다.', { status: apiRes.status }));
+      const upstream = safeKakaoDiagnostic(apiRes, data);
+      logException('location/geocode:upstream', req, new Error('Kakao API response error'), { upstream });
+      return res.status(apiRes.status).json(errorBody(req, '카카오 주소검색 API 응답 오류가 발생했습니다.', { upstream }));
     }
 
     const documents = Array.isArray(data?.documents) ? data.documents.map(normalizeKakaoAddressDocument) : [];
@@ -258,412 +270,292 @@ const MOLIT_TYPES = {
     url: 'https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev',
     nameTags: ['aptNm', '아파트', '단지'],
   },
-  offi: {
+  officetel: {
     label: '오피스텔',
     url: 'https://apis.data.go.kr/1613000/RTMSDataSvcOffiTrade/getRTMSDataSvcOffiTrade',
-    nameTags: ['offiNm', '오피스텔', '단지'],
+    nameTags: ['offiNm', '단지', '건물명'],
   },
   rh: {
     label: '연립다세대',
     url: 'https://apis.data.go.kr/1613000/RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade',
-    nameTags: ['mhouseNm', 'houseNm', '연립다세대', '단지'],
+    nameTags: ['mhouseNm', '연립다세대', '주택명'],
   },
 };
 
-function parseTradeXml(xml, tradeType = 'apt') {
-  const typeInfo = MOLIT_TYPES[tradeType] || MOLIT_TYPES.apt;
-  const items = [...String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/gi)].map((m) => m[1]);
-  return items.map((item) => ({
+function normalizeTradeItem(itemXml, tradeType, label) {
+  const name = pickXml(itemXml, MOLIT_TYPES[tradeType]?.nameTags || []);
+  return {
     tradeType,
-    tradeTypeLabel: typeInfo.label,
-    aptName: pickXml(item, typeInfo.nameTags) || pickXml(item, ['aptNm', 'offiNm', 'mhouseNm', 'houseNm', '아파트', '오피스텔', '연립다세대', '단지']),
-    dealAmount: pickXml(item, ['dealAmount', '거래금액']),
-    buildYear: pickXml(item, ['buildYear', '건축년도']),
-    dealYear: pickXml(item, ['dealYear', '년']),
-    dealMonth: pickXml(item, ['dealMonth', '월']),
-    dealDay: pickXml(item, ['dealDay', '일']),
-    area: pickXml(item, ['excluUseAr', '전용면적']),
-    floor: pickXml(item, ['floor', '층']),
-    dong: pickXml(item, ['umdNm', '법정동']),
-    roadName: pickXml(item, ['roadNm', '도로명']),
-    cancelDate: pickXml(item, ['cdealDay', '해제사유발생일']),
-  }));
+    tradeTypeLabel: label,
+    aptName: name,
+    dealAmount: pickXml(itemXml, ['dealAmount', '거래금액']),
+    dealYear: pickXml(itemXml, ['dealYear', '년']),
+    dealMonth: pickXml(itemXml, ['dealMonth', '월']),
+    dealDay: pickXml(itemXml, ['dealDay', '일']),
+    area: pickXml(itemXml, ['excluUseAr', '전용면적', 'area']),
+    floor: pickXml(itemXml, ['floor', '층']),
+    buildYear: pickXml(itemXml, ['buildYear', '건축년도']),
+  };
 }
 
-function compactName(value) {
-  return String(value || '').replace(/\s+/g, '').replace(/[()\[\]{}·,._\-]/g, '').toLowerCase();
+function xmlItems(xml) {
+  return [...String(xml || '').matchAll(/<item>([\s\S]*?)<\/item>/gi)].map((m) => m[1]);
 }
 
-function filterTradesByName(trades, aptName) {
-  const query = compactName(aptName);
-  if (!query) return { trades, matchQuality: 'none', filterApplied: false };
-  const filtered = trades.filter((t) => compactName(t.aptName).includes(query) || query.includes(compactName(t.aptName)));
-  const matchQuality = query.length >= 4 ? 'strong' : 'weak';
-  return { trades: filtered, matchQuality, filterApplied: true };
+function normalizeMolitServiceKey(value) {
+  const key = String(value || '').trim();
+  if (!key) return '';
+  try {
+    return decodeURIComponent(key);
+  } catch (_) {
+    return key;
+  }
 }
 
-async function fetchMolitType({ key, lawdCd, dealYmd, aptName, tradeType }) {
-  const typeInfo = MOLIT_TYPES[tradeType] || MOLIT_TYPES.apt;
-  const url = new URL(typeInfo.url);
-  url.searchParams.set('serviceKey', key);
+function validLawdCd(value) {
+  return /^\d{5}$/.test(String(value || ''));
+}
+
+function validDealYmd(value) {
+  return /^\d{6}$/.test(String(value || ''));
+}
+
+async function fetchMolitType({ type, lawdCd, dealYmd, aptName }) {
+  const config = MOLIT_TYPES[type];
+  if (!config) throw new Error('지원하지 않는 실거래가 유형입니다.');
+
+  const serviceKey = normalizeMolitServiceKey(externalApiConfig().molitKey);
+  if (!serviceKey) throw new Error('국토부 실거래가 API 키가 없습니다.');
+
+  const url = new URL(config.url);
   url.searchParams.set('LAWD_CD', lawdCd);
   url.searchParams.set('DEAL_YMD', dealYmd);
+  url.searchParams.set('serviceKey', serviceKey);
+  url.searchParams.set('numOfRows', '50');
   url.searchParams.set('pageNo', '1');
-  url.searchParams.set('numOfRows', '1000');
 
-  const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/xml,text/xml,*/*' } });
-  const xml = await apiRes.text();
-  if (!apiRes.ok) throw new Error(`${typeInfo.label} API 응답 오류: ${apiRes.status}`);
-  const parsed = parseTradeXml(xml, tradeType);
-  const filtered = filterTradesByName(parsed, aptName);
-  return { type: tradeType, label: typeInfo.label, rawCount: parsed.length, ...filtered };
-}
+  const res = await fetch(url.toString());
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${config.label} 실거래가 API 응답 오류`);
 
-async function lookupMolitTrades({ lawdCd, dealYmd, aptName, tradeType }) {
-  const key = process.env.MOLIT_API_KEY || process.env.DATA_GO_KR_KEY || '';
-  if (!key) return { status: 400, body: { ok: false, error: '국토부 실거래가 환경설정이 필요합니다.' } };
-  if (!/^\d{5}$/.test(lawdCd)) return { status: 400, body: { ok: false, error: '법정동코드 앞 5자리(LAWD_CD)를 입력해주세요.' } };
-  if (!/^\d{6}$/.test(dealYmd)) return { status: 400, body: { ok: false, error: '계약월(DEAL_YMD)은 YYYYMM 6자리로 입력해주세요.' } };
+  const items = xmlItems(text).map((xml) => normalizeTradeItem(xml, type, config.label));
+  const filter = String(aptName || '').trim().replace(/\s+/g, '');
+  const filtered = filter
+    ? items.filter((item) => String(item.aptName || '').replace(/\s+/g, '').includes(filter) || filter.includes(String(item.aptName || '').replace(/\s+/g, '')))
+    : items;
 
-  const types = tradeType && tradeType !== 'auto' ? [tradeType] : ['apt', 'offi', 'rh'];
-  const results = [];
-  const errors = [];
-  for (const type of types) {
-    try {
-      results.push(await fetchMolitType({ key, lawdCd, dealYmd, aptName, tradeType: type }));
-    } catch (e) {
-      errors.push({ type, error: '조회 실패' });
-    }
-  }
-
-  const trades = results.flatMap((r) => r.trades);
-  const rawCount = results.reduce((sum, r) => sum + Number(r.rawCount || 0), 0);
-  const filterApplied = Boolean(aptName);
-  const matchQuality = filterApplied
-    ? (compactName(aptName).length >= 4 ? 'strong' : 'weak')
-    : 'none';
   return {
-    status: 200,
-    body: {
-      ok: true,
-      count: trades.length,
-      rawCount,
-      filterApplied,
-      matchQuality,
-      tradeTypes: results.map((r) => ({ type: r.type, label: r.label, rawCount: r.rawCount, filteredCount: r.trades.length })),
-      errors,
-      trades: trades.slice(0, 150),
-    },
+    type,
+    label: config.label,
+    rawCount: items.length,
+    filteredCount: filtered.length,
+    trades: filtered,
   };
 }
 
 app.get('/api/molit/trades', async (req, res) => {
   try {
-    const result = await lookupMolitTrades({
-      lawdCd: String(req.query.lawdCd || '').trim(),
-      dealYmd: String(req.query.dealYmd || '').trim(),
-      aptName: String(req.query.aptName || '').trim(),
-      tradeType: String(req.query.tradeType || 'auto').trim(),
+    const lawdCd = String(req.query.lawdCd || '').trim();
+    const dealYmd = String(req.query.dealYmd || '').trim();
+    const aptName = String(req.query.aptName || '').trim();
+    const tradeType = String(req.query.tradeType || 'auto').trim();
+
+    if (!validLawdCd(lawdCd)) return res.status(400).json(errorBody(req, '법정동코드 5자리가 필요합니다.'));
+    if (!validDealYmd(dealYmd)) return res.status(400).json(errorBody(req, '계약월은 YYYYMM 형식이어야 합니다.'));
+
+    const types = tradeType === 'auto' ? Object.keys(MOLIT_TYPES) : [tradeType];
+    const results = [];
+
+    for (const type of types) {
+      try {
+        results.push(await fetchMolitType({ type, lawdCd, dealYmd, aptName }));
+      } catch (e) {
+        results.push({ type, label: MOLIT_TYPES[type]?.label || type, error: e.message, rawCount: 0, filteredCount: 0, trades: [] });
+      }
+    }
+
+    const allTrades = results.flatMap((r) => r.trades || []);
+    return res.json({
+      ok: true,
+      lawdCd,
+      dealYmd,
+      aptName,
+      tradeTypes: results.map(({ type, label, rawCount, filteredCount, error }) => ({ type, label, rawCount, filteredCount, error })),
+      rawCount: results.reduce((sum, r) => sum + Number(r.rawCount || 0), 0),
+      count: allTrades.length,
+      trades: allTrades,
+      requestId: req.requestId,
     });
-    return res.status(result.status).json({ ...result.body, requestId: req.requestId });
   } catch (e) {
     logException('molit/trades', req, e);
-    return res.status(500).json(errorBody(req, '실거래가 조회 중 오류가 발생했습니다.'));
+    return res.status(500).json(errorBody(req, '국토부 실거래가 조회 중 오류가 발생했습니다.'));
   }
 });
 
-app.get('/api/molit/apt-trades', async (req, res) => {
-  try {
-    const result = await lookupMolitTrades({
-      lawdCd: String(req.query.lawdCd || '').trim(),
-      dealYmd: String(req.query.dealYmd || '').trim(),
-      aptName: String(req.query.aptName || '').trim(),
-      tradeType: 'apt',
-    });
-    return res.status(result.status).json({ ...result.body, requestId: req.requestId });
-  } catch (e) {
-    logException('molit/apt-trades', req, e);
-    return res.status(500).json(errorBody(req, '실거래가 조회 중 오류가 발생했습니다.'));
-  }
-});
+const ONBID_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstListSrvc2';
+const ONBID_LIST_ENDPOINT = `${ONBID_BASE_URL}/getOnbidRlstList`; 
+const ONBID_DETAIL_ENDPOINT = `${ONBID_BASE_URL}/getOnbidRlstDtl`;
 
-const ONBID_REAL_ESTATE_LIST_URL = process.env.ONBID_LIST_URL || 'https://apis.data.go.kr/B010003/OnbidRlstListSrvc2/getRlstCltrList';
-const ONBID_PROPERTY_DETAIL_URL = process.env.ONBID_DETAIL_URL || 'http://apis.data.go.kr/B010003/OnbidPbancCltrDtlSrvc/getPbancCltrInf';
-
-function boundedInt(value, fallback, min, max) {
-  const parsed = Number.parseInt(String(value || ''), 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, parsed));
+function sanitizeOnbidParam(value, max = 80) {
+  return String(value || '')
+    .replace(/[<>`{}]/g, '')
+    .trim()
+    .slice(0, max);
 }
 
-function sanitizeOnbidText(value, maxLength = 50) {
-  const text = String(value || '').trim();
-  if (!text) return '';
-  if (text.length > maxLength) return text.slice(0, maxLength);
+function requireOnbidKey(req, res) {
+  const key = externalApiConfig().onbidKey;
+  if (!key) {
+    res.status(400).json(errorBody(req, '온비드 API 키가 없습니다. Railway Variables에 ONBID_API_KEY를 추가하세요.'));
+    return '';
+  }
+  return key;
+}
+
+function xmlItemsByName(xml, name) {
+  return [...String(xml || '').matchAll(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'gi'))].map((m) => m[1]);
+}
+
+function normalizeOnbidListItem(itemXml) {
+  return {
+    cltrNo: pickXml(itemXml, ['CLTR_NO', 'cltrNo']),
+    plnmNo: pickXml(itemXml, ['PLNM_NO', 'plnmNo']),
+    pbctNo: pickXml(itemXml, ['PBCT_NO', 'pbctNo']),
+    cltrNm: pickXml(itemXml, ['CLTR_NM', 'cltrNm']),
+    ctgrFullNm: pickXml(itemXml, ['CTGR_FULL_NM', 'ctgrFullNm']),
+    pbctBegnDtm: pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm']),
+    pbctClsDtm: pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm']),
+    minBidPrc: pickXml(itemXml, ['MIN_BID_PRC', 'minBidPrc']),
+    apslAsesAvgAmt: pickXml(itemXml, ['APSL_ASES_AVG_AMT', 'apslAsesAvgAmt']),
+    sido: pickXml(itemXml, ['SIDO', 'sido']),
+    signgu: pickXml(itemXml, ['SIGNGU', 'signgu']),
+    lot: pickXml(itemXml, ['LOT', 'lot']),
+    rawAddress: pickXml(itemXml, ['LDNM_ADRS', 'NMRD_ADRS', 'ldnmAdrs', 'nmrdAdrs']),
+    statNm: pickXml(itemXml, ['STAT_NM', 'statNm']),
+  };
+}
+
+function normalizeOnbidDetailItem(itemXml) {
+  return {
+    cltrNo: pickXml(itemXml, ['CLTR_NO', 'cltrNo']),
+    plnmNo: pickXml(itemXml, ['PLNM_NO', 'plnmNo']),
+    pbctNo: pickXml(itemXml, ['PBCT_NO', 'pbctNo']),
+    cltrNm: pickXml(itemXml, ['CLTR_NM', 'cltrNm']),
+    ctgrFullNm: pickXml(itemXml, ['CTGR_FULL_NM', 'ctgrFullNm']),
+    goodsNm: pickXml(itemXml, ['GOODS_NM', 'goodsNm']),
+    ldnmAdrs: pickXml(itemXml, ['LDNM_ADRS', 'ldnmAdrs']),
+    nmrdAdrs: pickXml(itemXml, ['NMRD_ADRS', 'nmrdAdrs']),
+    minBidPrc: pickXml(itemXml, ['MIN_BID_PRC', 'minBidPrc']),
+    apslAsesAvgAmt: pickXml(itemXml, ['APSL_ASES_AVG_AMT', 'apslAsesAvgAmt']),
+    pbctBegnDtm: pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm']),
+    pbctClsDtm: pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm']),
+    statNm: pickXml(itemXml, ['STAT_NM', 'statNm']),
+  };
+}
+
+async function fetchOnbid(endpoint, params) {
+  const serviceKey = requireOnbidKey({ requestId: null }, { status: () => ({ json: () => {} }) });
+  if (!serviceKey) throw new Error('온비드 API 키가 없습니다.');
+
+  const url = new URL(endpoint);
+  url.searchParams.set('ServiceKey', serviceKey);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
+  });
+
+  const res = await fetch(url.toString());
+  const text = await res.text();
+  if (!res.ok) throw new Error('온비드 API 응답 오류');
+
   return text;
-}
-
-function appendOnbidParam(url, name, value, maxLength = 50) {
-  const safe = sanitizeOnbidText(value, maxLength);
-  if (safe) url.searchParams.set(name, safe);
-}
-
-function normalizeOnbidItems(data) {
-  const body = data?.response?.body || data?.body || data;
-  const items = body?.items?.item || body?.item || [];
-  if (Array.isArray(items)) return items;
-  if (items && typeof items === 'object') return [items];
-  return [];
-}
-
-function normalizeOnbidDetail(data) {
-  const body = data?.response?.body || data?.body || data;
-  const item = body?.item || body?.items?.item || body;
-  if (Array.isArray(item)) return item[0] || {};
-  if (item && typeof item === 'object') return item;
-  return {};
-}
-
-function parseOnbidJson(text) {
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    return null;
-  }
-}
-
-function redactedSnippet(text, secret) {
-  let value = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 500);
-  if (secret) value = value.split(secret).join('[REDACTED]');
-  return value;
-}
-
-function onbidHeader(data) {
-  return data?.response?.header || data?.header || data?.cmmMsgHeader || {};
-}
-
-function onbidErrorFromJson(data) {
-  const header = onbidHeader(data);
-  const code = String(header.resultCode || header.returnReasonCode || header.errMsg || '').trim();
-  const message = String(header.resultMsg || header.returnAuthMsg || header.errMsg || header.message || '').trim();
-  return { code, message };
-}
-
-function onbidErrorFromText(text) {
-  return {
-    code: xmlText(text, 'resultCode') || xmlText(text, 'returnReasonCode') || xmlText(text, 'errMsg'),
-    message: xmlText(text, 'resultMsg') || xmlText(text, 'returnAuthMsg') || xmlText(text, 'errMsg'),
-  };
-}
-
-function isOnbidSuccess(data) {
-  const { code } = onbidErrorFromJson(data);
-  return !code || code === '00' || code === '0' || /^normal/i.test(code);
-}
-
-function onbidDiagnostics({ apiRes, text, data, endpoint, secret }) {
-  const jsonError = data ? onbidErrorFromJson(data) : { code: '', message: '' };
-  const textError = onbidErrorFromText(text);
-  const upstreamUrl = new URL(endpoint);
-  return {
-    upstreamStatus: apiRes.status,
-    upstreamContentType: apiRes.headers.get('content-type') || '',
-    upstreamEndpoint: `${upstreamUrl.origin}${upstreamUrl.pathname}`,
-    upstreamCode: jsonError.code || textError.code || '',
-    upstreamMessage: jsonError.message || textError.message || '',
-    upstreamBodySample: redactedSnippet(text, secret),
-  };
-}
-
-async function fetchOnbidJson(url, req, scope, userMessage, secret) {
-  const apiRes = await fetch(url.toString(), { headers: { Accept: 'application/json,*/*' } });
-  const text = await apiRes.text();
-  const data = parseOnbidJson(text);
-  const diag = onbidDiagnostics({ apiRes, text, data, endpoint: url.toString(), secret });
-
-  if (!apiRes.ok || !data || !isOnbidSuccess(data)) {
-    logException(scope, req, new Error('Onbid upstream response error'), {
-      upstreamStatus: diag.upstreamStatus,
-      upstreamContentType: diag.upstreamContentType,
-      upstreamEndpoint: diag.upstreamEndpoint,
-      upstreamCode: diag.upstreamCode,
-      upstreamMessage: diag.upstreamMessage,
-    });
-    return { ok: false, status: apiRes.ok ? 502 : apiRes.status, body: errorBody(req, userMessage, diag) };
-  }
-  return { ok: true, data };
 }
 
 app.get('/api/onbid/items', async (req, res) => {
   try {
-    const keys = externalApiConfig();
-    if (!keys.onbidKey) return res.status(400).json(errorBody(req, '온비드 공매 API 환경설정이 필요합니다.'));
+    const key = requireOnbidKey(req, res);
+    if (!key) return;
 
-    const pageNo = boundedInt(req.query.pageNo, 1, 1, 1000);
-    const numOfRows = boundedInt(req.query.numOfRows, 10, 1, 100);
-    const url = new URL(ONBID_REAL_ESTATE_LIST_URL);
-    url.searchParams.set('serviceKey', keys.onbidKey);
-    url.searchParams.set('pageNo', String(pageNo));
-    url.searchParams.set('numOfRows', String(numOfRows));
-    url.searchParams.set('resultType', 'json');
-    url.searchParams.set('prptDivCd', sanitizeOnbidText(req.query.prptDivCd, 80) || '0007,0010,0005,0002,0006');
-    url.searchParams.set('dspsMthodCd', sanitizeOnbidText(req.query.dspsMthodCd, 20) || '0001');
-    url.searchParams.set('bidDivCd', sanitizeOnbidText(req.query.bidDivCd, 20) || '0001');
-    url.searchParams.set('pvctTrgtYn', sanitizeOnbidText(req.query.pvctTrgtYn, 1) || 'N');
+    const query = sanitizeOnbidParam(req.query.query, 60);
+    const sido = sanitizeOnbidParam(req.query.sido, 30);
+    const pageNo = sanitizeOnbidParam(req.query.pageNo || '1', 10);
+    const numOfRows = sanitizeOnbidParam(req.query.numOfRows || '10', 10);
 
-    appendOnbidParam(url, 'lctnSdnm', req.query.lctnSdnm);
-    appendOnbidParam(url, 'lctnSggnm', req.query.lctnSggnm);
-    appendOnbidParam(url, 'lctnEmdNm', req.query.lctnEmdNm);
-    appendOnbidParam(url, 'onbidCltrNm', req.query.keyword || req.query.onbidCltrNm, 80);
-    appendOnbidParam(url, 'rqstOrgNm', req.query.rqstOrgNm, 80);
-    appendOnbidParam(url, 'lowstBidPrcStart', req.query.lowstBidPrcStart, 20);
-    appendOnbidParam(url, 'lowstBidPrcEnd', req.query.lowstBidPrcEnd, 20);
-    appendOnbidParam(url, 'bidPrdYmdStart', req.query.bidPrdYmdStart, 8);
-    appendOnbidParam(url, 'bidPrdYmdEnd', req.query.bidPrdYmdEnd, 8);
-
-    const upstream = await fetchOnbidJson(url, req, 'onbid/items:upstream', '온비드 upstream 응답을 확인하세요.', keys.onbidKey);
-    if (!upstream.ok) return res.status(upstream.status).json(upstream.body);
-
-    const data = upstream.data;
-    const body = data?.response?.body || data?.body || {};
-    const items = normalizeOnbidItems(data);
-    return res.json({
-      ok: true,
+    const xml = await fetchOnbid(ONBID_LIST_ENDPOINT, {
+      ServiceKey: key,
       pageNo,
       numOfRows,
-      totalCount: Number(body.totalCount || items.length || 0),
-      count: items.length,
-      items,
-      requestId: req.requestId,
+      CLTR_NM: query,
+      SIDO: sido,
+      _type: 'xml',
     });
+
+    const items = xmlItemsByName(xml, 'item').map(normalizeOnbidListItem);
+    return res.json({ ok: true, count: items.length, items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/items', req, e);
-    return res.status(500).json(errorBody(req, '온비드 공매 물건 조회 중 오류가 발생했습니다.'));
+    return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.', { detail: e.message }));
   }
 });
 
 app.get('/api/onbid/detail', async (req, res) => {
   try {
-    const keys = externalApiConfig();
-    if (!keys.onbidKey) return res.status(400).json(errorBody(req, '온비드 공매 API 환경설정이 필요합니다.'));
+    const key = requireOnbidKey(req, res);
+    if (!key) return;
 
-    const cltrMngNo = sanitizeOnbidText(req.query.cltrMngNo, 40);
-    const pbctCdtnNo = sanitizeOnbidText(req.query.pbctCdtnNo, 40);
-    if (!cltrMngNo) return res.status(400).json(errorBody(req, '물건관리번호(cltrMngNo)를 입력해주세요.'));
+    const cltrNo = sanitizeOnbidParam(req.query.cltrNo, 40);
+    const plnmNo = sanitizeOnbidParam(req.query.plnmNo, 40);
+    const pbctNo = sanitizeOnbidParam(req.query.pbctNo, 40);
+    if (!cltrNo && !plnmNo && !pbctNo) return res.status(400).json(errorBody(req, '온비드 상세 조회에 필요한 물건번호가 없습니다.'));
 
-    const url = new URL(ONBID_PROPERTY_DETAIL_URL);
-    url.searchParams.set('serviceKey', keys.onbidKey);
-    url.searchParams.set('resultType', 'json');
-    url.searchParams.set('cltrMngNo', cltrMngNo);
-    if (pbctCdtnNo) url.searchParams.set('pbctCdtnNo', pbctCdtnNo);
-
-    const upstream = await fetchOnbidJson(url, req, 'onbid/detail:upstream', '온비드 상세 upstream 응답을 확인하세요.', keys.onbidKey);
-    if (!upstream.ok) return res.status(upstream.status).json(upstream.body);
-
-    const data = upstream.data;
-    return res.json({
-      ok: true,
-      cltrMngNo,
-      pbctCdtnNo,
-      detail: normalizeOnbidDetail(data),
-      raw: data?.response || data,
-      requestId: req.requestId,
+    const xml = await fetchOnbid(ONBID_DETAIL_ENDPOINT, {
+      ServiceKey: key,
+      CLTR_NO: cltrNo,
+      PLNM_NO: plnmNo,
+      PBCT_NO: pbctNo,
+      _type: 'xml',
     });
+
+    const items = xmlItemsByName(xml, 'item').map(normalizeOnbidDetailItem);
+    return res.json({ ok: true, count: items.length, item: items[0] || null, items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/detail', req, e);
-    return res.status(500).json(errorBody(req, '온비드 공매 상세 조회 중 오류가 발생했습니다.'));
+    return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.', { detail: e.message }));
   }
 });
-
-function validateFetchInput({ saYear, saSer, jiwonNm }) {
-  const year = String(saYear || '').trim();
-  const serial = String(saSer || '').trim();
-  const court = String(jiwonNm || '').trim();
-
-  if (!year || !serial || !court) return '법원, 사건연도, 사건번호를 모두 입력해주세요.';
-  if (!/^\d{4}$/.test(year)) return '사건연도는 4자리 숫자로 입력해주세요.';
-  if (!/^\d{1,10}$/.test(serial)) return '사건번호는 숫자만 입력해주세요.';
-  return null;
-}
 
 app.post('/api/fetch', async (req, res) => {
-  const startTime = Date.now();
   try {
-    const { saYear, saSer, jiwonNm } = req.body;
-    const inputError = validateFetchInput({ saYear, saSer, jiwonNm });
-    if (inputError) return res.status(400).json(errorBody(req, inputError));
-
-    const year = String(saYear).trim();
-    const serial = String(saSer).trim();
-    const court = String(jiwonNm).trim();
-
-    console.log(`[fetch] ${court} ${year}타경${serial} requestId=${req.requestId}`);
-    const raw = await fetchCase(year, serial, court);
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-
-    if (raw.status !== 'ok') {
-      console.warn('[fetch] crawler failed', { requestId: req.requestId, diagnosis: raw.diagnosis || null, debug: raw.debug || null });
-      return res.status(502).json(errorBody(req, raw.error || '법원경매정보 조회에 실패했습니다.', {
-        diagnosis: raw.diagnosis || null,
-        elapsed: `${elapsed}s`,
-      }));
+    const { jiwonNm, saYear, saSer } = req.body || {};
+    if (!jiwonNm || !saYear || !saSer) {
+      return res.status(400).json(errorBody(req, '법원, 연도, 사건번호를 모두 입력하세요.'));
     }
-    return res.json({ ok: true, raw, elapsed: `${elapsed}s`, requestId: req.requestId });
+    const result = await fetchCase({ jiwonNm, saYear, saSer });
+    return res.json({ ok: true, raw: result, elapsed: result.elapsed, requestId: req.requestId });
   } catch (e) {
     logException('fetch', req, e);
-    return res.status(500).json(errorBody(req, '서버 처리 중 오류가 발생했습니다.'));
+    return res.status(500).json(errorBody(req, e.message || '조회 실패'));
   }
 });
 
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analyze', (req, res) => {
   try {
-    const { raw, manual, region = 'other' } = req.body;
-    if (!raw || !manual) return res.status(400).json(errorBody(req, '필수 파라미터 누락 (raw, manual)'));
-
-    const merged = { ...raw };
-    merged.rights = manual.rights || [];
-    merged.tenants = (manual.tenants || []).map((t) => ({
-      '임차인': t.name || '',
-      '전입신고일자': t.moveIn || '',
-      '확정일자': t.fixed || '',
-      '보증금': t.deposit || '',
-    }));
-
-    if (Array.isArray(manual.specials)) {
-      manual.specials.forEach((s) => {
-        merged.rights.push({
-          '접수일자': s.date || '2000-01-01',
-          '권리종류': s.type || '유치권',
-          '권리자': s.holder || '-',
-          '채권금액': s.amount || '0',
-        });
-      });
-    }
-
-    if (manual.malso && manual.malso.date) {
-      merged.rights.unshift({
-        '접수일자': manual.malso.date,
-        '권리종류': manual.malso.type || '근저당권',
-        '권리자': manual.malso.holder || '-',
-        '채권금액': manual.malso.amount || '0',
-        _userMalso: true,
-      });
-    }
-
-    const report = analyzeCase(merged, region);
-    return res.json({ ok: true, report, requestId: req.requestId });
+    const result = analyzeCase(req.body || {});
+    res.json({ ok: true, result, requestId: req.requestId });
   } catch (e) {
     logException('analyze', req, e);
-    return res.status(500).json(errorBody(req, '분석 처리 중 오류가 발생했습니다.'));
+    res.status(500).json(errorBody(req, '분석 중 오류가 발생했습니다.'));
   }
+});
+
+app.use((req, res) => {
+  res.status(404).json(errorBody(req, '찾을 수 없는 경로입니다.'));
 });
 
 app.use((err, req, res, next) => {
-  logException('express', req, err);
-  if (res.headersSent) return next(err);
-  return res.status(500).json(errorBody(req, '서버 처리 중 오류가 발생했습니다.'));
+  logException('unhandled', req, err);
+  res.status(500).json(errorBody(req, '서버 오류가 발생했습니다.'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`${SERVICE_NAME} 서버 시작: port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`${SERVICE_NAME} server listening on ${PORT}`);
 });
