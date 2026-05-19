@@ -110,13 +110,26 @@
 
   function renderSetupHint(message) {
     const text = clean(message);
-    const needsKey = text.includes('환경설정') || text.includes('API') || text.includes('키');
+    const needsKey = text.includes('환경설정') || text.includes('KAKAO_REST_API_KEY') || text.includes('키가 없습니다');
     if (!needsKey) return '';
     return `
       <div class="v2-info wide">
         <div class="k">필요 조치</div>
         <div class="v">Railway Variables에 KAKAO_REST_API_KEY 추가</div>
         <p class="v2-note">KAKAO_JS_KEY는 지도 표시용이고, 주소검색 프록시는 별도의 REST API 키를 사용합니다.</p>
+      </div>
+    `;
+  }
+
+  function renderUpstreamHint(message) {
+    const text = clean(message);
+    if (text.includes('환경설정') || text.includes('KAKAO_REST_API_KEY')) return '';
+    if (!text.includes('카카오') && !text.includes('좌표') && !text.includes('주소')) return '';
+    return `
+      <div class="v2-info wide">
+        <div class="k">확인 방향</div>
+        <div class="v">키는 인식됐고, 카카오 주소검색 응답 또는 주소 원문 확인이 필요합니다.</div>
+        <p class="v2-note">REST 키 값, 카카오 앱 사용 상태, 검색 주소 축약 여부를 확인하세요. 이 카드가 실패하면 실거래가 카드는 법정동코드가 없어 대기 상태가 됩니다.</p>
       </div>
     `;
   }
@@ -132,6 +145,7 @@
           ${info('API 상태', '확인 필요')}
           ${info('보안 구조', '서버 프록시 사용')}
           ${renderSetupHint(message)}
+          ${renderUpstreamHint(message)}
         </div>
       </section>
     `;
