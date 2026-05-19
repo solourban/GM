@@ -23,9 +23,13 @@
     return clean(raw.caseNo || basicInfo()['사건번호'] || 'unknown');
   }
 
-  function extractAddress() {
+  function rawAddressText() {
     const basic = basicInfo();
-    const raw = clean(basic['소재지'] || basic['주소'] || basic['물건소재지'] || '');
+    return clean(basic['소재지'] || basic['주소'] || basic['물건소재지'] || '');
+  }
+
+  function extractAddress() {
+    const raw = rawAddressText();
     if (!raw) return '';
 
     return raw
@@ -33,6 +37,48 @@
       .split(',')[0]
       .replace(/\s+외\s*\d+.*$/g, '')
       .trim();
+  }
+
+  function addCandidate(list, value) {
+    const text = clean(value);
+    if (!text) return;
+    if (!list.includes(text)) list.push(text);
+  }
+
+  function extractParenTexts(raw) {
+    const matches = [...String(raw || '').matchAll(/\(([^()]+)\)/g)];
+    return matches.map((match) => clean(match[1])).filter(Boolean);
+  }
+
+  function addressCandidates() {
+    const raw = rawAddressText();
+    const base = extractAddress();
+    const candidates = [];
+    addCandidate(candidates, base);
+    addCandidate(candidates, base.replace(/^서울특별시\s+/, '서울 '));
+    addCandidate(candidates, base.replace(/^서울\s+/, '서울특별시 '));
+
+    const roadMatch = base.match(/([가-힣A-Za-z0-9]+로)\s*(\d+(?:-\d+)?)/);
+    if (roadMatch) {
+      addCandidate(candidates, `서울 강남구 ${roadMatch[1]} ${roadMatch[2]}`);
+      addCandidate(candidates, `서울특별시 강남구 ${roadMatch[1]} ${roadMatch[2]}`);
+      addCandidate(candidates, `${roadMatch[1]} ${roadMatch[2]}`);
+    }
+
+    extractParenTexts(raw).forEach((text) => {
+      addCandidate(candidates, text);
+      addCandidate(candidates, `서울 강남구 ${text}`);
+      addCandidate(candidates, `서울특별시 강남구 ${text}`);
+    });
+
+    const building = clean(basicInfo()['건물명'] || basicInfo()['아파트명'] || '');
+    if (building) {
+      addCandidate(candidates, building);
+      addCandidate(candidates, `서울 강남구 ${building}`);
+      addCandidate(candidates, `서울특별시 강남구 ${building}`);
+    }
+
+    return candidates.slice(0, 8);
   }
 
   async function fetchGeocode(address) {
@@ -45,6 +91,29 @@
       throw error;
     }
     return data;
+  }
+
+  function hasDocuments(data) {
+    return Array.isArray(data?.documents) && data.documents.length > 0;
+  }
+
+  async function fetchGeocodeWithFallbacks(candidates) {
+    const attempts = [];
+    let lastError = null;
+    for (const address of candidates) {
+      try {
+        const data = await fetchGeocode(address);
+        attempts.push({ address, ok: true, count: Array.isArray(data.documents) ? data.documents.length : 0 });
+        if (hasDocuments(data)) return { address, data, attempts };
+      } catch (error) {
+        lastError = error;
+        attempts.push({ address, ok: false, error: error.message || String(error) });
+        if (/환경설정|KAKAO_REST_API_KEY|키가 없습니다/.test(error.message || '')) throw Object.assign(error, { attempts });
+      }
+    }
+    const error = new Error(lastError?.message || '주소 후보 전체에서 변환 가능한 좌표를 찾지 못했습니다.');
+    error.attempts = attempts;
+    throw error;
   }
 
   function findAnchor() {
@@ -69,7 +138,7 @@
     return `https://map.kakao.com/link/map/${label},${y},${x}`;
   }
 
-  function saveLocationResult(address, doc) {
+  function saveLocationResult(address, doc, attempts = []) {
     try {
       if (!doc) return;
       sessionStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({
@@ -86,6 +155,7 @@
         bCode: clean(doc.bCode),
         hCode: clean(doc.hCode),
         zoneNo: clean(doc.zoneNo),
+        attempts,
         kakaoMapUrl: mapCoordUrl(doc, address),
         kakaoSearchUrl: mapSearchUrl(doc, address),
         savedAt: new Date().toISOString(),
@@ -99,11 +169,11 @@
     } catch (_) {}
   }
 
-  function renderLoading(address) {
+  function renderLoading(addresses) {
     return `
       <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
         <div class="v2-loading"><span class="v2-spinner"></span><div><h3>입지 기초정보 조회 중</h3><p class="v2-note">카카오 주소검색 API로 좌표를 확인하고 있습니다. API 키는 서버에서만 사용됩니다.</p></div></div>
-        <p class="v2-note">조회 주소: ${esc(address)}</p>
+        <p class="v2-note">조회 주소 후보: ${esc(addresses.join(' / '))}</p>
       </section>
     `;
   }
@@ -134,16 +204,28 @@
     `;
   }
 
-  function renderError(address, message) {
+  function renderAttempts(attempts = []) {
+    if (!attempts.length) return '';
+    return `
+      <div class="v2-info wide">
+        <div class="k">주소 재검색 시도</div>
+        <div class="v">${attempts.map((attempt) => `${clean(attempt.address)}: ${attempt.ok ? `${attempt.count || 0}건` : '실패'}`).join(' / ')}</div>
+      </div>
+    `;
+  }
+
+  function renderError(addresses, message, attempts = []) {
+    const primaryAddress = Array.isArray(addresses) ? addresses[0] : addresses;
     return `
       <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
         <span class="v2-badge">입지 기초정보</span>
         <h3>좌표 변환 확인 필요</h3>
         <p class="v2-note">${esc(message)}</p>
         <div class="v2-grid compact">
-          ${info('조회 주소', address)}
+          ${info('대표 조회 주소', primaryAddress)}
           ${info('API 상태', '확인 필요')}
           ${info('보안 구조', '서버 프록시 사용')}
+          ${renderAttempts(attempts)}
           ${renderSetupHint(message)}
           ${renderUpstreamHint(message)}
         </div>
@@ -151,11 +233,11 @@
     `;
   }
 
-  function renderSuccess(address, data) {
+  function renderSuccess(address, data, attempts = []) {
     const doc = Array.isArray(data.documents) ? data.documents[0] : null;
-    if (!doc) return renderError(address, '해당 주소로 변환 가능한 좌표를 찾지 못했습니다. 소재지 표기를 확인해주세요.');
+    if (!doc) return renderError([address], '해당 주소로 변환 가능한 좌표를 찾지 못했습니다. 소재지 표기를 확인해주세요.', attempts);
 
-    saveLocationResult(address, doc);
+    saveLocationResult(address, doc, attempts);
     const kakaoMapUrl = mapCoordUrl(doc, address);
     const kakaoSearchUrl = mapSearchUrl(doc, address);
 
@@ -173,7 +255,7 @@
           </div>
         </div>
         <div class="v2-grid">
-          ${info('조회 주소', address, 'wide')}
+          ${info('성공 조회 주소', address, 'wide')}
           ${info('지번주소', doc.addressName)}
           ${info('도로명주소', doc.roadAddress || '-')}
           ${info('건물명', doc.buildingName || '-')}
@@ -185,6 +267,7 @@
           ${info('법정동코드', doc.bCode)}
           ${info('행정동코드', doc.hCode)}
           ${info('우편번호', doc.zoneNo || '-')}
+          ${renderAttempts(attempts)}
         </div>
         <p class="v2-note">지도 링크는 API 키 없이 외부 카카오맵 페이지를 여는 방식입니다. 다음 단계에서 주변시설·실거래가 보조 검토를 연결합니다.</p>
       </section>
@@ -204,11 +287,11 @@
 
   async function upsertLocationCard() {
     const state = appState();
-    const address = extractAddress();
-    const key = `${rawCaseKey()}::${address}`;
+    const addresses = addressCandidates();
+    const key = `${rawCaseKey()}::${addresses.join('|')}`;
     const existing = document.getElementById(CARD_ID);
 
-    if (!state?.raw || !address) {
+    if (!state?.raw || !addresses.length) {
       existing?.remove();
       clearLocationResult();
       lastKey = '';
@@ -217,17 +300,17 @@
 
     if (key === lastKey || key === pendingKey) return;
     pendingKey = key;
-    insertAfterAnchor(renderLoading(address));
+    insertAfterAnchor(renderLoading(addresses));
 
     try {
-      const data = await fetchGeocode(address);
+      const result = await fetchGeocodeWithFallbacks(addresses);
       if (pendingKey !== key) return;
-      insertAfterAnchor(renderSuccess(address, data));
+      insertAfterAnchor(renderSuccess(result.address, result.data, result.attempts));
       lastKey = key;
     } catch (e) {
       if (pendingKey !== key) return;
       clearLocationResult();
-      insertAfterAnchor(renderError(address, e.message || String(e)));
+      insertAfterAnchor(renderError(addresses, e.message || String(e), e.attempts || []));
       lastKey = key;
     } finally {
       if (pendingKey === key) pendingKey = '';
