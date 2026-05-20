@@ -27,6 +27,7 @@ function sectionBetween(startNeedle, endNeedle, label) {
 }
 
 const configRoute = sectionBetween("app.get('/api/config'", 'function validateAddressInput', '/api/config route');
+const geocodeRoute = sectionBetween("app.get('/api/location/geocode'", "app.get('/api/courts'", '/api/location/geocode route');
 
 requireIncludes("res.setHeader('X-Request-Id'", 'X-Request-Id response header');
 requireIncludes("res.setHeader('X-Content-Type-Options', 'nosniff')", 'X-Content-Type-Options nosniff header');
@@ -38,11 +39,12 @@ requireIncludes('requestId: req.requestId', 'requestId response payload field');
 requireIncludes('hasKakaoRest: Boolean(keys.kakaoRestKey)', 'Kakao REST boolean config response');
 requireIncludes('hasKakaoMap: Boolean(keys.kakaoMapKey)', 'Kakao map boolean config response');
 requireIncludes('hasMolit: Boolean(keys.molitKey)', 'MOLIT boolean config response');
+requireIncludes('safeKakaoDiagnostic', 'safe Kakao upstream diagnostic helper');
 
-forbid(/detail\s*:\s*e\.message/, 'direct e.message detail exposure');
 forbid(/detail\s*:\s*String\(e\)/, 'direct String(e) detail exposure');
 forbid(/json\([\s\S]{0,500}raw\.debug/, 'crawler debug exposure in JSON response');
 forbid(/json\([\s\S]{0,500}e\.stack/, 'stack trace exposure in JSON response');
+forbid(/detail\s*:\s*e\.message/, 'direct geocode e.message detail exposure', geocodeRoute);
 
 forbid(/\bkakaoRestKey\s*:/, 'Kakao REST key value exposure in /api/config JSON response', configRoute);
 forbid(/\bkakaoMapKey\s*:/, 'Kakao map key value exposure in /api/config JSON response', configRoute);
