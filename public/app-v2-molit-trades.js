@@ -138,18 +138,50 @@
     return { count: trades.length, minPrice, maxPrice, avgPrice, minArea, maxArea };
   }
 
-  function auctionTradeComparison(stats) {
+  function tradeScope(result, trades) {
+    const count = trades.length;
+    const aptName = clean(result?.aptName || '');
+    const rawCount = Number(result?.data?.rawCount || 0);
+    const hasExactFilter = Boolean(aptName && aptName !== '-' && aptName !== '미적용');
+    const veryBroad = count >= 80 || rawCount >= 80;
+
+    if (!count) return {
+      level: 'none',
+      label: '표본 없음',
+      priceComparable: false,
+      judgment: '최근 조회 범위에서 표시 가능한 거래가 없어 단지명 필터 해제 또는 계약월 확대가 필요합니다.',
+      comparison: '실거래 표본이 없어 가격 비교 판단을 보류합니다.',
+    };
+
+    if (hasExactFilter && !veryBroad) return {
+      level: 'specific',
+      label: '동일 단지·건물 후보',
+      priceComparable: true,
+      judgment: count >= 5 ? '동일 단지·건물 후보 기준 거래가 여러 건 확인되어 시세 참고자료로 활용할 수 있습니다.' : '동일 단지·건물 후보 거래가 일부 확인되지만 동·층·면적 확인이 필요합니다.',
+      comparison: '',
+    };
+
+    return {
+      level: 'regional',
+      label: '지역 참고시세',
+      priceComparable: false,
+      judgment: '동일 건물 확정값이 아니라 법정동·행정구역 단위 거래가 확인되었습니다. 시세 방향 참고자료로만 활용하세요.',
+      comparison: '지역 평균가 기준 비교값입니다. 동일 단지·동·층·면적 매칭 전까지 최종 입찰가 판단에는 직접 반영하지 마세요.',
+    };
+  }
+
+  function auctionTradeComparison(stats, scope) {
     const minBidWon = auctionMinBidWon();
     const avgTradeWon = Number(stats.avgPrice || 0) * 10000;
     const minTradeWon = Number(stats.minPrice || 0) * 10000;
     const avgRatio = minBidWon && avgTradeWon ? (minBidWon / avgTradeWon) * 100 : 0;
     const minRatio = minBidWon && minTradeWon ? (minBidWon / minTradeWon) * 100 : 0;
 
-    let judgment = '실거래 표본 또는 경매 최저가가 부족해 가격 비교 판단을 보류합니다.';
-    if (minBidWon && avgRatio > 0) {
-      if (avgRatio <= 70) judgment = '경매 최저가가 평균 실거래가 대비 낮은 편입니다. 권리·명도·수리비를 반영해 추가 검토할 만합니다.';
-      else if (avgRatio <= 90) judgment = '경매 최저가가 평균 실거래가 대비 보통 범위입니다. 비용 반영 후 입찰가를 신중히 정해야 합니다.';
-      else judgment = '경매 최저가가 평균 실거래가에 근접하거나 높습니다. 추가 비용 반영 시 가격 매력이 낮을 수 있습니다.';
+    let judgment = scope?.comparison || '실거래 표본 또는 경매 최저가가 부족해 가격 비교 판단을 보류합니다.';
+    if (scope?.priceComparable && minBidWon && avgRatio > 0) {
+      if (avgRatio <= 70) judgment = '경매 최저가가 동일 단지·건물 후보 평균 실거래가 대비 낮은 편입니다. 권리·명도·수리비를 반영해 추가 검토할 만합니다.';
+      else if (avgRatio <= 90) judgment = '경매 최저가가 동일 단지·건물 후보 평균 실거래가 대비 보통 범위입니다. 비용 반영 후 입찰가를 신중히 정해야 합니다.';
+      else judgment = '경매 최저가가 동일 단지·건물 후보 평균 실거래가에 근접하거나 높습니다. 추가 비용 반영 시 가격 매력이 낮을 수 있습니다.';
     }
 
     return {
@@ -159,27 +191,27 @@
       avgRatio,
       minRatio,
       judgment,
+      priceComparable: Boolean(scope?.priceComparable),
+      scopeLabel: scope?.label || '-',
+      scopeLevel: scope?.level || 'none',
     };
-  }
-
-  function judgmentText(stats) {
-    if (!stats.count) return '최근 조회 범위에서 표시 가능한 거래가 없어 단지명 필터 해제 또는 계약월 확대가 필요합니다.';
-    if (stats.count >= 5) return '동일 법정동 기준 거래가 여러 건 확인되어 시세 참고자료로 활용할 수 있습니다.';
-    if (stats.count >= 2) return '거래가 일부 확인되지만 표본이 적어 동일 단지·면적 여부 확인이 필요합니다.';
-    return '거래가 1건만 확인되어 시세 판단 근거로는 부족합니다.';
   }
 
   function renderStatsSummary(trades, result) {
     const stats = tradeStats(trades);
-    const comparison = auctionTradeComparison(stats);
+    const scope = tradeScope(result, trades);
+    const comparison = auctionTradeComparison(stats, scope);
+    const avgRatioLabel = comparison.avgRatio ? `${comparison.avgRatio.toFixed(1)}%${comparison.priceComparable ? '' : ' · 참고'}` : '-';
+    const minRatioLabel = comparison.minRatio ? `${comparison.minRatio.toFixed(1)}%${comparison.priceComparable ? '' : ' · 참고'}` : '-';
     return `
       <div class="v2-grid compact">
-        ${info('거래 판단', judgmentText(stats, result), 'wide')}
+        ${info('시세 근거 범위', scope.label, 'wide')}
+        ${info('거래 판단', scope.judgment, 'wide')}
         ${info('가격 비교 판단', comparison.judgment, 'wide')}
         ${info('경매 최저가', formatWon(comparison.minBidWon))}
         ${info('평균 실거래가', comparison.avgTradeWon ? formatWon(comparison.avgTradeWon) : '-')}
-        ${info('최저가/평균가', comparison.avgRatio ? `${comparison.avgRatio.toFixed(1)}%` : '-')}
-        ${info('최저가/최저실거래', comparison.minRatio ? `${comparison.minRatio.toFixed(1)}%` : '-')}
+        ${info('최저가/평균가', avgRatioLabel)}
+        ${info('최저가/최저실거래', minRatioLabel)}
         ${info('거래 건수', `${stats.count}건`)}
         ${info('최저 거래금액', formatManwon(stats.minPrice))}
         ${info('최고 거래금액', formatManwon(stats.maxPrice))}
@@ -269,7 +301,8 @@
   function renderSuccess(result, location) {
     const trades = Array.isArray(result.data?.trades) ? result.data.trades : [];
     const stats = tradeStats(trades);
-    const comparison = auctionTradeComparison(stats);
+    const scope = tradeScope(result, trades);
+    const comparison = auctionTradeComparison(stats, scope);
     saveTradeResult({
       lawdCd: result.lawdCd,
       dealYmd: result.dealYmd,
@@ -280,7 +313,8 @@
       tradeTypes: result.data?.tradeTypes || [],
       stats,
       comparison,
-      judgment: judgmentText(stats, result),
+      tradeScope: scope,
+      judgment: scope.judgment,
       trades: trades.slice(0, 20),
       attempts: result.attempts || [],
     });
