@@ -138,12 +138,6 @@
     return { count: trades.length, minPrice, maxPrice, avgPrice, minArea, maxArea };
   }
 
-  function ratioText(wonValue, manwonValue) {
-    const baseWon = Number(manwonValue || 0) * 10000;
-    if (!wonValue || !baseWon) return '-';
-    return `${((wonValue / baseWon) * 100).toFixed(1)}%`;
-  }
-
   function auctionTradeComparison(stats) {
     const minBidWon = auctionMinBidWon();
     const avgTradeWon = Number(stats.avgPrice || 0) * 10000;
@@ -168,7 +162,7 @@
     };
   }
 
-  function judgmentText(stats, result) {
+  function judgmentText(stats) {
     if (!stats.count) return '최근 조회 범위에서 표시 가능한 거래가 없어 단지명 필터 해제 또는 계약월 확대가 필요합니다.';
     if (stats.count >= 5) return '동일 법정동 기준 거래가 여러 건 확인되어 시세 참고자료로 활용할 수 있습니다.';
     if (stats.count >= 2) return '거래가 일부 확인되지만 표본이 적어 동일 단지·면적 여부 확인이 필요합니다.';
@@ -195,6 +189,24 @@
     `;
   }
 
+  function renderWaiting(reason, location = null) {
+    return `
+      <section class="v2-result-card" id="${CARD_ID}">
+        <span class="v2-badge">실거래가·시세 확인</span>
+        <h3>국토부 실거래가 조회 대기</h3>
+        <p class="v2-note">${esc(reason)}</p>
+        <div class="v2-grid compact">
+          ${info('현재 상태', '입지 기초정보 필요')}
+          ${info('필요 데이터', '법정동코드 LAWD_CD')}
+          ${info('조회 방식', '최근 계약월 순차 조회')}
+          ${info('보안 구조', '서버 프록시 사용')}
+          ${info('법정동코드', location?.bCode || '-', 'wide')}
+        </div>
+        <p class="v2-note">입지 기초정보 카드에서 주소 좌표와 법정동코드가 확인되면 이 카드가 자동으로 실거래가 결과 카드로 바뀝니다.</p>
+      </section>
+    `;
+  }
+
   function renderLoading(location) {
     return `
       <section class="v2-result-card" id="${CARD_ID}">
@@ -207,7 +219,7 @@
   function renderError(message, location) {
     return `
       <section class="v2-result-card" id="${CARD_ID}">
-        <span class="v2-badge">실거래가 기초조회</span>
+        <span class="v2-badge">실거래가·시세 확인</span>
         <h3>실거래가 조회 확인 필요</h3>
         <p class="v2-note">${esc(message)}</p>
         <div class="v2-grid compact">
@@ -277,7 +289,7 @@
       <section class="v2-result-card" id="${CARD_ID}">
         <div class="v2-result-head">
           <div>
-            <span class="v2-badge">실거래가 기초조회</span>
+            <span class="v2-badge">실거래가·시세 확인</span>
             <h3>국토부 실거래가 조회 결과</h3>
             <p class="v2-note">법정동코드 기준 최근 계약월을 순차 조회했습니다. API 키는 브라우저에 노출되지 않습니다.</p>
           </div>
@@ -314,15 +326,23 @@
     const key = `${state?.raw?.caseNo || 'unknown'}::${lawdCd}::${candidateName(location)}`;
     const existing = document.getElementById(CARD_ID);
 
-    if (!state?.raw || !location?.queryAddress) {
+    if (!state?.raw) {
       existing?.remove();
       clearTradeResult();
       lastKey = '';
       return;
     }
 
+    if (!location?.queryAddress) {
+      clearTradeResult();
+      lastKey = '';
+      insertAfterAnchor(renderWaiting('주소 좌표 변환이 완료되면 법정동코드 기준으로 국토부 실거래가를 자동 조회합니다.'));
+      return;
+    }
+
     if (!lawdCd) {
-      insertAfterAnchor(renderError('법정동코드가 없어 국토부 실거래가 조회를 할 수 없습니다.', location));
+      clearTradeResult();
+      insertAfterAnchor(renderWaiting('입지 기초정보는 있으나 법정동코드가 없어 실거래가 조회를 아직 시작할 수 없습니다.', location));
       return;
     }
 
