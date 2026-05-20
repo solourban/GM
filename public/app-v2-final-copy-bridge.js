@@ -54,6 +54,36 @@
     return `${summary.length}:${summary.slice(0, 48)}:${summary.slice(-48)}`;
   }
 
+  function tradeScopeInfo(judgment, trades) {
+    const rawScope = trades?.tradeScope || {};
+    const level = clean(judgment?.tradeScopeLevel || rawScope.level || trades?.comparison?.scopeLevel || '');
+    const label = clean(judgment?.tradeScope || rawScope.label || trades?.comparison?.scopeLabel || '');
+    const comparable = Boolean(judgment?.priceComparable || trades?.comparison?.priceComparable || rawScope.priceComparable);
+    if (level || label) {
+      return {
+        level: level || (comparable ? 'specific' : 'regional'),
+        label: label || (comparable ? '동일 단지·건물 후보' : '지역 참고시세'),
+        comparable,
+      };
+    }
+    const count = Number(trades?.count || trades?.stats?.count || 0);
+    if (!count) return { level: 'none', label: '없음', comparable: false };
+    return { level: 'regional', label: '지역 참고시세', comparable: false };
+  }
+
+  function ratioText(ratio, scope) {
+    const n = Number(ratio || 0);
+    if (!n) return '-';
+    if (!scope?.comparable) return `${n.toFixed(1)}% (지역 참고값·입찰가 산정 직접 반영 금지)`;
+    return `${n.toFixed(1)}%`;
+  }
+
+  function regionalCaveat(scope) {
+    if (scope?.level === 'specific' && scope?.comparable) return '';
+    if (scope?.level === 'none') return '실거래가 표본이 없어 가격 비교 판단을 보류해야 합니다.';
+    return '실거래가는 동일 건물·동·층·면적 매칭 전까지 지역 참고시세로만 보고, 최종 입찰가 산정에는 직접 반영하지 마세요.';
+  }
+
   function buildSummary() {
     const report = appState()?.report;
     if (!report) return '';
@@ -61,6 +91,7 @@
     const location = loadJson(LOCATION_KEY);
     const trades = loadJson(TRADE_KEY);
     const comparison = trades?.comparison || {};
+    const scope = tradeScopeInfo(judgment, trades);
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inherited = numberValue(report?.inherited?.total);
     const lines = [];
@@ -79,10 +110,14 @@
       if (judgment.decision.text) lines.push(`- 종합 판단: ${clean(judgment.decision.text)}`);
       if (judgment.riskText) lines.push(`- 권리 위험도: ${clean(judgment.riskText)}`);
       if (judgment.inheritedTotalText) lines.push(`- 인수 추정금액: ${clean(judgment.inheritedTotalText)}`);
-      lines.push(`- 실거래가 표본: ${Number(judgment.tradeCount || 0)}건`);
-      lines.push(`- 최저가/평균가: ${judgment.avgRatio ? `${Number(judgment.avgRatio).toFixed(1)}%` : '-'}`);
+      lines.push(`- 실거래가 표본: ${Number(judgment.tradeCount || trades?.count || 0)}건`);
+      lines.push(`- 시세 근거 범위: ${scope.label}`);
+      lines.push(`- 최저가/평균가: ${ratioText(judgment.avgRatio || comparison.avgRatio, scope)}`);
       lines.push(`- 입지 좌표 확인: ${judgment.hasLocation ? '완료' : '미확인'}`);
       if (judgment.comparisonJudgment) lines.push(`- 가격 비교 판단: ${clean(judgment.comparisonJudgment)}`);
+      else if (comparison.judgment) lines.push(`- 가격 비교 판단: ${clean(comparison.judgment)}`);
+      const caveat = regionalCaveat(scope);
+      if (caveat) lines.push(`- 시세 주의: ${caveat}`);
       if (Array.isArray(judgment.reasons) && judgment.reasons.length) {
         lines.push('- 판단 근거:');
         judgment.reasons.slice(0, 6).forEach((reason) => lines.push(`  · ${clean(reason)}`));
@@ -105,9 +140,12 @@
       lines.push(`- LAWD_CD: ${clean(trades.lawdCd)}`);
       if (trades.dealYmd) lines.push(`- 조회 계약월: ${clean(trades.dealYmd)}`);
       lines.push(`- 표시 결과: ${Number(trades.count || 0)}건`);
+      lines.push(`- 시세 근거 범위: ${scope.label}`);
       if (trades.judgment) lines.push(`- 거래 판단: ${clean(trades.judgment)}`);
       if (comparison.judgment) lines.push(`- 가격 비교 판단: ${clean(comparison.judgment)}`);
-      if (comparison.avgRatio) lines.push(`- 최저가/평균가: ${Number(comparison.avgRatio).toFixed(1)}%`);
+      if (comparison.avgRatio) lines.push(`- 최저가/평균가: ${ratioText(comparison.avgRatio, scope)}`);
+      const caveat = regionalCaveat(scope);
+      if (caveat) lines.push(`- 실거래가 해석 주의: ${caveat}`);
     }
 
     lines.push('');
