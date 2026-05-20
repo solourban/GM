@@ -14,10 +14,12 @@ function requireIncludes(content, needle, label) {
   if (!content.includes(needle)) fail(`${label} is missing.`);
 }
 
-requireIncludes(server, "app.get('/api/location/geocode'", 'Kakao geocode proxy route');
-requireIncludes(server, 'dapi.kakao.com/v2/local/search/address.json', 'Kakao local API upstream call in server');
-requireIncludes(server, "app.get('/api/molit/trades'", 'MOLIT trades proxy route');
-requireIncludes(server, "app.get('/api/molit/apt-trades'", 'MOLIT apt trades proxy route');
-requireIncludes(server, 'apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev', 'MOLIT apartment upstream call in server');
+requireIncludes(server, "app.get('/api/location/geocode'", 'Kakao geocode route');
+requireIncludes(server, 'dapi.kakao.com/v2/local/search/address.json', 'Kakao local call in server');
+requireIncludes(server, 'safeKakaoDiagnostic', 'Kakao diagnostic helper');
+requireIncludes(server, "app.get('/api/molit/trades'", 'MOLIT unified trades route');
+requireIncludes(server, 'RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev', 'MOLIT apartment call in server');
+requireIncludes(server, 'RTMSDataSvcOffiTrade/getRTMSDataSvcOffiTrade', 'MOLIT officetel call in server');
+requireIncludes(server, 'RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade', 'MOLIT row house call in server');
 
 console.log('External API proxy guard passed.');
