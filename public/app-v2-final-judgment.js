@@ -60,9 +60,47 @@
     return '낮음';
   }
 
-  function priceScore(comparison) {
+  function tradeCount(trades) {
+    return Number(trades?.count || trades?.stats?.count || 0);
+  }
+
+  function tradeScope(trades) {
+    const count = tradeCount(trades);
+    const aptName = clean(trades?.aptName || '');
+    const rawCount = Number(trades?.rawCount || 0);
+    const hasExactFilter = Boolean(aptName && aptName !== '-' && aptName !== '미적용');
+    const veryBroad = count >= 80 || rawCount >= 80;
+
+    if (!count) {
+      return {
+        level: 'none',
+        label: '없음',
+        priceComparable: false,
+        text: '표시 가능한 실거래가가 없습니다.',
+      };
+    }
+
+    if (hasExactFilter && !veryBroad) {
+      return {
+        level: 'specific',
+        label: '동일 단지·건물 후보',
+        priceComparable: true,
+        text: '단지명 또는 건물명 후보가 적용된 실거래가입니다. 그래도 동·층·면적은 원본으로 재확인해야 합니다.',
+      };
+    }
+
+    return {
+      level: 'regional',
+      label: '지역 참고시세',
+      priceComparable: false,
+      text: '동일 건물 확정값이 아니라 법정동·행정구역 단위 참고시세입니다. 최종 입찰가 산정에는 직접 반영하지 마세요.',
+    };
+  }
+
+  function priceScore(comparison, trades) {
+    const scope = tradeScope(trades);
     const ratio = Number(comparison?.avgRatio || 0);
-    if (!ratio) return 0;
+    if (!scope.priceComparable || !ratio) return 0;
     if (ratio <= 70) return 2;
     if (ratio <= 90) return 1;
     return -1;
@@ -80,19 +118,24 @@
   function evidenceScore(location, trades) {
     let score = 0;
     if (location?.x && location?.y) score += 1;
-    const count = Number(trades?.count || trades?.stats?.count || 0);
-    if (count >= 5) score += 1;
-    else if (count === 0) score -= 1;
+    const scope = tradeScope(trades);
+    if (scope.level === 'specific') score += 1;
+    else if (scope.level === 'regional') score += 0.25;
+    else score -= 1;
     return score;
   }
 
   function finalDecision(currentReport, location, trades) {
     const comparison = trades?.comparison || {};
-    const total = riskScore(currentReport) + priceScore(comparison) + evidenceScore(location, trades);
+    const total = riskScore(currentReport) + priceScore(comparison, trades) + evidenceScore(location, trades);
     const riskLevel = currentReport?.risk?.level || 'ok';
+    const scope = tradeScope(trades);
 
     if (riskLevel === 'danger') {
       return { label: '보류', tone: 'danger', score: total, text: '권리 위험이 높아 가격 조건보다 원본 서류 확인이 우선입니다.' };
+    }
+    if (scope.level !== 'specific' && total >= 2) {
+      return { label: '조건부검토', tone: 'warn', score: total, text: '권리와 입지 기초조건은 양호하지만, 실거래가는 지역 참고시세라 가격 판단은 보수적으로 봐야 합니다.' };
     }
     if (total >= 3) {
       return { label: '적극검토', tone: 'ok', score: total, text: '현재 입력값 기준 권리·가격·입지 기초조건이 비교적 양호합니다.' };
@@ -108,21 +151,24 @@
     const riskLevel = currentReport?.risk?.level || 'ok';
     const inheritedTotal = numberValue(currentReport?.inherited?.total);
     const comparison = trades?.comparison || {};
-    const count = Number(trades?.count || trades?.stats?.count || 0);
+    const count = tradeCount(trades);
+    const scope = tradeScope(trades);
 
     list.push(`권리 위험도: ${riskText(riskLevel)}`);
     if (inheritedTotal > 0) list.push(`인수 추정금액: ${money(inheritedTotal)} 확인 필요`);
     else list.push('인수 추정금액: 현재 입력값 기준 0원');
 
-    if (comparison.judgment) list.push(`가격 비교: ${clean(comparison.judgment)}`);
+    if (scope.priceComparable && comparison.judgment) list.push(`가격 비교: ${clean(comparison.judgment)}`);
+    else if (count > 0) list.push('가격 비교: 지역 참고시세라 최종 입찰가 판단에는 직접 반영하지 않음');
     else list.push('가격 비교: 실거래가 비교 정보 부족');
 
     if (location?.x && location?.y) list.push('입지 확인: 주소 좌표 변환 완료');
     else list.push('입지 확인: 좌표 변환 정보 없음');
 
-    if (count >= 5) list.push(`실거래가 표본: ${count}건으로 참고 가능`);
-    else if (count > 0) list.push(`실거래가 표본: ${count}건으로 표본 부족 주의`);
+    if (count > 0) list.push(`실거래가 표본: ${count}건 · ${scope.label}`);
     else list.push('실거래가 표본: 표시 가능한 거래 없음');
+
+    if (scope.level === 'regional') list.push('주의: 동일 단지·동·층·면적 매칭 전까지 평균가 비율은 참고값으로만 사용');
 
     return list.slice(0, 6);
   }
@@ -131,7 +177,9 @@
     const decision = finalDecision(currentReport, location, trades);
     const comparison = trades?.comparison || {};
     const inheritedTotal = numberValue(currentReport?.inherited?.total);
-    const tradeCount = Number(trades?.count || trades?.stats?.count || 0);
+    const count = tradeCount(trades);
+    const scope = tradeScope(trades);
+    const avgRatio = scope.priceComparable ? Number(comparison.avgRatio || 0) : 0;
     return {
       decision,
       reasons: reasons(currentReport, location, trades),
@@ -139,9 +187,13 @@
       riskText: riskText(currentReport?.risk?.level || 'ok'),
       inheritedTotal,
       inheritedTotalText: money(inheritedTotal),
-      tradeCount,
-      avgRatio: Number(comparison.avgRatio || 0),
-      comparisonJudgment: clean(comparison.judgment || ''),
+      tradeCount: count,
+      tradeScope: scope.label,
+      tradeScopeLevel: scope.level,
+      tradeScopeNote: scope.text,
+      priceComparable: scope.priceComparable,
+      avgRatio,
+      comparisonJudgment: scope.priceComparable ? clean(comparison.judgment || '') : '지역 참고시세라 평균가 비율은 최종 판단에 직접 반영하지 않습니다.',
       hasLocation: Boolean(location?.x && location?.y),
     };
   }
@@ -174,8 +226,10 @@
           <div class="v2-info"><div class="k">권리 위험도</div><div class="v">${esc(snapshot.riskText)}</div></div>
           <div class="v2-info"><div class="k">인수 추정금액</div><div class="v">${esc(snapshot.inheritedTotalText)}</div></div>
           <div class="v2-info"><div class="k">실거래가 표본</div><div class="v">${esc(`${snapshot.tradeCount}건`)}</div></div>
+          <div class="v2-info"><div class="k">시세 근거 범위</div><div class="v">${esc(snapshot.tradeScope)}</div></div>
           <div class="v2-info"><div class="k">최저가/평균가</div><div class="v">${esc(snapshot.avgRatio ? `${snapshot.avgRatio.toFixed(1)}%` : '-')}</div></div>
         </div>
+        <p class="v2-note">${esc(snapshot.tradeScopeNote)}</p>
         <ul class="v2-check-list">
           ${snapshot.reasons.map((item) => `<li>${esc(item)}</li>`).join('')}
         </ul>
