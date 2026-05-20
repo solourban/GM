@@ -144,6 +144,13 @@ async function callApi(path, payload) {
 }
 
 async function fetchCase(saYear, saSer, jiwonNm) {
+  if (saYear && typeof saYear === 'object') {
+    const payload = saYear;
+    saYear = payload.saYear;
+    saSer = payload.saSer;
+    jiwonNm = payload.jiwonNm;
+  }
+
   const courtName = normalizeCourtName(jiwonNm);
   const cortOfcCd = COURT_CODES[courtName];
   const csNo = `${saYear}타경${saSer}`;
