@@ -21,5 +21,14 @@ requireIncludes(server, "app.get('/api/onbid/detail'", 'Onbid detail proxy route
 requireIncludes(server, 'getOnbidRlstDtl', 'Onbid detail upstream endpoint in server');
 requireIncludes(server, 'process.env.ONBID_API_KEY', 'Onbid server-side environment variable usage');
 requireIncludes(server, 'hasOnbid', 'Onbid config status flag');
+requireIncludes(server, "req.query.query || req.query.keyword || req.query.cltrNm", 'Onbid keyword alias handling');
+requireIncludes(server, "req.query.sido || req.query.lctnSdnm", 'Onbid sido alias handling');
+requireIncludes(server, "req.query.signgu || req.query.lctnSggnm", 'Onbid signgu alias handling');
+requireIncludes(server, 'PBCT_BEGN_DTM: bidPrdYmdStart', 'Onbid bid start filter forwarding');
+requireIncludes(server, 'PBCT_CLS_DTM: bidPrdYmdEnd', 'Onbid bid end filter forwarding');
+requireIncludes(server, "req.query.cltrNo || req.query.cltrMngNo", 'Onbid detail cltrNo alias handling');
+requireIncludes(server, "req.query.pbctNo || req.query.pbctCdtnNo", 'Onbid detail pbctNo alias handling');
+requireIncludes(server, 'cltrMngNo: cltrNo', 'Onbid list/detail frontend cltr alias');
+requireIncludes(server, 'pbctCdtnNo: pbctNo', 'Onbid list/detail frontend pbct alias');
 
 console.log('Onbid proxy guard passed.');
