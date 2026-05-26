@@ -161,6 +161,49 @@ run('말소기준권리가 없으면 위험도는 ok가 아니어야 한다', ()
   assert.ok(report.risk.flags.some((flag) => /말소기준권리/.test(flag.msg)));
 });
 
+run('raw/manual payload도 말소기준권리와 임차인을 병합해 분석한다', () => {
+  const report = analyzeCase({
+    raw: {
+      caseNo: '2024타경110754',
+      court: '서울중앙지방법원',
+      basic: baseBasic({ 감정평가액: '242,000,000', 최저매각가격: '8,514,000' }),
+      rights: [],
+      tenants: [],
+    },
+    manual: {
+      malso: { date: '2022.3.24.', type: '근저당권', holder: '합자회사금오주류', amount: '40,000,000' },
+      tenants: [{ name: '김예슬', moveIn: '2022.02.25', fixed: '2022/02/03', deposit: '267,000,000' }],
+    },
+    region: 'seoul',
+  });
+
+  assert.strictEqual(report.case, '2024타경110754');
+  assert.strictEqual(report.malso.date, '2022-03-24');
+  assert.strictEqual(report.malso.isMalso, true);
+  assert.strictEqual(report.tenants.length, 1);
+  assert.strictEqual(report.tenants[0].daehang, '있음');
+  assert.strictEqual(report.risk.level, 'danger');
+});
+
+run('manual 임차인이 있으면 raw 임차인보다 우선 적용한다', () => {
+  const report = analyzeCase({
+    raw: {
+      basic: baseBasic(),
+      rights: [{ date: '20200501', type: '근저당권', holder: 'OO은행', amount: '120000000' }],
+      tenants: [{ name: 'raw임차인', moveIn: '20190101', fixed: '20190102', deposit: '90000000' }],
+    },
+    manual: {
+      malso: { date: '20200501', type: '근저당권', holder: 'OO은행', amount: '120000000' },
+      tenants: [{ name: 'manual임차인', moveIn: '20230115', fixed: '20230116', deposit: '50000000' }],
+    },
+  });
+
+  assert.strictEqual(report.tenants.length, 1);
+  assert.strictEqual(report.tenants[0].name, 'manual임차인');
+  assert.strictEqual(report.tenants[0].daehang, '없음');
+  assert.strictEqual(report.inherited.total, 0);
+});
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 }
