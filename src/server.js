@@ -158,7 +158,7 @@ function normalizeKakaoAddressDocument(doc) {
   const address = doc?.address || {};
   const road = doc?.road_address || {};
   return {
-    addressName: doc?.address_name || '',
+    addressName: address.address_name || '',
     x: doc?.x || '',
     y: doc?.y || '',
     type: doc?.address_type || '',
