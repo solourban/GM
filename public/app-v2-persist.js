@@ -237,9 +237,9 @@
     if (saved?.savedAt) {
       const date = new Date(saved.savedAt);
       const label = Number.isNaN(date.getTime()) ? '이전 입력값 저장됨' : `${date.toLocaleString('ko-KR')} 저장됨`;
-      status.textContent = `입력값은 사건번호별로 자동 저장됩니다. 최근 저장: ${label}`;
+      status.textContent = `입력값은 법원·연도·사건번호 기준으로 자동 저장됩니다. 다른 사건 입력값은 표시하지 않습니다. 최근 저장: ${label}`;
     } else {
-      status.textContent = '입력값은 사건번호별로 자동 저장됩니다.';
+      status.textContent = '입력값은 법원·연도·사건번호 기준으로 자동 저장됩니다. 다른 사건 입력값은 표시하지 않습니다.';
     }
   }
 
