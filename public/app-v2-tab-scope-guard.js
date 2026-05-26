@@ -24,32 +24,46 @@
   }
 
   function activeTab() {
-    return app()?.state?.activeTab || 'search';
+    const stateTab = app()?.state?.activeTab;
+    if (stateTab) return stateTab;
+    const activeButton = document.querySelector('.v2-tab.active[data-tab], [data-tab].active');
+    return activeButton?.dataset?.tab || 'search';
   }
 
   function removeByIds(ids) {
     ids.forEach((id) => document.getElementById(id)?.remove());
   }
 
-  function isInsideActivePanel(node) {
-    const panel = node?.closest?.('.v2-panel');
-    return !panel || panel.classList.contains('active');
-  }
-
-  function scopeFeatureCards() {
+  function removeOutOfScopeCards() {
     const tab = activeTab();
-
-    if (tab !== 'date') removeByIds(DATE_CARD_IDS);
-    if (tab !== 'saved') removeByIds(SAVED_CARD_IDS);
-
-    if (tab === 'search' || tab === 'bulk') {
-      removeByIds(['v2ServiceStatusCard']);
-    }
+    const allowed = new Set();
+    if (tab === 'date') DATE_CARD_IDS.forEach((id) => allowed.add(id));
+    if (tab === 'saved') SAVED_CARD_IDS.forEach((id) => allowed.add(id));
+    if (tab === 'search') allowed.add('v2ServiceStatusCard');
 
     FEATURE_CARD_IDS.forEach((id) => {
       const node = document.getElementById(id);
-      if (node && !isInsideActivePanel(node)) node.remove();
+      if (node && !allowed.has(id)) node.remove();
     });
+  }
+
+  function moveAllowedCardsIntoActivePanel() {
+    const tab = activeTab();
+    const activePanel = document.querySelector(`.v2-panel.active[data-panel="${tab}"]`) || document.querySelector('.v2-panel.active');
+    if (!activePanel) return;
+
+    if (tab === 'date') {
+      const stack = document.getElementById('v2CandidateStackCard');
+      const ranking = document.getElementById('v2CandidateRankingCard');
+      const anchor = document.getElementById('v2DateSourceCard') || activePanel.querySelector('.v2-card') || activePanel;
+      if (stack && !activePanel.contains(stack)) anchor.insertAdjacentElement('afterend', stack);
+      if (ranking && !activePanel.contains(ranking)) stack?.insertAdjacentElement('afterend', ranking);
+    }
+  }
+
+  function scopeFeatureCards() {
+    removeOutOfScopeCards();
+    moveAllowedCardsIntoActivePanel();
   }
 
   function renameDateResetButtons() {
@@ -151,20 +165,36 @@
     cleanupServiceToggle();
   }
 
+  let pending = false;
+  function scheduleTick(delay = 0) {
+    if (pending && delay === 0) return;
+    pending = true;
+    window.setTimeout(() => {
+      pending = false;
+      tick();
+    }, delay);
+  }
+
   document.addEventListener('click', (event) => {
     if (event.target.closest('.brand, .v2-tab, [data-tab]')) {
-      window.setTimeout(tick, 0);
-      window.setTimeout(tick, 80);
-      window.setTimeout(tick, 250);
+      scheduleTick(0);
+      scheduleTick(80);
+      scheduleTick(250);
     }
   }, true);
 
   document.addEventListener('click', (event) => {
     if (!event.target.closest('[data-action="reset-current-case"]')) return;
-    window.setTimeout(ensureNextStepResetControl, 0);
-    window.setTimeout(scopeFeatureCards, 0);
+    scheduleTick(0);
+    scheduleTick(120);
   }, true);
 
-  setInterval(tick, 300);
+  const observer = new MutationObserver(() => scheduleTick(0));
+  document.addEventListener('DOMContentLoaded', () => {
+    observer.observe(document.body, { childList: true, subtree: true });
+    tick();
+  });
+
+  setInterval(tick, 150);
   window.__auctionTabScopeGuard = { tick, scopeFeatureCards, ensureNextStepResetControl };
 })();
