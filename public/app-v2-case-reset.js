@@ -1,11 +1,27 @@
 (() => {
   const STORAGE_PREFIX = 'auction-note:v2.2:case:';
+  const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';
   const SCHEMA_VERSION = 3;
   const ACTIVE_CASE_SESSION_KEY = 'auction-note:v2:active-case-key';
   const TRANSIENT_SESSION_KEYS = [
     'auction-note:v2:location-geocode',
     'auction-note:v2:molit-trades',
     'auction-note:v2:final-judgment',
+  ];
+  const TRANSIENT_CARD_IDS = [
+    'v2LocationCard',
+    'v2MolitTradeCard',
+    'v2FinalJudgmentCard',
+    'v2DecisionConfidenceCard',
+    'v2FinalCopyCard',
+    'v2BiddingSummaryCard',
+    'v2BidRangeCard',
+    'v2FundingReviewCard',
+    'v2PreBidChecklistCard',
+    'v2RiskBriefCard',
+    'v2CopySummaryCard',
+    'v2BidPlanCard',
+    'v2AllocationCard',
   ];
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -57,15 +73,49 @@
     return { court, year, caseNo, key: `${STORAGE_PREFIX}${court}:${year || 'no-year'}:${caseNo}` };
   }
 
+  function identityFromSearchForm() {
+    const court = normalizeCourt(document.getElementById('jiwonNmV2')?.value || '');
+    const rawYear = clean(document.getElementById('saYearV2')?.value || '');
+    const caseNo = normalizeCaseNo(document.getElementById('saSerV2')?.value || '', rawYear);
+    const year = yearFromCaseNo(caseNo, rawYear);
+    if (!court || !caseNo) return null;
+    return { court, year, caseNo, key: `${STORAGE_PREFIX}${court}:${year || 'no-year'}:${caseNo}` };
+  }
+
+  function currentCaseKey(identity = currentCaseIdentity()) {
+    return identity?.key || '';
+  }
+
+  function bidPlanStorageKey(identity) {
+    if (!identity?.court || !identity?.caseNo) return '';
+    return `${BID_PLAN_STORAGE_PREFIX}${identity.court}:${identity.caseNo}`;
+  }
+
+  function resetCaseRuntimeState(s) {
+    if (!s) return;
+    s.manual = defaultManual();
+    s.report = null;
+    s.reportAt = '';
+    s.analyzeError = '';
+    s.analyzing = false;
+    s.validationWarnings = [];
+  }
+
   function clearTransientCaseData() {
     try {
       TRANSIENT_SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key));
     } catch (_) {}
-    document.getElementById('v2LocationCard')?.remove();
-    document.getElementById('v2MolitTradeCard')?.remove();
-    document.getElementById('v2FinalJudgmentCard')?.remove();
-    document.getElementById('v2DecisionConfidenceCard')?.remove();
-    document.getElementById('v2FinalCopyCard')?.remove();
+    TRANSIENT_CARD_IDS.forEach((id) => document.getElementById(id)?.remove());
+  }
+
+  function removeCurrentCaseStorage(identity) {
+    const key = currentCaseKey(identity);
+    if (!key) return;
+    try {
+      localStorage.removeItem(key);
+      const bidKey = bidPlanStorageKey(identity);
+      if (bidKey) localStorage.removeItem(bidKey);
+    } catch (_) {}
   }
 
   function syncActiveCaseSession(identity) {
@@ -128,10 +178,15 @@
 
     const saved = loadSavedCase(identity.key);
     s.__persistSwitchingCase = true;
-    s.manual = saved?.manual ? safeManual(saved.manual) : defaultManual();
-    s.report = saved?.report || null;
-    s.validationWarnings = Array.isArray(saved?.validationWarnings) ? saved.validationWarnings.filter(clean) : [];
-    s.analyzeError = '';
+    if (saved?.manual || saved?.report) {
+      s.manual = saved?.manual ? safeManual(saved.manual) : defaultManual();
+      s.report = saved?.report || null;
+      s.validationWarnings = Array.isArray(saved?.validationWarnings) ? saved.validationWarnings.filter(clean) : [];
+      s.analyzeError = '';
+      s.analyzing = false;
+    } else {
+      resetCaseRuntimeState(s);
+    }
     s.__persistActiveCaseKey = identity.key;
     s.__persistRestoredKey = identity.key;
     s.__persistSwitchingCase = false;
@@ -141,22 +196,101 @@
     }
   }
 
-  function checkCaseSwitch() {
+  function resetCurrentCaseState() {
     const s = state();
-    if (!s?.raw) return;
+    const api = app();
     const identity = currentCaseIdentity();
-    if (!identity?.key) return;
+    if (!s || !identity?.key) return false;
+
+    s.__persistSwitchingCase = true;
+    removeCurrentCaseStorage(identity);
+    resetCaseRuntimeState(s);
+    clearTransientCaseData();
+    syncActiveCaseSession(identity);
+    s.__persistActiveCaseKey = identity.key;
+    s.__persistRestoredKey = identity.key;
+    s.__coreCaseResetActiveKey = identity.key;
+    s.__persistSwitchingCase = false;
+
+    if (typeof api?.renderResults === 'function') {
+      api.renderResults({ keepScroll: true });
+    }
+    return true;
+  }
+
+  function prepareForSearchCase() {
+    const s = state();
+    const nextIdentity = identityFromSearchForm();
+    if (!s || !nextIdentity?.key) return false;
+    if (!s.__coreCaseResetActiveKey || s.__coreCaseResetActiveKey === nextIdentity.key) return false;
+
+    s.__persistSwitchingCase = true;
+    resetCaseRuntimeState(s);
+    clearTransientCaseData();
+    s.__persistActiveCaseKey = nextIdentity.key;
+    s.__persistRestoredKey = '';
+    s.__coreCaseResetActiveKey = nextIdentity.key;
+    s.__persistSwitchingCase = false;
+    return true;
+  }
+
+  function syncCurrentCase() {
+    const s = state();
+    if (!s?.raw) return false;
+    const identity = currentCaseIdentity();
+    if (!identity?.key) return false;
 
     if (!s.__coreCaseResetActiveKey) {
       s.__coreCaseResetActiveKey = identity.key;
       syncActiveCaseSession(identity);
-      return;
+      return false;
     }
 
-    if (s.__coreCaseResetActiveKey === identity.key) return;
+    if (s.__coreCaseResetActiveKey === identity.key) return false;
     s.__coreCaseResetActiveKey = identity.key;
     applyCaseState(identity);
+    return true;
   }
 
-  setInterval(checkCaseSwitch, 250);
+  function renderCaseScopeNotice() {
+    const identity = currentCaseIdentity();
+    const step2 = document.getElementById('step2InputCard');
+    if (!step2 || !identity?.key) return;
+
+    let notice = document.getElementById('v2CaseScopeNotice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'v2CaseScopeNotice';
+      notice.className = 'v2-cta-row';
+      const title = step2.querySelector('h3');
+      if (title?.nextSibling) step2.insertBefore(notice, title.nextSibling);
+      else step2.prepend(notice);
+    }
+    notice.innerHTML = `
+      <p class="v2-note" style="margin:0;flex:1 1 280px">입력값은 법원·연도·사건번호 기준으로 자동 저장됩니다. 다른 사건으로 전환하면 이전 사건 입력값은 표시하지 않습니다.</p>
+      <button class="v2-danger-btn" type="button" data-action="reset-current-case">현재 사건 입력 초기화</button>
+    `;
+  }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('#btnFetchV2')) {
+      prepareForSearchCase();
+      return;
+    }
+    if (!event.target.closest('[data-action="reset-current-case"]')) return;
+    resetCurrentCaseState();
+  }, true);
+
+  setInterval(() => {
+    syncCurrentCase();
+    renderCaseScopeNotice();
+  }, 250);
+
+  window.__auctionCaseScope = {
+    syncCurrentCase,
+    resetCurrentCase: resetCurrentCaseState,
+    prepareForSearchCase,
+    currentCaseIdentity,
+    currentCaseKey,
+  };
 })();
