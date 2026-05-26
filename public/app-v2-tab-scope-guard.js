@@ -1,0 +1,170 @@
+(() => {
+  const FEATURE_CARD_IDS = [
+    'v2CandidateStackCard',
+    'v2CandidateRankingCard',
+    'v2SavedCandidateCard',
+    'v2SavedTopFiveCard',
+    'v2SavedTabRuntimeCard',
+    'v2ServiceStatusCard',
+  ];
+  const DATE_CARD_IDS = ['v2CandidateStackCard', 'v2CandidateRankingCard'];
+  const SAVED_CARD_IDS = ['v2SavedCandidateCard', 'v2SavedTopFiveCard', 'v2SavedTabRuntimeCard'];
+  const RESET_NOTICE_ID = 'v2NextStepCaseResetNotice';
+  const SERVICE_TOGGLE_ID = 'v2ServiceStatusToggle';
+  const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function app() {
+    return window.__auctionV2 || null;
+  }
+
+  function activeTab() {
+    return app()?.state?.activeTab || 'search';
+  }
+
+  function removeByIds(ids) {
+    ids.forEach((id) => document.getElementById(id)?.remove());
+  }
+
+  function isInsideActivePanel(node) {
+    const panel = node?.closest?.('.v2-panel');
+    return !panel || panel.classList.contains('active');
+  }
+
+  function scopeFeatureCards() {
+    const tab = activeTab();
+
+    if (tab !== 'date') removeByIds(DATE_CARD_IDS);
+    if (tab !== 'saved') removeByIds(SAVED_CARD_IDS);
+
+    if (tab === 'search' || tab === 'bulk') {
+      removeByIds(['v2ServiceStatusCard']);
+    }
+
+    FEATURE_CARD_IDS.forEach((id) => {
+      const node = document.getElementById(id);
+      if (node && !isInsideActivePanel(node)) node.remove();
+    });
+  }
+
+  function renameDateResetButtons() {
+    document.querySelectorAll('#v2ClearCandidateStackBtn').forEach((button) => {
+      button.textContent = '매각기일 후보 초기화';
+      button.setAttribute('aria-label', '매각기일 후보 초기화');
+    });
+  }
+
+  function currentCaseLabel() {
+    const identity = window.__auctionCaseScope?.currentCaseIdentity?.();
+    if (identity?.court || identity?.caseNo) {
+      return [identity.court, identity.year, identity.caseNo].filter(Boolean).join(' · ');
+    }
+    const court = clean(document.getElementById('jiwonNmV2')?.value || '');
+    const year = clean(document.getElementById('saYearV2')?.value || '');
+    const serial = clean(document.getElementById('saSerV2')?.value || '');
+    return [court, year, serial ? `${serial}` : ''].filter(Boolean).join(' · ');
+  }
+
+  function findNextStepCard() {
+    return Array.from(document.querySelectorAll('#resultsSection .v2-result-card'))
+      .find((card) => clean(card.querySelector('h3')?.textContent) === '다음 단계') || null;
+  }
+
+  function ensureNextStepResetControl() {
+    const card = findNextStepCard();
+    if (!card) {
+      document.getElementById(RESET_NOTICE_ID)?.remove();
+      return;
+    }
+
+    let notice = document.getElementById(RESET_NOTICE_ID);
+    if (notice && !card.contains(notice)) notice.remove();
+    notice = document.getElementById(RESET_NOTICE_ID);
+
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = RESET_NOTICE_ID;
+      notice.className = 'v2-cta-row';
+      card.appendChild(notice);
+    }
+
+    notice.innerHTML = `
+      <p class="v2-note" style="margin:0;flex:1 1 320px">
+        법원·연도·사건번호 기준으로 현재 사건 입력값만 초기화합니다. 저장 후보 목록은 삭제하지 않습니다.<br>
+        <strong style="color:var(--ink)">현재 기준: ${esc(currentCaseLabel() || '-')}</strong>
+      </p>
+      <button class="v2-danger-btn" type="button" data-action="reset-current-case">현재 사건 입력 초기화</button>
+    `;
+  }
+
+  function ensureServiceStatusToggle() {
+    const statusCard = document.getElementById('v2ServiceStatusCard');
+    if (!statusCard) return;
+    if (activeTab() !== 'search') return;
+
+    const panels = document.getElementById('v2HomePanels');
+    if (!panels) {
+      statusCard.remove();
+      return;
+    }
+
+    let toggle = document.getElementById(SERVICE_TOGGLE_ID);
+    if (!toggle) {
+      toggle = document.createElement('button');
+      toggle.id = SERVICE_TOGGLE_ID;
+      toggle.type = 'button';
+      toggle.className = 'v2-small-btn';
+      toggle.style.margin = '14px auto 0';
+      toggle.style.display = 'block';
+      toggle.textContent = '연동 상태 보기';
+      panels.insertAdjacentElement('afterend', toggle);
+      toggle.addEventListener('click', () => {
+        const card = document.getElementById('v2ServiceStatusCard');
+        if (!card) return;
+        const opened = card.dataset.open === '1';
+        card.dataset.open = opened ? '0' : '1';
+        card.hidden = opened;
+        toggle.textContent = opened ? '연동 상태 보기' : '연동 상태 숨기기';
+      });
+    }
+
+    if (statusCard.dataset.open !== '1') {
+      statusCard.hidden = true;
+      toggle.textContent = '연동 상태 보기';
+    }
+  }
+
+  function cleanupServiceToggle() {
+    if (activeTab() !== 'search') document.getElementById(SERVICE_TOGGLE_ID)?.remove();
+  }
+
+  function tick() {
+    scopeFeatureCards();
+    renameDateResetButtons();
+    ensureNextStepResetControl();
+    ensureServiceStatusToggle();
+    cleanupServiceToggle();
+  }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('.brand, .v2-tab, [data-tab]')) {
+      window.setTimeout(tick, 0);
+      window.setTimeout(tick, 80);
+      window.setTimeout(tick, 250);
+    }
+  }, true);
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-action="reset-current-case"]')) return;
+    window.setTimeout(ensureNextStepResetControl, 0);
+    window.setTimeout(scopeFeatureCards, 0);
+  }, true);
+
+  setInterval(tick, 300);
+  window.__auctionTabScopeGuard = { tick, scopeFeatureCards, ensureNextStepResetControl };
+})();
