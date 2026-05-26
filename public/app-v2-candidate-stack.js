@@ -24,6 +24,10 @@
     return n ? `${n.toLocaleString('ko-KR')}원` : '-';
   }
 
+  function activeTab() {
+    return window.__auctionV2?.state?.activeTab || document.querySelector('.v2-tab.active')?.dataset?.tab || 'search';
+  }
+
   function stackKey(caseNo) {
     return compact(caseNo || 'unknown');
   }
@@ -102,11 +106,6 @@
     saveStack(loadStack().filter((item) => stackKey(item.caseNo) !== key));
   }
 
-  function removeSavedCandidate(caseNo) {
-    const key = stackKey(caseNo);
-    saveSavedCandidates(loadSavedCandidates().filter((item) => stackKey(item.caseNo) !== key));
-  }
-
   function clearStack() {
     try {
       sessionStorage.removeItem(STACK_KEY);
@@ -178,24 +177,6 @@
     return score;
   }
 
-  function scoreReasons(item) {
-    const reasons = [];
-    const minBid = numberValue(item.minBid);
-    const appraisal = numberValue(item.appraisal);
-    const failCount = Number(item.failCount || 0);
-    if (minBid > 0) reasons.push(`가격: 최저가 ${formatWon(item.minBid)}로 비교 기준에 포함됩니다.`);
-    if (appraisal > 0 && minBid > 0) reasons.push(`할인율: 감정가 대비 최저가 비율이 ${percent(discountRate(item))}입니다.`);
-    if (failCount > 0) reasons.push(`유찰: ${failCount}회 유찰되어 가격 조정 이력이 있습니다.`);
-    if (isHousing(item)) reasons.push('용도: 주거형으로 우선 검토군에 포함됩니다.');
-    if (clean(item.memo || loadMemo(item.caseNo))) reasons.push('메모: 별도 검토 메모가 있어 추적 필요성이 있습니다.');
-    return reasons;
-  }
-
-  function scoreReasonText(item) {
-    const reasons = scoreReasons(item);
-    return reasons.length ? reasons.join(' ') : '기초 정보가 부족해 점수 근거가 제한적입니다.';
-  }
-
   function oneLineDecision(item, score) {
     const minBid = numberValue(item.minBid);
     const appraisal = numberValue(item.appraisal);
@@ -213,7 +194,7 @@
 
   function topCandidates(items, limit = 3) {
     return [...items]
-      .map((item) => ({ item, score: candidateScore(item), reasons: scoreReasonText(item), decision: oneLineDecision(item, candidateScore(item)) }))
+      .map((item) => ({ item, score: candidateScore(item), decision: oneLineDecision(item, candidateScore(item)) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
   }
@@ -223,50 +204,44 @@
     return loadSavedCandidates().some((item) => stackKey(item.caseNo) === key);
   }
 
-  function findSearchPanel() {
-    return document.querySelector('.v2-panel[data-panel="search"]');
+  function panelByTab(tab) {
+    const exact = document.querySelector(`.v2-panel[data-panel="${tab}"]`);
+    if (exact) return exact;
+    return Array.from(document.querySelectorAll('.v2-panel')).find((panel) => {
+      if (tab === 'date') return panel.textContent.includes('매각기일 추천');
+      if (tab === 'saved') return panel.textContent.includes('저장 후보');
+      return false;
+    }) || null;
   }
 
-  function findAnchor() {
-    const sourceCard = document.getElementById('v2DateSourceCard');
-    if (sourceCard) return sourceCard;
-    const panel = findSearchPanel();
-    return panel?.querySelector('.v2-card') || null;
+  function findDateAnchor() {
+    const panel = panelByTab('date');
+    if (!panel) return null;
+    return panel.querySelector('#v2DateSourceCard') || panel.querySelector('.v2-card') || panel;
   }
 
-  function findCandidateByCase(caseNo) {
-    const key = stackKey(caseNo);
-    return loadSavedCandidates().find((item) => stackKey(item.caseNo) === key)
-      || loadStack().find((item) => stackKey(item.caseNo) === key)
-      || null;
+  function parseCaseNo(value) {
+    const text = clean(value);
+    const match = text.match(/(\d{4})\s*타경\s*(\d+)/);
+    if (match) return { year: match[1], serial: match[2] };
+    const year = text.match(/\b(20\d{2})\b/)?.[1] || '';
+    const digits = text.replace(/\D/g, '');
+    const serial = year && digits.startsWith(year) ? digits.slice(4) : digits;
+    return { year, serial };
   }
 
   function fillSearchFromCandidate(caseNo) {
-    const candidate = findCandidateByCase(caseNo);
-    const value = clean(candidate?.caseNo || caseNo);
-    if (!value) return;
-
-    const input = document.querySelector('#caseNo, input[name="caseNo"], input[data-field="caseNo"]');
-    if (input) {
-      input.value = value;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    try {
-      sessionStorage.setItem('auction-note:v2:selected-date-candidate', JSON.stringify({
-        ...(candidate || {}),
-        caseNo: value,
-        source: candidate?.source || '저장 후보',
-        selectedAt: new Date().toISOString(),
-      }));
-    } catch (_) {}
-
-    const searchTab = document.querySelector('[data-tab="search"], [data-panel-target="search"], button[value="search"]');
-    searchTab?.click?.();
-
-    const searchPanel = findSearchPanel();
-    searchPanel?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    const parsed = parseCaseNo(caseNo);
+    document.querySelector('[data-tab="search"]')?.click?.();
+    window.setTimeout(() => {
+      const year = document.getElementById('saYearV2');
+      const serial = document.getElementById('saSerV2');
+      if (year && parsed.year) year.value = parsed.year;
+      if (serial && parsed.serial) {
+        serial.value = parsed.serial;
+        serial.focus();
+      }
+    }, 80);
   }
 
   function renderRanking(items) {
@@ -323,7 +298,7 @@
                   <td>${esc(item.failCount || '-')}</td>
                   <td>${esc(memo || '-')}</td>
                   <td>
-                    <button type="button" class="v2-small-btn" data-search-saved-candidate="${esc(item.caseNo || '')}">조회하기</button>
+                    <button type="button" class="v2-small-btn" data-search-candidate="${esc(item.caseNo || '')}">조회하기</button>
                     <button type="button" class="v2-small-btn" data-save-candidate="${esc(item.caseNo || '')}" ${saved ? 'disabled' : ''}>${saved ? '저장됨' : '저장 후보 추가'}</button>
                     <button type="button" class="v2-small-btn" data-remove-candidate="${esc(item.caseNo || '')}">삭제</button>
                   </td>
@@ -336,85 +311,6 @@
     `;
   }
 
-  function renderSavedTopFive(saved) {
-    if (!saved.length) return '';
-    const top = topCandidates(saved, 5);
-    return `
-      <section class="v2-card" id="v2SavedTopFiveCard">
-        <span class="v2-badge">TOP 5</span>
-        <h3>저장 후보 TOP 5</h3>
-        <p class="v2-note">저장 후보를 최저가, 감정가 대비 할인율, 유찰횟수, 주거형 여부, 메모 여부 기준으로 단순 점수화한 목록입니다.</p>
-        <div class="v2-detail-table-wrap">
-          <table class="v2-detail-table">
-            <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>한 줄 판단</th><th>근거 설명</th><th>조회</th></tr></thead>
-            <tbody>
-              ${top.map(({ item, score, reasons, decision }, index) => `
-                <tr>
-                  <td>${index + 1}</td>
-                  <td>${esc(item.caseNo || '-')}</td>
-                  <td>${score}</td>
-                  <td>${esc(decision)}</td>
-                  <td>${esc(reasons)}</td>
-                  <td><button type="button" class="v2-small-btn" data-search-saved-candidate="${esc(item.caseNo || '')}">조회하기</button></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        <p class="v2-note">이 점수는 기초 정렬용입니다. 권리위험, 자금계획, 시세 비교는 다음 단계에서 별도로 보강해야 합니다.</p>
-      </section>
-    `;
-  }
-
-  function renderSavedCandidates() {
-    const saved = loadSavedCandidates();
-    if (!saved.length) {
-      return `
-        <section class="v2-card" id="v2SavedCandidateCard">
-          <span class="v2-badge">저장 후보</span>
-          <h3>저장 후보 목록</h3>
-          <p class="v2-note">아직 저장된 후보가 없습니다. 임시 비교 목록에서 “저장 후보 추가”를 누르면 여기에 보관됩니다.</p>
-        </section>
-      `;
-    }
-
-    return `
-      ${renderSavedTopFive(saved)}
-      <section class="v2-card" id="v2SavedCandidateCard">
-        <span class="v2-badge">저장 후보</span>
-        <h3>저장 후보 목록</h3>
-        <p class="v2-note">브라우저 localStorage에 보관됩니다. TOP 5는 기초 점수 기준으로 별도 표시됩니다.</p>
-        <div class="v2-grid four">
-          <div class="v2-info"><div class="k">저장 후보 수</div><div class="v">${saved.length}건</div></div>
-          <div class="v2-info"><div class="k">최근 저장</div><div class="v">${esc(saved[0]?.caseNo || '-')}</div></div>
-          <div class="v2-info"><div class="k">메모 보유</div><div class="v">${saved.filter((item) => clean(item.memo || loadMemo(item.caseNo))).length}건</div></div>
-          <div class="v2-info"><div class="k">보관 범위</div><div class="v">브라우저</div></div>
-        </div>
-        <div class="v2-detail-table-wrap">
-          <table class="v2-detail-table">
-            <thead><tr><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>메모</th><th>관리</th></tr></thead>
-            <tbody>
-              ${saved.map((item) => `
-                <tr>
-                  <td>${esc(item.caseNo || '-')}</td>
-                  <td>${esc(item.saleDate || '-')}</td>
-                  <td>${esc(item.usage || '-')}</td>
-                  <td>${esc(item.minBid || '-')}</td>
-                  <td>${esc(item.appraisal || '-')}</td>
-                  <td>${esc(clean(item.memo || loadMemo(item.caseNo)) || '-')}</td>
-                  <td>
-                    <button type="button" class="v2-small-btn" data-search-saved-candidate="${esc(item.caseNo || '')}">조회하기</button>
-                    <button type="button" class="v2-small-btn" data-remove-saved-candidate="${esc(item.caseNo || '')}">저장 삭제</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    `;
-  }
-
   function renderCard() {
     const items = loadStack();
     const savedCount = loadSavedCandidates().length;
@@ -424,9 +320,9 @@
           <div>
             <span class="v2-badge">임시 비교 목록</span>
             <h3>매각기일 검토 후보</h3>
-            <p class="v2-note">매각기일에서 눌러본 후보들을 세션 동안 임시로 모아 비교합니다. 저장 후보로 승격할 수 있습니다.</p>
+            <p class="v2-note">매각기일 추천 탭에서 눌러본 후보만 모아 비교합니다. 저장 후보로 승격할 수 있습니다.</p>
           </div>
-          <button type="button" class="v2-small-btn" id="v2ClearCandidateStackBtn" ${items.length ? '' : 'disabled'}>전체 초기화</button>
+          <button type="button" class="v2-small-btn" id="v2ClearCandidateStackBtn" ${items.length ? '' : 'disabled'}>매각기일 후보 초기화</button>
         </div>
         <div class="v2-grid four">
           <div class="v2-info"><div class="k">임시 후보 수</div><div class="v">${items.length}건</div></div>
@@ -437,12 +333,23 @@
         ${renderRows(items)}
       </section>
       ${renderRanking(items)}
-      ${renderSavedCandidates()}
     `;
   }
 
+  function removeRenderedCards() {
+    document.getElementById('v2CandidateStackCard')?.remove();
+    document.getElementById('v2CandidateRankingCard')?.remove();
+    document.getElementById('v2SavedCandidateCard')?.remove();
+    document.getElementById('v2SavedTopFiveCard')?.remove();
+  }
+
   function upsertCard() {
-    const anchor = findAnchor();
+    if (activeTab() !== 'date') {
+      removeRenderedCards();
+      return;
+    }
+
+    const anchor = findDateAnchor();
     if (!anchor) return;
 
     const existing = document.getElementById('v2CandidateStackCard');
@@ -469,12 +376,11 @@
       });
     }
 
-    document.querySelectorAll('[data-search-saved-candidate]').forEach((button) => {
+    document.querySelectorAll('[data-search-candidate]').forEach((button) => {
       if (button.dataset.bound) return;
       button.dataset.bound = '1';
       button.addEventListener('click', () => {
-        fillSearchFromCandidate(button.dataset.searchSavedCandidate);
-        upsertCard();
+        fillSearchFromCandidate(button.dataset.searchCandidate);
       });
     });
 
@@ -495,15 +401,6 @@
         upsertCard();
       });
     });
-
-    document.querySelectorAll('[data-remove-saved-candidate]').forEach((button) => {
-      if (button.dataset.bound) return;
-      button.dataset.bound = '1';
-      button.addEventListener('click', () => {
-        removeSavedCandidate(button.dataset.removeSavedCandidate);
-        upsertCard();
-      });
-    });
   }
 
   document.addEventListener('click', (event) => {
@@ -514,5 +411,12 @@
     window.setTimeout(upsertCard, 250);
   }, true);
 
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest?.('.v2-tab, [data-tab], .brand')) return;
+    window.setTimeout(upsertCard, 0);
+    window.setTimeout(upsertCard, 120);
+  }, true);
+
   setInterval(upsertCard, 1000);
+  window.__auctionCandidateStack = { upsertCard, removeRenderedCards, loadStack };
 })();
