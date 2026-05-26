@@ -109,6 +109,77 @@ function normalizeTenants(raw = []) {
     .filter((t) => t.name || t.moveIn || t.fixed || t.deposit);
 }
 
+function cleanText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function hasAnyValue(obj, keys) {
+  return keys.some((key) => cleanText(obj?.[key]));
+}
+
+function manualMalsoRight(manual = {}) {
+  const malso = manual?.malso || {};
+  if (!hasAnyValue(malso, ['date', 'type', 'holder', 'amount', '접수일자', '권리종류', '권리자', '채권금액'])) return null;
+  return {
+    date: cleanText(malso.date || malso['접수일자'] || malso['접수일']),
+    type: cleanText(malso.type || malso['권리종류']) || '근저당권',
+    holder: cleanText(malso.holder || malso['권리자']),
+    amount: cleanText(malso.amount || malso['채권금액'] || malso['채권최고액']),
+    _userMalso: true,
+  };
+}
+
+function manualSpecialRights(manual = {}) {
+  return safeArray(manual?.specials)
+    .filter((special) => hasAnyValue(special, ['date', 'type', 'holder', 'amount', '접수일자', '권리종류', '권리자', '채권금액']))
+    .map((special) => ({
+      date: cleanText(special.date || special['접수일자'] || special['접수일']),
+      type: cleanText(special.type || special['권리종류']) || '유치권',
+      holder: cleanText(special.holder || special['권리자']),
+      amount: cleanText(special.amount || special['채권금액'] || special['채권최고액']),
+    }));
+}
+
+function manualTenantRows(manual = {}) {
+  return safeArray(manual?.tenants)
+    .map((tenant) => ({
+      name: cleanText(tenant?.name || tenant?.['임차인'] || tenant?.['성명']),
+      moveIn: cleanText(tenant?.moveIn || tenant?.['전입일'] || tenant?.['전입신고일자']),
+      fixed: cleanText(tenant?.fixed || tenant?.['확정일자']),
+      deposit: cleanText(tenant?.deposit || tenant?.['보증금'] || tenant?.['임차보증금']),
+    }))
+    .filter((tenant) => hasAnyValue(tenant, ['name', 'moveIn', 'fixed', 'deposit']));
+}
+
+function normalizeAnalyzePayload(input, fallbackRegion = 'other') {
+  if (!input || typeof input !== 'object' || !input.raw || typeof input.raw !== 'object') {
+    return { raw: input || {}, region: fallbackRegion || 'other' };
+  }
+
+  const raw = input.raw || {};
+  const manual = input.manual && typeof input.manual === 'object' ? input.manual : {};
+  const rights = [...safeArray(raw.rights)];
+  const malso = manualMalsoRight(manual);
+  if (malso) rights.push(malso);
+  rights.push(...manualSpecialRights(manual));
+
+  const manualTenants = manualTenantRows(manual);
+  const tenants = manualTenants.length ? manualTenants : safeArray(raw.tenants);
+
+  return {
+    raw: {
+      ...raw,
+      rights,
+      tenants,
+    },
+    region: input.region || fallbackRegion || 'other',
+  };
+}
+
 function findMalso(rights) {
   const userSelected = rights.find((r) => r._userMalso && r.dateValid);
   if (userSelected) return userSelected;
@@ -394,7 +465,9 @@ function generateExplanation(rep) {
 }
 
 function analyzeCase(raw, region = 'other') {
-  const safeRaw = raw || {};
+  const normalized = normalizeAnalyzePayload(raw, region);
+  const safeRaw = normalized.raw || {};
+  const effectiveRegion = normalized.region || region || 'other';
   const rights = normalizeRights(safeRaw.rights);
   const tenantsRaw = normalizeTenants(safeRaw.tenants);
   const malso = findMalso(rights);
@@ -405,7 +478,7 @@ function analyzeCase(raw, region = 'other') {
   const minBid = parseMoney(basic['최저매각가격'] || basic['최저가']);
   const appraisal = parseMoney(basic['감정평가액'] || basic['감정가']);
 
-  const baedang = simulateBaedang(minBid || appraisal || 100_000_000, analyzedRights, tenants, region);
+  const baedang = simulateBaedang(minBid || appraisal || 100_000_000, analyzedRights, tenants, effectiveRegion);
   const inherited = calculateInherited(analyzedRights, tenants);
   const risk = assessRisk(analyzedRights, tenants, inherited, minBid, malso);
   const bidRec = recommendBid(appraisal, minBid, inherited.total);
