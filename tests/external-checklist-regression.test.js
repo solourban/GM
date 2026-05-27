@@ -13,7 +13,7 @@ const required = [
   [script, 'data-external-count', 'live count marker'],
   [script, 'data-external-status', 'live status marker'],
   [script, 'updateCardStatus', 'status-only update function'],
-  [script, 'injectFinalJudgmentStatus', 'final judgment status bridge'],
+  [script, 'removeFinalJudgmentStatus', 'final judgment detach cleanup'],
   [script, 'card.dataset.caseKey !== caseKey(currentReport)', 'case change rerender guard'],
   [script, 'saveChecklist(data, currentReport)', 'case scoped localStorage save'],
   [script, 'document.addEventListener(\'change\'', 'change listener'],
@@ -24,6 +24,8 @@ const required = [
 const forbidden = [
   [script, 'outerHTML', 'full card outerHTML replacement'],
   [script, 'setInterval(upsertCard, 1200)', 'blind full rerender interval'],
+  [script, 'injectFinalJudgmentStatus', 'final judgment card injection'],
+  [script, 'v2ExternalVerificationFinalStatus\');\n      box.className', 'final judgment injected info box'],
 ];
 
 const missing = required.filter(([source, needle]) => !source.includes(needle)).map(([, , label]) => label);

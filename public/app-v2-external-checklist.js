@@ -112,28 +112,17 @@
     if (statusNode) statusNode.textContent = statusText(count);
   }
 
-  function injectFinalJudgmentStatus(payload = loadChecklist()) {
-    const card = document.getElementById('v2FinalJudgmentCard');
-    if (!card) return;
-    const count = checkedCount(payload);
-    const tone = statusTone(count);
-    let box = document.getElementById('v2ExternalVerificationFinalStatus');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = 'v2ExternalVerificationFinalStatus';
-      box.className = 'v2-info wide';
-      card.querySelector('.v2-grid')?.appendChild(box);
-    }
-    box.innerHTML = `<div class="k">외부 검증</div><div class="v"><span class="v2-pill ${tone}">${count}/5</span></div><p class="v2-note">${esc(statusText(count))}</p>`;
+  function removeFinalJudgmentStatus() {
+    document.getElementById('v2ExternalVerificationFinalStatus')?.remove();
   }
 
   function upsertCard() {
     const currentReport = report();
     const target = anchor();
     const existing = document.getElementById(CARD_ID);
+    removeFinalJudgmentStatus();
     if (!currentReport || !target) {
       existing?.remove();
-      document.getElementById('v2ExternalVerificationFinalStatus')?.remove();
       return;
     }
 
@@ -155,7 +144,6 @@
     } else {
       updateCardStatus(data);
     }
-    injectFinalJudgmentStatus(data);
   }
 
   function updateFromDom() {
@@ -172,7 +160,7 @@
     const card = document.getElementById(CARD_ID);
     if (card) card.dataset.signature = signature(currentReport, data);
     updateCardStatus(data);
-    injectFinalJudgmentStatus(data);
+    removeFinalJudgmentStatus();
   }
 
   document.addEventListener('change', (event) => { if (event.target.closest?.(`#${CARD_ID}`)) updateFromDom(); });
