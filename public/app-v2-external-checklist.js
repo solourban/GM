@@ -14,13 +14,8 @@
     { id: 'listing', title: '현재 매물·호가·등록기간', source: '네이버 부동산 등', guide: '같은 단지·평형 현재 호가, 최초 등록일, 가격 변경 여부 확인' },
   ];
 
-  function state() {
-    return window.__auctionV2?.state || null;
-  }
-
-  function report() {
-    return state()?.report || null;
-  }
+  function state() { return window.__auctionV2?.state || null; }
+  function report() { return state()?.report || null; }
 
   function caseKey(currentReport = report()) {
     const court = clean(currentReport?.court || currentReport?.raw?.court || '');
@@ -28,9 +23,7 @@
     return [court, caseNo].filter(Boolean).join(':') || 'unknown';
   }
 
-  function storageKey(currentReport = report()) {
-    return `${STORAGE_PREFIX}${caseKey(currentReport)}`;
-  }
+  function storageKey(currentReport = report()) { return `${STORAGE_PREFIX}${caseKey(currentReport)}`; }
 
   function defaultState() {
     return {
@@ -49,27 +42,15 @@
         checks: { ...base.checks, ...(parsed.checks || {}) },
         memos: { ...base.memos, ...(parsed.memos || {}) },
       };
-    } catch (_) {
-      return base;
-    }
+    } catch (_) { return base; }
   }
 
   function saveChecklist(payload, currentReport = report()) {
-    try {
-      localStorage.setItem(storageKey(currentReport), JSON.stringify({ ...payload, savedAt: new Date().toISOString() }));
-    } catch (_) {}
+    try { localStorage.setItem(storageKey(currentReport), JSON.stringify({ ...payload, savedAt: new Date().toISOString() })); } catch (_) {}
   }
 
-  function checkedCount(payload = loadChecklist()) {
-    return ITEMS.filter((item) => Boolean(payload.checks?.[item.id])).length;
-  }
-
-  function statusTone(count) {
-    if (count >= 5) return 'ok';
-    if (count >= 3) return 'warn';
-    return 'danger';
-  }
-
+  function checkedCount(payload = loadChecklist()) { return ITEMS.filter((item) => Boolean(payload.checks?.[item.id])).length; }
+  function statusTone(count) { if (count >= 5) return 'ok'; if (count >= 3) return 'warn'; return 'danger'; }
   function statusText(count) {
     if (count >= 5) return '외부 검증 5대 항목이 모두 확인되었습니다.';
     if (count >= 3) return '외부 검증 일부가 확인되었습니다. 미확인 항목 보완 후 입찰가를 정하세요.';
@@ -96,8 +77,8 @@
       <h3>입찰 전 5대 외부 검증 체크리스트</h3>
       <p class="v2-note">권리분석 이후 실제 입찰가를 정하기 전, 외부 서비스와 현장성 정보를 따로 확인합니다. 아래 항목은 자동 확정값이 아니라 확인 기록입니다.</p>
       <div class="v2-grid compact">
-        <div class="v2-info"><div class="k">확인 상태</div><div class="v"><span class="v2-pill ${tone}">${count}/5</span></div></div>
-        <div class="v2-info wide"><div class="k">판단 안내</div><div class="v">${esc(statusText(count))}</div></div>
+        <div class="v2-info"><div class="k">확인 상태</div><div class="v"><span class="v2-pill ${tone}" data-external-count>${count}/5</span></div></div>
+        <div class="v2-info wide"><div class="k">판단 안내</div><div class="v" data-external-status>${esc(statusText(count))}</div></div>
       </div>
       <div class="v2-detail-table-wrap">
         <table class="v2-detail-table">
@@ -117,6 +98,18 @@
       </div>
       <p class="v2-note">확인처의 댓글·호가·통계는 참고자료입니다. 최종 입찰 판단은 등기부, 매각물건명세서, 점유관계, 현장조사, 대출 가능액을 함께 봐야 합니다.</p>
     `;
+  }
+
+  function updateCardStatus(payload = loadChecklist()) {
+    const count = checkedCount(payload);
+    const tone = statusTone(count);
+    const countNode = document.querySelector(`#${CARD_ID} [data-external-count]`);
+    const statusNode = document.querySelector(`#${CARD_ID} [data-external-status]`);
+    if (countNode) {
+      countNode.textContent = `${count}/5`;
+      countNode.className = `v2-pill ${tone}`;
+    }
+    if (statusNode) statusNode.textContent = statusText(count);
   }
 
   function injectFinalJudgmentStatus(payload = loadChecklist()) {
@@ -151,15 +144,16 @@
       card = document.createElement('section');
       card.id = CARD_ID;
       card.className = 'v2-card';
+      card.innerHTML = renderCardHtml(data);
+      card.dataset.caseKey = caseKey(currentReport);
+      card.dataset.signature = nextSignature;
       target.insertAdjacentElement('afterend', card);
-    }
-    if (card.dataset.signature !== nextSignature) {
-      const focused = document.activeElement;
-      const editingThisCard = focused?.closest?.(`#${CARD_ID}`);
-      if (!editingThisCard) {
-        card.innerHTML = renderCardHtml(data);
-        card.dataset.signature = nextSignature;
-      }
+    } else if (card.dataset.caseKey !== caseKey(currentReport)) {
+      card.innerHTML = renderCardHtml(data);
+      card.dataset.caseKey = caseKey(currentReport);
+      card.dataset.signature = nextSignature;
+    } else {
+      updateCardStatus(data);
     }
     injectFinalJudgmentStatus(data);
   }
@@ -177,19 +171,20 @@
     saveChecklist(data, currentReport);
     const card = document.getElementById(CARD_ID);
     if (card) card.dataset.signature = signature(currentReport, data);
+    updateCardStatus(data);
     injectFinalJudgmentStatus(data);
   }
 
-  document.addEventListener('change', (event) => {
-    if (!event.target.closest?.(`#${CARD_ID}`)) return;
-    updateFromDom();
-  });
+  document.addEventListener('change', (event) => { if (event.target.closest?.(`#${CARD_ID}`)) updateFromDom(); });
+  document.addEventListener('input', (event) => { if (event.target.closest?.(`#${CARD_ID}`)) updateFromDom(); });
 
-  document.addEventListener('input', (event) => {
-    if (!event.target.closest?.(`#${CARD_ID}`)) return;
-    updateFromDom();
-  });
-
-  setInterval(upsertCard, 1200);
+  let lastReportKey = '';
+  setInterval(() => {
+    const nextKey = caseKey(report());
+    if (nextKey !== lastReportKey || document.getElementById('v2FinalJudgmentCard') || document.getElementById(CARD_ID)) {
+      lastReportKey = nextKey;
+      upsertCard();
+    }
+  }, 1200);
   window.__auctionExternalChecklist = { loadChecklist, checkedCount, upsertCard };
 })();
