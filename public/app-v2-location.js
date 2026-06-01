@@ -138,6 +138,40 @@
     return `https://map.kakao.com/link/map/${label},${y},${x}`;
   }
 
+  function mapEmbedUrl(doc) {
+    const x = clean(doc?.x);
+    const y = clean(doc?.y);
+    if (!x || !y) return '';
+    return `https://maps.google.com/maps?q=${encodeURIComponent(`${y},${x}`)}&z=17&output=embed`;
+  }
+
+  function renderMapPreview(doc, address) {
+    const src = mapEmbedUrl(doc);
+    if (!src) return '';
+    const title = clean(doc?.buildingName || doc?.roadAddress || doc?.addressName || address || '경매 물건 위치');
+    return `
+      <div class="v2-map-card" style="margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--bg);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
+          <div>
+            <strong style="display:block;font-size:15px;">지도 미리보기</strong>
+            <span class="v2-note" style="margin-top:2px;display:block;">${esc(title)}</span>
+          </div>
+          <span class="v2-pill ok">좌표 확인</span>
+        </div>
+        <iframe
+          title="${esc(title)} 지도 미리보기"
+          src="${esc(src)}"
+          width="100%"
+          height="320"
+          style="display:block;border:0;"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          allowfullscreen>
+        </iframe>
+      </div>
+    `;
+  }
+
   function saveLocationResult(address, doc, attempts = []) {
     try {
       if (!doc) return;
@@ -158,6 +192,7 @@
         attempts,
         kakaoMapUrl: mapCoordUrl(doc, address),
         kakaoSearchUrl: mapSearchUrl(doc, address),
+        mapEmbedUrl: mapEmbedUrl(doc),
         savedAt: new Date().toISOString(),
       }));
     } catch (_) {}
@@ -254,6 +289,7 @@
             <a class="v2-small-btn" href="${esc(kakaoSearchUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">주소 검색</a>
           </div>
         </div>
+        ${renderMapPreview(doc, address)}
         <div class="v2-grid">
           ${info('성공 조회 주소', address, 'wide')}
           ${info('지번주소', doc.addressName)}
@@ -269,7 +305,7 @@
           ${info('우편번호', doc.zoneNo || '-')}
           ${renderAttempts(attempts)}
         </div>
-        <p class="v2-note">지도 링크는 API 키 없이 외부 카카오맵 페이지를 여는 방식입니다. 다음 단계에서 주변시설·실거래가 보조 검토를 연결합니다.</p>
+        <p class="v2-note">지도 미리보기는 좌표 확인용입니다. 실제 동·호수, 출입구, 경사, 소음, 상권, 교통 여건은 현장과 외부 지도로 다시 확인하세요.</p>
       </section>
     `;
   }
