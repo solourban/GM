@@ -138,16 +138,36 @@
     return `https://map.kakao.com/link/map/${label},${y},${x}`;
   }
 
-  function mapEmbedUrl(doc) {
+  function kakaoMapPoint(doc) {
     const x = clean(doc?.x);
     const y = clean(doc?.y);
-    if (!x || !y) return '';
-    return `https://maps.google.com/maps?q=${encodeURIComponent(`${y},${x}`)}&z=17&output=embed`;
+    if (!x || !y) return null;
+    return { x, y };
+  }
+
+  let kakaoSdkPromise = null;
+
+  function loadKakaoSdk() {
+    if (window.kakao?.maps?.load) return Promise.resolve();
+    if (kakaoSdkPromise) return kakaoSdkPromise;
+    kakaoSdkPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '/api/kakao/maps-sdk.js';
+      script.async = true;
+      script.dataset.kakaoMapsSdk = 'proxy';
+      script.onload = () => {
+        if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
+        else reject(new Error('Kakao map SDK is unavailable.'));
+      };
+      script.onerror = () => reject(new Error('Kakao map SDK proxy load failed.'));
+      document.head.appendChild(script);
+    });
+    return kakaoSdkPromise;
   }
 
   function renderMapPreview(doc, address) {
-    const src = mapEmbedUrl(doc);
-    if (!src) return '';
+    const point = kakaoMapPoint(doc);
+    if (!point) return '';
     const title = clean(doc?.buildingName || doc?.roadAddress || doc?.addressName || address || '경매 물건 위치');
     return `
       <div class="v2-map-card" style="margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--bg);">
@@ -158,18 +178,46 @@
           </div>
           <span class="v2-pill ok">좌표 확인</span>
         </div>
-        <iframe
-          title="${esc(title)} 지도 미리보기"
-          src="${esc(src)}"
-          width="100%"
-          height="320"
-          style="display:block;border:0;"
-          loading="lazy"
-          referrerpolicy="no-referrer-when-downgrade"
-          allowfullscreen>
-        </iframe>
+        <div
+          class="v2-kakao-map-preview"
+          data-x="${esc(point.x)}"
+          data-y="${esc(point.y)}"
+          data-title="${esc(title)}"
+          style="height:320px;display:grid;place-items:center;color:var(--ink-3);">
+          Kakao map loading...
+        </div>
       </div>
     `;
+  }
+
+  async function initKakaoMapPreviews(root = document) {
+    const targets = Array.from(root.querySelectorAll?.('.v2-kakao-map-preview[data-x][data-y]') || []);
+    if (!targets.length) return;
+
+    try {
+      await loadKakaoSdk();
+    } catch (e) {
+      targets.forEach((target) => {
+        target.textContent = e.message || 'Kakao map load failed.';
+      });
+      return;
+    }
+
+    targets.forEach((target) => {
+      if (target.dataset.ready === '1') return;
+      const x = Number(target.dataset.x);
+      const y = Number(target.dataset.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        target.textContent = 'Invalid map coordinates.';
+        return;
+      }
+      const coords = new window.kakao.maps.LatLng(y, x);
+      target.innerHTML = '';
+      target.style.display = 'block';
+      const map = new window.kakao.maps.Map(target, { center: coords, level: 3 });
+      new window.kakao.maps.Marker({ map, position: coords });
+      target.dataset.ready = '1';
+    });
   }
 
   function saveLocationResult(address, doc, attempts = []) {
@@ -192,7 +240,7 @@
         attempts,
         kakaoMapUrl: mapCoordUrl(doc, address),
         kakaoSearchUrl: mapSearchUrl(doc, address),
-        mapEmbedUrl: mapEmbedUrl(doc),
+        mapProvider: 'kakao',
         savedAt: new Date().toISOString(),
       }));
     } catch (_) {}
@@ -221,7 +269,7 @@
       <div class="v2-info wide">
         <div class="k">필요 조치</div>
         <div class="v">Railway Variables에 KAKAO_REST_API_KEY 추가</div>
-        <p class="v2-note">KAKAO_JS_KEY는 지도 표시용이고, 주소검색 프록시는 별도의 REST API 키를 사용합니다.</p>
+        <p class="v2-note">지도 표시용 키와 주소검색 프록시의 REST 키는 별도로 설정됩니다.</p>
       </div>
     `;
   }
@@ -316,6 +364,7 @@
     const existing = document.getElementById(CARD_ID);
     if (existing) existing.outerHTML = html;
     else anchor.insertAdjacentHTML('afterend', html);
+    return document.getElementById(CARD_ID);
   }
 
   let lastKey = '';
@@ -341,7 +390,8 @@
     try {
       const result = await fetchGeocodeWithFallbacks(addresses);
       if (pendingKey !== key) return;
-      insertAfterAnchor(renderSuccess(result.address, result.data, result.attempts));
+      const card = insertAfterAnchor(renderSuccess(result.address, result.data, result.attempts));
+      initKakaoMapPreviews(card || document);
       lastKey = key;
     } catch (e) {
       if (pendingKey !== key) return;
