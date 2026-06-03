@@ -145,6 +145,35 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+app.get('/api/kakao/maps-sdk.js', async (req, res) => {
+  const keys = externalApiConfig();
+  if (!keys.kakaoMapKey) {
+    return res.status(400).type('application/javascript').send('throw new Error("Kakao map SDK key is not configured.");');
+  }
+
+  try {
+    const url = new URL('https://dapi.kakao.com/v2/maps/sdk.js');
+    url.searchParams.set('appkey', keys.kakaoMapKey);
+    url.searchParams.set('autoload', 'false');
+    url.searchParams.set('libraries', 'services');
+
+    const apiRes = await fetch(url.toString(), {
+      headers: { Accept: 'application/javascript,*/*' },
+    });
+    const body = await apiRes.text();
+
+    if (!apiRes.ok) {
+      logException('kakao/maps-sdk:upstream', req, new Error('Kakao Maps SDK response error'), { status: apiRes.status });
+      return res.status(502).type('application/javascript').send('throw new Error("Kakao map SDK proxy failed.");');
+    }
+
+    return res.type('application/javascript; charset=utf-8').send(body);
+  } catch (e) {
+    logException('kakao/maps-sdk', req, e);
+    return res.status(502).type('application/javascript').send('throw new Error("Kakao map SDK proxy failed.");');
+  }
+});
+
 function validateAddressInput(address) {
   const value = String(address || '').trim();
   if (!value) return { error: '주소를 입력해주세요.' };

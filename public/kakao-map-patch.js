@@ -32,13 +32,16 @@
     return configPromise;
   }
 
-  function loadKakaoSdk(key) {
+  function loadKakaoSdk() {
     if (window.kakao?.maps?.services) return Promise.resolve();
     if (sdkPromise) return sdkPromise;
     sdkPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&libraries=services&autoload=false`;
-      script.onload = () => window.kakao.maps.load(resolve);
+      script.src = '/api/kakao/maps-sdk.js';
+      script.onload = () => {
+        if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
+        else reject(new Error('Kakao Maps SDK 로드 실패'));
+      };
       script.onerror = () => reject(new Error('Kakao Maps SDK 로드 실패'));
       document.head.appendChild(script);
     });
@@ -72,12 +75,12 @@
       </div>`;
   }
 
-  async function renderMap(card, address, key) {
+  async function renderMap(card, address) {
     const shell = card.querySelector('.map-shell');
     if (!shell || !address) return;
     shell.textContent = '지도 로딩 중...';
     try {
-      await loadKakaoSdk(key);
+      await loadKakaoSdk();
       const geocoder = new window.kakao.maps.services.Geocoder();
       geocoder.addressSearch(address, (result, status) => {
         if (status !== window.kakao.maps.services.Status.OK || !result?.[0]) {
@@ -107,10 +110,10 @@
     if (!anchor) return;
 
     const cfg = await getConfig();
-    const key = cfg?.kakaoMapKey || '';
-    anchor.insertAdjacentHTML('afterend', renderEmptyCard(address, key ? '지도 준비 중...' : 'KAKAO_MAP_KEY 환경변수가 아직 설정되지 않았습니다.'));
+    const hasMap = Boolean(cfg?.hasKakaoMap);
+    anchor.insertAdjacentHTML('afterend', renderEmptyCard(address, hasMap ? '지도 준비 중...' : 'KAKAO_MAP_KEY 환경변수가 아직 설정되지 않았습니다.'));
     const card = rs.querySelector('.kakao-map-card');
-    if (key && card) renderMap(card, address, key);
+    if (hasMap && card) renderMap(card, address);
   }
 
   const observer = new MutationObserver(() => injectMapCard());

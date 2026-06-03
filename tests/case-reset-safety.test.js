@@ -3,7 +3,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const CASE_RESET_PATH = path.join(ROOT, 'public', 'app-v2-case-reset.js');
-const content = fs.readFileSync(CASE_RESET_PATH, 'utf8');
+const content = fs.readFileSync(CASE_RESET_PATH, 'utf8').replace(/\r\n?/g, '\n');
 
 function fail(message) {
   console.error(`Case reset safety guard failed: ${message}`);

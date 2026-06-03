@@ -26,7 +26,8 @@ function sectionBetween(startNeedle, endNeedle, label) {
   return content.slice(start, end);
 }
 
-const configRoute = sectionBetween("app.get('/api/config'", 'function validateAddressInput', '/api/config route');
+const configRoute = sectionBetween("app.get('/api/config'", "app.get('/api/kakao/maps-sdk.js'", '/api/config route');
+const kakaoSdkRoute = sectionBetween("app.get('/api/kakao/maps-sdk.js'", 'function validateAddressInput', '/api/kakao/maps-sdk.js route');
 const geocodeRoute = sectionBetween("app.get('/api/location/geocode'", "app.get('/api/courts'", '/api/location/geocode route');
 
 requireIncludes("res.setHeader('X-Request-Id'", 'X-Request-Id response header');
@@ -40,6 +41,9 @@ requireIncludes('hasKakaoRest: Boolean(keys.kakaoRestKey)', 'Kakao REST boolean 
 requireIncludes('hasKakaoMap: Boolean(keys.kakaoMapKey)', 'Kakao map boolean config response');
 requireIncludes('hasMolit: Boolean(keys.molitKey)', 'MOLIT boolean config response');
 requireIncludes('safeKakaoDiagnostic', 'safe Kakao upstream diagnostic helper');
+requireIncludes("app.get('/api/kakao/maps-sdk.js'", 'Kakao Maps SDK proxy route');
+requireIncludes("url.searchParams.set('appkey', keys.kakaoMapKey)", 'server-side Kakao Maps SDK appkey usage');
+requireIncludes("res.type('application/javascript; charset=utf-8')", 'Kakao Maps SDK JavaScript content type');
 
 forbid(/detail\s*:\s*String\(e\)/, 'direct String(e) detail exposure');
 forbid(/json\([\s\S]{0,500}raw\.debug/, 'crawler debug exposure in JSON response');
@@ -48,7 +52,9 @@ forbid(/detail\s*:\s*e\.message/, 'direct geocode e.message detail exposure', ge
 
 forbid(/\bkakaoRestKey\s*:/, 'Kakao REST key value exposure in /api/config JSON response', configRoute);
 forbid(/\bkakaoMapKey\s*:/, 'Kakao map key value exposure in /api/config JSON response', configRoute);
+forbid(/\bkakaoJsKey\s*:/, 'Kakao JS key value exposure in /api/config JSON response', configRoute);
 forbid(/\bmolitKey\s*:/, 'MOLIT key value exposure in /api/config JSON response', configRoute);
 forbid(/KakaoAK\s*\$\{keys\.kakaoRestKey\}/, 'Kakao REST authorization header exposure in /api/config route', configRoute);
+forbid(/req\.query/, 'client query forwarding in Kakao SDK proxy route', kakaoSdkRoute);
 
 console.log('Server security guard passed.');

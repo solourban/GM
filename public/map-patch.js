@@ -32,14 +32,17 @@
     return configPromise;
   }
 
-  function loadKakaoSdk(key) {
+  function loadKakaoSdk() {
     if (window.kakao?.maps?.services) return Promise.resolve();
     if (sdkPromise) return sdkPromise;
     sdkPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false&libraries=services`;
+      script.src = '/api/kakao/maps-sdk.js';
       script.async = true;
-      script.onload = () => window.kakao.maps.load(resolve);
+      script.onload = () => {
+        if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
+        else reject(new Error('Kakao 지도 SDK 로드 실패'));
+      };
       script.onerror = () => reject(new Error('Kakao 지도 SDK 로드 실패'));
       document.head.appendChild(script);
     });
@@ -92,7 +95,7 @@
     }
 
     const config = await getConfig();
-    if (!config?.hasKakaoMap || !config?.kakaoJsKey) {
+    if (!config?.hasKakaoMap) {
       box.className = 'kakao-map-box';
       box.innerHTML = `Kakao 지도 API 키가 필요합니다.<br><span class="muted">Railway 환경변수에 KAKAO_JS_KEY를 추가하세요.</span>`;
       return;
@@ -101,7 +104,7 @@
     try {
       box.className = 'kakao-map-box';
       box.textContent = 'Kakao 지도 로딩 중...';
-      await loadKakaoSdk(config.kakaoJsKey);
+      await loadKakaoSdk();
       const geocoder = new window.kakao.maps.services.Geocoder();
       geocoder.addressSearch(address, (result, status) => {
         if (status !== window.kakao.maps.services.Status.OK || !result?.length) {
