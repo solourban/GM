@@ -15,6 +15,7 @@
     inputText: '',
     selectedCourt: '',
     restored: false,
+    propertyType: 'all',
   };
 
   function appState() {
@@ -45,6 +46,10 @@
     return minBid && appraisal ? (minBid / appraisal) * 100 : 0;
   }
 
+  function propertyTypes() {
+    return window.__auctionPropertyTypes || null;
+  }
+
   function loadJsonList(storage, key) {
     try {
       const parsed = JSON.parse(storage.getItem(key) || '[]');
@@ -68,6 +73,7 @@
       state.selectedCourt = clean(parsed.selectedCourt);
       state.rows = Array.isArray(parsed.rows) ? parsed.rows.slice(0, 10) : [];
       state.message = clean(parsed.message);
+      state.propertyType = propertyTypes()?.normalize(clean(parsed.propertyType)) || 'all';
       state.restored = Boolean(state.inputText || state.rows.length);
     } catch (_) {}
   }
@@ -79,6 +85,7 @@
         selectedCourt: state.selectedCourt,
         rows: state.rows.slice(0, 10),
         message: state.message,
+        propertyType: state.propertyType,
         savedAt: new Date().toISOString(),
       }));
     } catch (_) {}
@@ -205,14 +212,21 @@
     return row?.ok ? row : null;
   }
 
-  function renderRows() {
+  function visibleRows() {
+    const indexed = state.rows.map((row, index) => ({ row, index }));
+    if (state.propertyType === 'all' || !propertyTypes()) return indexed;
+    return indexed.filter(({ row }) => row.ok && propertyTypes().matches(row, state.propertyType));
+  }
+
+  function renderRows(rows) {
     if (!state.rows.length) return '<p class="v2-note">아직 일괄조회 결과가 없습니다.</p>';
+    if (!rows.length) return '<p class="v2-note">선택한 물건종류에 해당하는 일괄조회 성공 건이 없습니다.</p>';
     return `
       <div class="v2-detail-table-wrap">
         <table class="v2-detail-table">
           <thead><tr><th>상태</th><th>법원</th><th>사건번호</th><th>물건종별</th><th>소재지</th><th>최저가</th><th>매각기일</th><th>관리</th></tr></thead>
           <tbody>
-            ${state.rows.map((row, index) => {
+            ${rows.map(({ row, index }) => {
               const basic = row.raw?.basic || {};
               const caseNo = rowCaseNo(row);
               return `
@@ -241,6 +255,8 @@
   function renderResults() {
     const okCount = state.rows.filter((row) => row.ok).length;
     const failCount = state.rows.filter((row) => !row.ok).length;
+    const successfulRows = state.rows.filter((row) => row.ok);
+    const displayRows = visibleRows();
     return `
       <section class="v2-card" id="${RESULT_ID}">
         <span class="v2-badge">일괄조회 결과</span>
@@ -252,7 +268,8 @@
           <div class="v2-info"><div class="k">상태</div><div class="v">${esc(state.running ? '조회 중' : '대기')}</div></div>
           <div class="v2-info"><div class="k">보존</div><div class="v">세션 저장</div></div>
         </div>
-        ${renderRows()}
+        ${successfulRows.length ? propertyTypes()?.render(successfulRows, state.propertyType, 'data-bulk-property-type') || '' : ''}
+        ${renderRows(displayRows)}
       </section>
     `;
   }
@@ -304,6 +321,7 @@
     state.running = true;
     state.message = '';
     state.rows = [];
+    state.propertyType = 'all';
     persistBulkState();
     upsert();
 
@@ -387,6 +405,7 @@
         state.message = '';
         state.inputText = '';
         state.restored = false;
+        state.propertyType = 'all';
         clearBulkState();
         upsert();
       });
@@ -405,6 +424,15 @@
       button.addEventListener('click', () => {
         if (button.dataset.bulkAction === 'open') openSingle(button);
         if (button.dataset.bulkAction === 'temp' || button.dataset.bulkAction === 'save') handleCandidateAction(button);
+      });
+    });
+    document.querySelectorAll('[data-bulk-property-type]').forEach((button) => {
+      if (button.dataset.bound) return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', () => {
+        state.propertyType = button.dataset.bulkPropertyType || 'all';
+        persistBulkState();
+        upsert();
       });
     });
   }

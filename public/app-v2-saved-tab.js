@@ -3,6 +3,11 @@
   const MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let selectedPropertyType = 'all';
+
+  function propertyTypes() {
+    return window.__auctionPropertyTypes || null;
+  }
 
   function compact(value) {
     return clean(value).replace(/\s+/g, '').replace(/[^0-9가-힣A-Za-z]/g, '');
@@ -57,7 +62,7 @@
   }
 
   function isHousing(item) {
-    return /주거|아파트|다세대|단독|연립|다가구|주택/i.test(clean(item?.usage));
+    return /주거|아파트|다세대|단독|연립|다가구|주택/i.test(propertyTypes()?.usageOf(item) || clean(item?.usage));
   }
 
   function failCount(item) {
@@ -153,21 +158,24 @@
   }
 
   function renderSaved(items) {
-    const top = topCandidates(items, 5);
-    const memoCount = items.filter((item) => clean(loadMemo(item))).length;
-    const rightsCount = items.filter(hasRightsCheck).length;
-    const priceCount = items.filter(hasPriceCheck).length;
+    const filteredItems = propertyTypes()?.filter(items, selectedPropertyType) || [...items];
+    const top = topCandidates(filteredItems, 5);
+    const memoCount = filteredItems.filter((item) => clean(loadMemo(item))).length;
+    const rightsCount = filteredItems.filter(hasRightsCheck).length;
+    const priceCount = filteredItems.filter(hasPriceCheck).length;
     return `
       <div class="v2-card" id="v2SavedTabRuntimeCard">
         <span class="v2-badge">검토 우선순위</span>
         <h3>저장 후보 검토 우선순위 TOP 5</h3>
         <p class="v2-note">저장 후보를 감정가 대비 최저가 비율, 유찰횟수, 용도, 매각기일, 메모, 권리분석, 시세 확인 여부를 참고지표로 정렬합니다.</p>
         <div class="v2-grid compact">
-          <div class="v2-info"><div class="k">저장 후보 수</div><div class="v">${items.length}건</div></div>
+          <div class="v2-info"><div class="k">표시 / 전체</div><div class="v">${filteredItems.length} / ${items.length}건</div></div>
           <div class="v2-info"><div class="k">메모 보유</div><div class="v">${memoCount}건</div></div>
           <div class="v2-info"><div class="k">권리분석 확인</div><div class="v">${rightsCount}건</div></div>
           <div class="v2-info"><div class="k">시세 확인</div><div class="v">${priceCount}건</div></div>
         </div>
+        ${propertyTypes()?.render(items, selectedPropertyType, 'data-saved-property-type') || ''}
+        ${top.length ? '' : '<p class="v2-note">선택한 물건종류에 해당하는 저장 후보가 없습니다.</p>'}
         <div class="v2-detail-table-wrap">
           <table class="v2-detail-table">
             <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>용도</th><th>매각기일</th><th>최저가/감정가</th><th>가격비율</th><th>유찰</th><th>메모</th><th>권리</th><th>시세</th><th>판단</th><th>관리</th></tr></thead>
@@ -177,7 +185,7 @@
                   <td>${index + 1}</td>
                   <td>${esc(item.caseNo || '-')}</td>
                   <td>${score}</td>
-                  <td>${esc(item.usage || '-')}</td>
+                  <td>${esc(propertyTypes()?.usageOf(item) || item.usage || '-')}</td>
                   <td>${esc(item.saleDate || '-')}</td>
                   <td>${esc(item.minBid || formatWon(item.minBid))}<br><small>${esc(item.appraisal || formatWon(item.appraisal))}</small></td>
                   <td>${percent(discountRate(item))}</td>
@@ -206,7 +214,7 @@
     if (!panel) return;
     const items = loadSavedCandidates();
     const html = items.length ? renderSaved(items) : renderEmpty();
-    const signature = `${items.length}:${items.map((item) => `${compact(item.caseNo)}:${candidateScore(item)}:${clean(loadMemo(item)).length}`).join('|')}`;
+    const signature = `${selectedPropertyType}:${items.length}:${items.map((item) => `${compact(item.caseNo)}:${candidateScore(item)}:${clean(loadMemo(item)).length}`).join('|')}`;
     if (panel.dataset.savedTabSignature === signature && panel.querySelector('#v2SavedTabRuntimeCard')) return;
     panel.dataset.savedTabSignature = signature;
     panel.innerHTML = html;
@@ -236,6 +244,15 @@
   }
 
   document.addEventListener('click', (event) => {
+    const propertyButton = event.target.closest('[data-saved-property-type]');
+    if (propertyButton) {
+      selectedPropertyType = propertyButton.dataset.savedPropertyType || 'all';
+      const panel = findSavedPanel();
+      if (panel) panel.dataset.savedTabSignature = '';
+      render();
+      return;
+    }
+
     const button = event.target.closest('[data-saved-tab-action]');
     if (!button) return;
     const caseNo = button.dataset.caseNo;
