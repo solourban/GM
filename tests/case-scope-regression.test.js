@@ -34,12 +34,15 @@ const scenarioReturnToA = 'case A restore keeps saved values';
 requireIncludes(files.caseReset, 'loadSavedCase(identity.key)', scenarioReturnToA, 'case-key saved state load');
 requireIncludes(files.caseReset, 'saved?.manual ? safeManual(saved.manual) : defaultManual()', scenarioReturnToA, 'saved manual restore');
 requireIncludes(files.caseReset, 's.report = saved?.report || null;', scenarioReturnToA, 'saved report restore');
+requireIncludes(files.caseReset, 'specReview: safeSpecReview(src.specReview)', scenarioReturnToA, 'saved specReview restore');
+requireIncludes(files.persist, 'specReview: safeSpecReview(src?.specReview)', scenarioReturnToA, 'persisted specReview save');
 requireIncludes(files.persist, 'if (s.__persistActiveCaseKey && s.__persistActiveCaseKey !== identity.key) return;', scenarioReturnToA, 'cross-case save guard');
 requireIncludes(files.persist, 's.__persistRestoredKey === key', scenarioReturnToA, 'same-case restore guard');
 
 const scenarioReset = 'reset clears current case state and bid plan';
 requireIncludes(files.caseReset, 'function resetCurrentCaseState()', scenarioReset, 'reset function');
 requireIncludes(files.caseReset, 'removeCurrentCaseStorage(identity);', scenarioReset, 'stored case removal');
+requireIncludes(files.caseReset, 'removeCurrentSpecDraft(identity);', scenarioReset, 'current spec draft removal');
 requireIncludes(files.caseReset, 'clearAnalysisDerivedData();', scenarioReset, 'analysis-only derived cleanup');
 requireIncludes(files.caseReset, 'localStorage.removeItem(key);', scenarioReset, 'current case localStorage removal');
 requireIncludes(files.caseReset, 'currentCaseBidPlanKeys(identity).forEach((bidKey) => localStorage.removeItem(bidKey))', scenarioReset, 'bid plan localStorage removal');

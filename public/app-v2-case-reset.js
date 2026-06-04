@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_PREFIX = 'auction-note:v2.2:case:';
   const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';
+  const SPEC_DRAFT_STORAGE_PREFIX = 'auction-note:v2:spec-extraction:';
   const SCHEMA_VERSION = 3;
   const ACTIVE_CASE_SESSION_KEY = 'auction-note:v2:active-case-key';
   const TRANSIENT_SESSION_KEYS = [
@@ -56,6 +57,7 @@
       malso: { date: '', type: '근저당권', holder: '', amount: '' },
       tenants: [{ name: '', moveIn: '', fixed: '', deposit: '' }],
       specials: [],
+      specReview: { occupants: [], specialRights: [], takeoverNotes: [] },
     };
   }
 
@@ -152,6 +154,15 @@
     } catch (_) {}
   }
 
+  function removeCurrentSpecDraft(identity) {
+    const caseKey = currentCaseKey(identity);
+    if (!caseKey) return;
+    try {
+      sessionStorage.removeItem(`${SPEC_DRAFT_STORAGE_PREFIX}${caseKey}`);
+    } catch (_) {}
+    window.__auctionSpecExtractor?.clearDraft?.(caseKey);
+  }
+
   function syncActiveCaseSession(identity) {
     if (!identity?.key) return;
     try {
@@ -186,6 +197,40 @@
         date: clean(special?.date),
         amount: clean(special?.amount),
       })) : [],
+      specReview: safeSpecReview(src.specReview),
+    };
+  }
+
+  function safeSpecReview(value) {
+    const src = value && typeof value === 'object' ? value : {};
+    return {
+      occupants: Array.isArray(src.occupants) ? src.occupants.map((item) => ({
+        tenantName: clean(item?.tenantName),
+        occupantName: clean(item?.occupantName),
+        moveIn: clean(item?.moveIn),
+        fixed: clean(item?.fixed),
+        claimDate: clean(item?.claimDate),
+        deposit: clean(item?.deposit),
+        rent: clean(item?.rent),
+        occupiedPart: clean(item?.occupiedPart),
+        sourceId: clean(item?.sourceId),
+        confirmedAt: clean(item?.confirmedAt),
+      })).filter((item) => Object.values(item).some(clean)) : [],
+      specialRights: Array.isArray(src.specialRights) ? src.specialRights.map((item) => ({
+        typeCandidate: clean(item?.typeCandidate),
+        holder: clean(item?.holder),
+        date: clean(item?.date),
+        amount: clean(item?.amount),
+        phrase: clean(item?.phrase),
+        sourceId: clean(item?.sourceId),
+        confirmedAt: clean(item?.confirmedAt),
+      })).filter((item) => Object.values(item).some(clean)) : [],
+      takeoverNotes: Array.isArray(src.takeoverNotes) ? src.takeoverNotes.map((item) => ({
+        kind: clean(item?.kind),
+        phrase: clean(item?.phrase),
+        sourceId: clean(item?.sourceId),
+        confirmedAt: clean(item?.confirmedAt),
+      })).filter((item) => Object.values(item).some(clean)) : [],
     };
   }
 
@@ -238,6 +283,7 @@
 
     s.__persistSwitchingCase = true;
     removeCurrentCaseStorage(identity);
+    removeCurrentSpecDraft(identity);
     resetCaseRuntimeState(s);
     clearAnalysisDerivedData();
     syncActiveCaseSession(identity);

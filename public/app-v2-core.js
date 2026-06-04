@@ -18,6 +18,7 @@
       malso: { date: '', type: '근저당권', holder: '', amount: '' },
       tenants: [{ name: '', moveIn: '', fixed: '', deposit: '' }],
       specials: [],
+      specReview: { occupants: [], specialRights: [], takeoverNotes: [] },
     },
   };
 
@@ -377,6 +378,20 @@
     state.manual.tenants = state.manual.tenants.map((t) => ({ name: clean(t.name), moveIn: clean(t.moveIn), fixed: clean(t.fixed), deposit: clean(t.deposit) }));
     if (!state.manual.tenants.length) state.manual.tenants = [{ name:'', moveIn:'', fixed:'', deposit:'' }];
     state.manual.specials = state.manual.specials.map((s) => ({ type: clean(s.type) || '유치권', holder: clean(s.holder), date: clean(s.date), amount: clean(s.amount) }));
+    const review = state.manual.specReview && typeof state.manual.specReview === 'object' ? state.manual.specReview : {};
+    state.manual.specReview = {
+      occupants: Array.isArray(review.occupants) ? review.occupants : [],
+      specialRights: Array.isArray(review.specialRights) ? review.specialRights : [],
+      takeoverNotes: Array.isArray(review.takeoverNotes) ? review.takeoverNotes : [],
+    };
+  }
+
+  function manualForAnalyze() {
+    return {
+      malso: state.manual.malso,
+      tenants: state.manual.tenants,
+      specials: state.manual.specials,
+    };
   }
 
   async function runAnalyze() {
@@ -386,7 +401,7 @@
     state.analyzeError = '';
     renderResults({ keepScroll:true });
     try {
-      const res = await fetch('/api/analyze', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ raw: state.raw, manual: state.manual, region:'other' }) });
+      const res = await fetch('/api/analyze', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ raw: state.raw, manual: manualForAnalyze(), region:'other' }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || data.detail || '권리분석에 실패했습니다.');
       state.report = data.report;
