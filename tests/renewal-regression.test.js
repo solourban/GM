@@ -54,6 +54,7 @@ const requiredScripts = [
   '/app-v2-core.js',
   '/app-v2-onbid-entry.js',
   '/app-v2-service-status.js',
+  '/app-v2-property-types.js',
   '/app-v2-date-source.js',
   '/app-v2-candidate-stack.js',
   '/app-v2-saved-tab.js',
@@ -70,6 +71,7 @@ requiredScripts.forEach((script) => requireIncludes(INDEX, script, `${script} lo
 requireBefore(INDEX, '/app-v2-request-id-bridge.js', '/app-v2-core.js', 'request id bridge must load before core');
 requireBefore(INDEX, '/app-v2-core.js', '/app-v2-onbid-entry.js', 'Onbid entry must load after core');
 requireBefore(INDEX, '/app-v2-core.js', '/app-v2-service-status.js', 'service status must load after core');
+requireBefore(INDEX, '/app-v2-property-types.js', '/app-v2-date.js', 'property type helper must load before date screen');
 requireBefore(INDEX, '/app-v2-date-source.js', '/app-v2-candidate-stack.js', 'candidate stack must load after date source');
 requireBefore(INDEX, '/app-v2-candidate-stack.js', '/app-v2-saved-tab.js', 'saved tab must load after candidate stack');
 requireBefore(INDEX, '/app-v2-saved-tab.js', '/app-v2-bulk-tab.js', 'bulk tab must load after saved tab');

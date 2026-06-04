@@ -32,7 +32,7 @@
     handoff: null,
     selectedCandidate: null,
     sortMode: 'score',
-    housingOnly: false,
+    propertyType: 'all',
     form: {
       court: SUPPORTED_COURT,
       start: todayInput(),
@@ -89,6 +89,10 @@
     return /주거|아파트|다세대|단독|연립|다가구|주택/i.test(clean(item?.usage));
   }
 
+  function propertyTypes() {
+    return window.__auctionPropertyTypes || null;
+  }
+
   function candidateDiscountRate(item) {
     const minBid = numberValue(item?.minBid);
     const appraisal = numberValue(item?.appraisal);
@@ -96,7 +100,7 @@
   }
 
   function visibleItems() {
-    const filtered = state.housingOnly ? state.items.filter(isHousing) : [...state.items];
+    const filtered = propertyTypes()?.filter(state.items, state.propertyType) || [...state.items];
     const sorted = [...filtered];
     sorted.sort((a, b) => {
       if (state.sortMode === 'minBid') return numberValue(a.minBid) - numberValue(b.minBid);
@@ -124,10 +128,6 @@
 
   function selected(value, target) {
     return String(value) === String(target) ? 'selected' : '';
-  }
-
-  function checked(value) {
-    return value ? 'checked' : '';
   }
 
   function captureForm() {
@@ -172,10 +172,9 @@
   }
 
   function renderCandidateComparison() {
-    const items = state.items || [];
+    const items = visibleItems();
     if (!items.length) return '';
 
-    const displayItems = visibleItems();
     const lowestMinBid = pickLowest(items, (item) => numberValue(item.minBid));
     const lowestRate = pickLowest(items, candidateDiscountRate);
     const mostFailed = pickHighest(items, (item) => Number(item.failCount || 0));
@@ -195,7 +194,7 @@
         </div>
         <ul class="v2-list">
           <li>전체 후보 평균 최저가: ${formatWon(avgMinBid)}</li>
-          <li>현재 표시 후보: ${displayItems.length}건 / 전체 ${items.length}건</li>
+          <li>현재 표시 후보: ${items.length}건 / 전체 ${state.items.length}건</li>
           <li>${selectedComparisonText(avgMinBid)}</li>
         </ul>
       </div>
@@ -226,15 +225,15 @@
       <div class="v2-card">
         <span class="v2-badge">목록 정렬</span>
         <h3>후보 정렬·필터</h3>
-        <div class="v2-form" style="grid-template-columns:minmax(180px,1fr) minmax(180px,1fr);">
+        <div class="v2-form" style="grid-template-columns:minmax(180px,1fr);">
           <label class="v2-field"><span>정렬 기준</span><select id="dateSortModeV2">
             <option value="score" ${selected(state.sortMode, 'score')}>기본 추천순</option>
             <option value="minBid" ${selected(state.sortMode, 'minBid')}>최저가 낮은순</option>
             <option value="discount" ${selected(state.sortMode, 'discount')}>할인율 높은순</option>
             <option value="failCount" ${selected(state.sortMode, 'failCount')}>유찰 많은순</option>
           </select></label>
-          <label class="v2-field"><span>필터</span><label class="v2-check"><input id="dateHousingOnlyV2" type="checkbox" ${checked(state.housingOnly)}> 주거형만 보기</label></label>
         </div>
+        ${propertyTypes()?.render(items, state.propertyType, 'data-date-property-type') || ''}
       </div>
     `;
   }
@@ -281,7 +280,7 @@
       <div class="v2-card">
         <h3>매각기일 추천</h3>
         <p>법원과 기간을 기준으로 이번에 볼 만한 매각기일 후보를 조회합니다. 결과는 후보 선별용이며, 단일 사건 조회로 다시 검토해야 합니다.</p>
-        <div class="v2-form" style="grid-template-columns:minmax(180px,1fr) minmax(140px,.7fr) minmax(140px,.7fr) minmax(140px,.7fr) auto;">
+        <div class="v2-form v2-date-search-form">
           <label class="v2-field"><span>법원</span><select id="dateCourtV2"><option value="${SUPPORTED_COURT}" ${selected(state.form.court, SUPPORTED_COURT)}>서울중앙</option></select></label>
           <label class="v2-field"><span>시작일</span><input id="dateStartV2" type="date" value="${esc(state.form.start)}"></label>
           <label class="v2-field"><span>종료일</span><input id="dateEndV2" type="date" value="${esc(state.form.end)}"></label>
@@ -462,14 +461,14 @@
       });
     }
 
-    const housing = panel.querySelector('#dateHousingOnlyV2');
-    if (housing && !housing.dataset.bound) {
-      housing.dataset.bound = '1';
-      housing.addEventListener('change', () => {
-        state.housingOnly = housing.checked;
+    panel.querySelectorAll('[data-date-property-type]').forEach((button) => {
+      if (button.dataset.bound) return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', () => {
+        state.propertyType = button.dataset.datePropertyType || 'all';
         render(panel);
       });
-    }
+    });
 
     const btn = panel.querySelector('#dateFetchV2');
     if (btn && !btn.dataset.bound) {
