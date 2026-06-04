@@ -43,6 +43,9 @@ requireIncludes('hasMolit: Boolean(keys.molitKey)', 'MOLIT boolean config respon
 requireIncludes('safeKakaoDiagnostic', 'safe Kakao upstream diagnostic helper');
 requireIncludes("app.get('/api/kakao/maps-sdk.js'", 'Kakao Maps SDK proxy route');
 requireIncludes("url.searchParams.set('appkey', keys.kakaoMapKey)", 'server-side Kakao Maps SDK appkey usage');
+requireIncludes('window.__kakaoMapsSdkLoader', 'Kakao browser SDK loader promise');
+requireIncludes("document.createElement('script')", 'Kakao browser SDK script creation');
+requireIncludes('script.src = ${sdkUrl}', 'Kakao browser SDK source assignment');
 requireIncludes("res.type('application/javascript; charset=utf-8')", 'Kakao Maps SDK JavaScript content type');
 
 forbid(/detail\s*:\s*String\(e\)/, 'direct String(e) detail exposure');
@@ -56,5 +59,6 @@ forbid(/\bkakaoJsKey\s*:/, 'Kakao JS key value exposure in /api/config JSON resp
 forbid(/\bmolitKey\s*:/, 'MOLIT key value exposure in /api/config JSON response', configRoute);
 forbid(/KakaoAK\s*\$\{keys\.kakaoRestKey\}/, 'Kakao REST authorization header exposure in /api/config route', configRoute);
 forbid(/req\.query/, 'client query forwarding in Kakao SDK proxy route', kakaoSdkRoute);
+forbid(/await\s+fetch\(/, 'server-side Kakao SDK download that breaks browser appkey detection', kakaoSdkRoute);
 
 console.log('Server security guard passed.');

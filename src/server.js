@@ -145,33 +145,34 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-app.get('/api/kakao/maps-sdk.js', async (req, res) => {
+app.get('/api/kakao/maps-sdk.js', (req, res) => {
   const keys = externalApiConfig();
   if (!keys.kakaoMapKey) {
     return res.status(400).type('application/javascript').send('throw new Error("Kakao map SDK key is not configured.");');
   }
 
-  try {
-    const url = new URL('https://dapi.kakao.com/v2/maps/sdk.js');
-    url.searchParams.set('appkey', keys.kakaoMapKey);
-    url.searchParams.set('autoload', 'false');
-    url.searchParams.set('libraries', 'services');
+  const url = new URL('https://dapi.kakao.com/v2/maps/sdk.js');
+  url.searchParams.set('appkey', keys.kakaoMapKey);
+  url.searchParams.set('autoload', 'false');
+  url.searchParams.set('libraries', 'services');
+  const sdkUrl = JSON.stringify(url.toString());
 
-    const apiRes = await fetch(url.toString(), {
-      headers: { Accept: 'application/javascript,*/*' },
-    });
-    const body = await apiRes.text();
-
-    if (!apiRes.ok) {
-      logException('kakao/maps-sdk:upstream', req, new Error('Kakao Maps SDK response error'), { status: apiRes.status });
-      return res.status(502).type('application/javascript').send('throw new Error("Kakao map SDK proxy failed.");');
-    }
-
-    return res.type('application/javascript; charset=utf-8').send(body);
-  } catch (e) {
-    logException('kakao/maps-sdk', req, e);
-    return res.status(502).type('application/javascript').send('throw new Error("Kakao map SDK proxy failed.");');
-  }
+  return res.type('application/javascript; charset=utf-8').send(`
+    (() => {
+      if (window.__kakaoMapsSdkLoader) return;
+      window.__kakaoMapsSdkLoader = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = ${sdkUrl};
+        script.async = true;
+        script.onload = () => {
+          if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
+          else reject(new Error('Kakao map SDK is unavailable.'));
+        };
+        script.onerror = () => reject(new Error('Kakao map SDK load failed.'));
+        document.head.appendChild(script);
+      });
+    })();
+  `);
 });
 
 function validateAddressInput(address) {

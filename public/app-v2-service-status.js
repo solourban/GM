@@ -33,6 +33,13 @@
         note: '카카오맵 JS 키와 별개로 REST API 키가 필요합니다.',
       });
     }
+    if (!config?.hasKakaoMap) {
+      missing.push({
+        label: '카카오맵',
+        env: env.kakaoMap || 'KAKAO_JS_KEY',
+        note: '지도 표시용 JavaScript 키를 추가하고 Kakao Developers에 현재 배포 주소를 JavaScript SDK 도메인으로 등록해야 합니다.',
+      });
+    }
     if (!config?.hasMolit) {
       missing.push({ label: '국토부 실거래가', env: env.molit || 'MOLIT_API_KEY', note: '공공데이터포털 실거래가 서비스키가 필요합니다.' });
     }
