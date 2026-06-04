@@ -52,6 +52,7 @@ requiredConfigFlags.forEach(([needle, label]) => requireIncludes(SERVER, needle,
 const requiredScripts = [
   '/app-v2-request-id-bridge.js',
   '/app-v2-spec-extractor-parser.js',
+  '/app-v2-spec-extractor.js',
   '/app-v2-core.js',
   '/app-v2-onbid-entry.js',
   '/app-v2-service-status.js',
@@ -72,6 +73,8 @@ requiredScripts.forEach((script) => requireIncludes(INDEX, script, `${script} lo
 requireBefore(INDEX, '/app-v2-request-id-bridge.js', '/app-v2-core.js', 'request id bridge must load before core');
 requireBefore(INDEX, '/app-v2-request-id-bridge.js', '/app-v2-spec-extractor-parser.js', 'specification parser must load after request id bridge');
 requireBefore(INDEX, '/app-v2-spec-extractor-parser.js', '/app-v2-core.js', 'specification parser must load before core');
+requireBefore(INDEX, '/app-v2-core.js', '/app-v2-spec-extractor.js', 'specification review UI must load after core');
+requireBefore(INDEX, '/app-v2-case-reset.js', '/app-v2-spec-extractor.js', 'specification review UI must load after case scope');
 requireBefore(INDEX, '/app-v2-core.js', '/app-v2-onbid-entry.js', 'Onbid entry must load after core');
 requireBefore(INDEX, '/app-v2-core.js', '/app-v2-service-status.js', 'service status must load after core');
 requireBefore(INDEX, '/app-v2-property-types.js', '/app-v2-date.js', 'property type helper must load before date screen');
