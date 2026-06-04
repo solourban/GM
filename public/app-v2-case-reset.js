@@ -8,6 +8,9 @@
     'auction-note:v2:molit-trades',
     'auction-note:v2:final-judgment',
   ];
+  const ANALYSIS_SESSION_KEYS = [
+    'auction-note:v2:final-judgment',
+  ];
   const TRANSIENT_CARD_IDS = [
     'v2LocationCard',
     'v2MolitTradeCard',
@@ -22,6 +25,21 @@
     'v2CopySummaryCard',
     'v2BidPlanCard',
     'v2AllocationCard',
+  ];
+  const ANALYSIS_CARD_IDS = [
+    'v2FinalJudgmentCard',
+    'v2DecisionConfidenceCard',
+    'v2FinalCopyCard',
+    'v2BiddingSummaryCard',
+    'v2BidRangeCard',
+    'v2FundingReviewCard',
+    'v2PreBidChecklistCard',
+    'v2RiskBriefCard',
+    'v2CopySummaryCard',
+    'v2BidPlanCard',
+    'v2AllocationCard',
+    'v2CaseSyncStatusCard',
+    'v2ExternalVerificationCard',
   ];
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -86,9 +104,19 @@
     return identity?.key || '';
   }
 
-  function bidPlanStorageKey(identity) {
-    if (!identity?.court || !identity?.caseNo) return '';
-    return `${BID_PLAN_STORAGE_PREFIX}${identity.court}:${identity.caseNo}`;
+  function currentCaseBidPlanKeys(identity) {
+    const s = state();
+    const report = s?.report || {};
+    const raw = s?.raw || {};
+    const basic = raw.basic || {};
+    const pairs = [
+      [identity?.court, identity?.caseNo],
+      [clean(raw.court || basic['법원']), clean(raw.caseNo || basic['사건번호'])],
+      [clean(report.court || report.raw?.court), clean(report.case || report.caseNo)],
+    ];
+    return Array.from(new Set(pairs
+      .filter(([court, caseNo]) => court && caseNo)
+      .map(([court, caseNo]) => `${BID_PLAN_STORAGE_PREFIX}${court}:${caseNo}`)));
   }
 
   function resetCaseRuntimeState(s) {
@@ -108,13 +136,19 @@
     TRANSIENT_CARD_IDS.forEach((id) => document.getElementById(id)?.remove());
   }
 
+  function clearAnalysisDerivedData() {
+    try {
+      ANALYSIS_SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key));
+    } catch (_) {}
+    ANALYSIS_CARD_IDS.forEach((id) => document.getElementById(id)?.remove());
+  }
+
   function removeCurrentCaseStorage(identity) {
     const key = currentCaseKey(identity);
     if (!key) return;
     try {
       localStorage.removeItem(key);
-      const bidKey = bidPlanStorageKey(identity);
-      if (bidKey) localStorage.removeItem(bidKey);
+      currentCaseBidPlanKeys(identity).forEach((bidKey) => localStorage.removeItem(bidKey));
     } catch (_) {}
   }
 
@@ -205,7 +239,7 @@
     s.__persistSwitchingCase = true;
     removeCurrentCaseStorage(identity);
     resetCaseRuntimeState(s);
-    clearTransientCaseData();
+    clearAnalysisDerivedData();
     syncActiveCaseSession(identity);
     s.__persistActiveCaseKey = identity.key;
     s.__persistRestoredKey = identity.key;
@@ -266,8 +300,10 @@
       if (title?.nextSibling) step2.insertBefore(notice, title.nextSibling);
       else step2.prepend(notice);
     }
+    if (notice.dataset.caseResetSignature === identity.key) return;
+    notice.dataset.caseResetSignature = identity.key;
     notice.innerHTML = `
-      <p class="v2-note" style="margin:0;flex:1 1 280px">입력값은 법원·연도·사건번호 기준으로 자동 저장됩니다. 다른 사건으로 전환하면 이전 사건 입력값은 표시하지 않습니다.</p>
+      <p class="v2-note" style="margin:0;flex:1 1 280px">입력값은 법원·연도·사건번호 기준으로 자동 저장됩니다. 초기화하면 현재 사건의 Step 2·권리분석·입찰가만 지우고, 저장 후보·외부검증 메모·실거래가 결과는 유지합니다.</p>
       <button class="v2-danger-btn" type="button" data-action="reset-current-case">현재 사건 입력 초기화</button>
     `;
   }
@@ -278,6 +314,8 @@
       return;
     }
     if (!event.target.closest('[data-action="reset-current-case"]')) return;
+    event.preventDefault();
+    event.stopPropagation();
     resetCurrentCaseState();
   }, true);
 
@@ -292,5 +330,6 @@
     prepareForSearchCase,
     currentCaseIdentity,
     currentCaseKey,
+    clearAnalysisDerivedData,
   };
 })();

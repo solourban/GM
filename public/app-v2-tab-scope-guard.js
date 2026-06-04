@@ -107,10 +107,13 @@
       card.appendChild(notice);
     }
 
+    const signature = currentCaseLabel() || '-';
+    if (notice.dataset.caseResetSignature === signature) return;
+    notice.dataset.caseResetSignature = signature;
     notice.innerHTML = `
       <p class="v2-note" style="margin:0;flex:1 1 320px">
-        법원·연도·사건번호 기준으로 현재 사건 입력값만 초기화합니다. 저장 후보 목록은 삭제하지 않습니다.<br>
-        <strong style="color:var(--ink)">현재 기준: ${esc(currentCaseLabel() || '-')}</strong>
+        현재 사건의 Step 2·권리분석·입찰가만 초기화합니다. 저장 후보·외부검증 메모·실거래가 결과는 유지합니다.<br>
+        <strong style="color:var(--ink)">현재 기준: ${esc(signature)}</strong>
       </p>
       <button class="v2-danger-btn" type="button" data-action="reset-current-case">현재 사건 입력 초기화</button>
     `;

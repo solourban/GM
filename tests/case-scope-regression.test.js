@@ -40,9 +40,11 @@ requireIncludes(files.persist, 's.__persistRestoredKey === key', scenarioReturnT
 const scenarioReset = 'reset clears current case state and bid plan';
 requireIncludes(files.caseReset, 'function resetCurrentCaseState()', scenarioReset, 'reset function');
 requireIncludes(files.caseReset, 'removeCurrentCaseStorage(identity);', scenarioReset, 'stored case removal');
+requireIncludes(files.caseReset, 'clearAnalysisDerivedData();', scenarioReset, 'analysis-only derived cleanup');
 requireIncludes(files.caseReset, 'localStorage.removeItem(key);', scenarioReset, 'current case localStorage removal');
-requireIncludes(files.caseReset, 'localStorage.removeItem(bidKey);', scenarioReset, 'bid plan localStorage removal');
+requireIncludes(files.caseReset, 'currentCaseBidPlanKeys(identity).forEach((bidKey) => localStorage.removeItem(bidKey))', scenarioReset, 'bid plan localStorage removal');
 requireIncludes(files.caseReset, 'data-action="reset-current-case"', scenarioReset, 'reset UI action');
+requireIncludes(files.caseReset, 'event.stopPropagation();', scenarioReset, 'duplicate core render prevention');
 requireIncludes(files.bidPlan, "const STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';", scenarioReset, 'bid plan storage namespace');
 requireIncludes(files.copySummary, "const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:';", scenarioReset, 'copy summary bid plan namespace');
 
@@ -50,9 +52,15 @@ const scenarioCopy = 'case scope copy is visible to users';
 requireIncludes(files.caseReset, '법원·연도·사건번호 기준으로 자동 저장됩니다', scenarioCopy, 'case-key autosave copy');
 requireIncludes(files.persist, '다른 사건 입력값은 표시하지 않습니다', scenarioCopy, 'persist safety copy');
 
+const scenarioPreserve = 'reset preserves current case reference caches and external notes';
+requireIncludes(files.caseReset, "const ANALYSIS_SESSION_KEYS = [", scenarioPreserve, 'analysis-only session cleanup scope');
+requireIncludes(files.caseReset, "const TRANSIENT_SESSION_KEYS = [", scenarioPreserve, 'case-switch transient cleanup scope');
+requireIncludes(files.caseReset, '저장 후보·외부검증 메모·실거래가 결과는 유지합니다.', scenarioPreserve, 'preservation copy');
+
 console.log([
   `Case scope regression passed: ${scenarioAtoB}`,
   `Case scope regression passed: ${scenarioReturnToA}`,
   `Case scope regression passed: ${scenarioReset}`,
   `Case scope regression passed: ${scenarioCopy}`,
+  `Case scope regression passed: ${scenarioPreserve}`,
 ].join('\n'));
