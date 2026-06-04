@@ -316,6 +316,19 @@
     if (location.bCode) lines.push(`- 법정동코드: ${clean(location.bCode)}`);
     if (location.hCode) lines.push(`- 행정동코드: ${clean(location.hCode)}`);
     if (location.kakaoMapUrl) lines.push(`- 카카오맵: ${clean(location.kakaoMapUrl)}`);
+    const nearby = Array.isArray(location.nearby?.categories) ? location.nearby.categories : [];
+    if (nearby.length) {
+      lines.push('- 주변 생활편의 시설:');
+      nearby.forEach((category) => {
+        if (category.error) {
+          lines.push(`  - ${clean(category.label)}: 확인 실패`);
+          return;
+        }
+        const distance = Number(category.nearestDistance || 0);
+        const distanceLabel = distance >= 1000 ? `${(distance / 1000).toFixed(1)}km` : distance ? `${Math.round(distance)}m` : '-';
+        lines.push(`  - ${clean(category.label)}: ${Number(category.count || 0)}곳 / 최근접 ${distanceLabel}${category.nearestName ? ` (${clean(category.nearestName)})` : ''}`);
+      });
+    }
   }
 
   function tradeDate(trade) {

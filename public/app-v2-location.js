@@ -2,6 +2,12 @@
   const CARD_ID = 'v2LocationCard';
   const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+  const NEARBY_CATEGORIES = [
+    { id: 'subway', code: 'SW8', label: '지하철역', radius: 1500 },
+    { id: 'school', code: 'SC4', label: '학교', radius: 1000 },
+    { id: 'hospital', code: 'HP8', label: '병원', radius: 1000 },
+    { id: 'convenience', code: 'CS2', label: '편의점', radius: 500 },
+  ];
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -177,6 +183,96 @@
     target.style.placeItems = 'center';
   }
 
+  function distanceText(value) {
+    const meters = Number(value || 0);
+    if (!Number.isFinite(meters) || meters <= 0) return '-';
+    if (meters < 1000) return `${Math.round(meters)}m`;
+    return `${(meters / 1000).toFixed(1)}km`;
+  }
+
+  function nearbySummaryNode(mapTarget) {
+    return mapTarget.closest('.v2-map-card')?.querySelector('[data-nearby-summary]') || null;
+  }
+
+  function renderNearbyStatus(mapTarget, results) {
+    const summary = nearbySummaryNode(mapTarget);
+    if (!summary) return;
+    summary.innerHTML = `
+      <div style="grid-column:1/-1;background:#fff;padding:12px 14px;">
+        <strong style="display:block;font-size:14px;">주변 생활편의 시설</strong>
+        <span class="v2-note" style="display:block;margin-top:2px;">카카오 장소검색 기준 반경 내 시설과 가장 가까운 거리를 확인했습니다.</span>
+      </div>
+      ${results.map((result) => {
+        if (result.error) {
+          return `<div style="background:#fff;padding:12px 14px;"><strong style="display:block;font-size:13px;">${esc(result.label)}</strong><span class="v2-note">확인 실패</span></div>`;
+        }
+        const nearest = result.nearestName
+          ? `${result.nearestName} · ${distanceText(result.nearestDistance)}`
+          : `반경 ${distanceText(result.radius)} 내 없음`;
+        return `<div style="background:#fff;padding:12px 14px;min-width:0;"><strong style="display:block;font-size:13px;">${esc(result.label)} ${Number(result.count || 0).toLocaleString('ko-KR')}곳</strong><span class="v2-note" style="display:block;overflow-wrap:anywhere;">${esc(nearest)}</span></div>`;
+      }).join('')}
+    `;
+  }
+
+  function renderNearbyFailure(mapTarget, message) {
+    const summary = nearbySummaryNode(mapTarget);
+    if (!summary) return;
+    summary.innerHTML = `<div style="grid-column:1/-1;background:#fff;padding:12px 14px;"><strong style="display:block;font-size:14px;">주변 시설 확인 필요</strong><span class="v2-note" style="display:block;margin-top:2px;">${esc(message)}</span></div>`;
+  }
+
+  function searchNearbyCategory(places, category, coords) {
+    return new Promise((resolve) => {
+      places.categorySearch(category.code, (items, status, pagination) => {
+        const statusApi = window.kakao.maps.services.Status;
+        if (status === statusApi.OK) {
+          const first = Array.isArray(items) ? items[0] : null;
+          resolve({
+            id: category.id,
+            label: category.label,
+            radius: category.radius,
+            count: Number(pagination?.totalCount || items?.length || 0),
+            nearestName: clean(first?.place_name),
+            nearestDistance: Number(first?.distance || 0),
+          });
+          return;
+        }
+        if (status === statusApi.ZERO_RESULT) {
+          resolve({ id: category.id, label: category.label, radius: category.radius, count: 0, nearestName: '', nearestDistance: 0 });
+          return;
+        }
+        resolve({ id: category.id, label: category.label, radius: category.radius, count: 0, nearestName: '', nearestDistance: 0, error: true });
+      }, {
+        location: coords,
+        radius: category.radius,
+        sort: window.kakao.maps.services.SortBy.DISTANCE,
+      });
+    });
+  }
+
+  function saveNearbyResult(results) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(LOCATION_STORAGE_KEY) || 'null');
+      if (!saved || saved.caseKey !== rawCaseKey()) return;
+      saved.nearby = {
+        complete: results.every((result) => !result.error),
+        categories: results,
+        analyzedAt: new Date().toISOString(),
+      };
+      sessionStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(saved));
+    } catch (_) {}
+  }
+
+  async function analyzeNearby(mapTarget, coords) {
+    if (!window.kakao?.maps?.services?.Places) {
+      renderNearbyFailure(mapTarget, '카카오 장소검색 서비스를 불러오지 못했습니다.');
+      return;
+    }
+    const places = new window.kakao.maps.services.Places();
+    const results = await Promise.all(NEARBY_CATEGORIES.map((category) => searchNearbyCategory(places, category, coords)));
+    renderNearbyStatus(mapTarget, results);
+    saveNearbyResult(results);
+  }
+
   function loadKakaoSdk() {
     if (window.kakao?.maps?.Map) return Promise.resolve();
     if (window.__kakaoMapsSdkLoader) return window.__kakaoMapsSdkLoader;
@@ -205,7 +301,7 @@
       <div class="v2-map-card" style="margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--bg);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
           <div>
-            <strong style="display:block;font-size:15px;">지도 미리보기</strong>
+            <strong style="display:block;font-size:15px;">지도·주변시설 분석</strong>
             <span class="v2-note" style="margin-top:2px;display:block;">${esc(title)}</span>
           </div>
           <span class="v2-pill ok">좌표 확인</span>
@@ -217,6 +313,12 @@
           data-title="${esc(title)}"
           style="height:320px;display:grid;place-items:center;color:var(--ink-3);">
           Kakao map loading...
+        </div>
+        <div
+          data-nearby-summary
+          aria-live="polite"
+          style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line);">
+          <div style="grid-column:1/-1;background:#fff;padding:12px 14px;"><strong style="display:block;font-size:14px;">주변 생활편의 시설 확인 중</strong><span class="v2-note">지하철·학교·병원·편의점을 조회하고 있습니다.</span></div>
         </div>
       </div>
     `;
@@ -232,6 +334,7 @@
       const message = await mapFailureMessage();
       targets.forEach((target) => {
         renderMapFailure(target, message);
+        renderNearbyFailure(target, '지도를 먼저 연결해야 주변 시설을 확인할 수 있습니다.');
       });
       return;
     }
@@ -243,17 +346,20 @@
         const y = Number(target.dataset.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) {
           renderMapFailure(target, '지도에 표시할 좌표가 올바르지 않습니다.');
+          renderNearbyFailure(target, '유효한 좌표가 있어야 주변 시설을 확인할 수 있습니다.');
           return;
         }
         const coords = new window.kakao.maps.LatLng(y, x);
         target.innerHTML = '';
         target.style.display = 'block';
-        const map = new window.kakao.maps.Map(target, { center: coords, level: 3 });
+        const map = new window.kakao.maps.Map(target, { center: coords, level: 4 });
         new window.kakao.maps.Marker({ map, position: coords });
         window.setTimeout(() => map.relayout(), 0);
         target.dataset.ready = '1';
+        analyzeNearby(target, coords).catch(() => renderNearbyFailure(target, '주변 시설 분석 중 오류가 발생했습니다.'));
       } catch (_) {
         renderMapFailure(target, '카카오 지도 렌더링에 실패했습니다. 잠시 후 다시 시도하세요.');
+        renderNearbyFailure(target, '지도를 먼저 연결해야 주변 시설을 확인할 수 있습니다.');
       }
     });
   }
@@ -391,7 +497,7 @@
           ${info('우편번호', doc.zoneNo || '-')}
           ${renderAttempts(attempts)}
         </div>
-        <p class="v2-note">지도 미리보기는 좌표 확인용입니다. 실제 동·호수, 출입구, 경사, 소음, 상권, 교통 여건은 현장과 외부 지도로 다시 확인하세요.</p>
+        <p class="v2-note">주변시설 결과는 카카오 장소검색 반경 기준 참고값입니다. 실제 동·호수, 출입구, 경사, 소음, 통학·보행 동선은 현장과 외부 지도로 다시 확인하세요.</p>
       </section>
     `;
   }

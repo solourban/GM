@@ -125,6 +125,24 @@
     return score;
   }
 
+  function distanceText(value) {
+    const meters = Number(value || 0);
+    if (!Number.isFinite(meters) || meters <= 0) return '-';
+    if (meters < 1000) return `${Math.round(meters)}m`;
+    return `${(meters / 1000).toFixed(1)}km`;
+  }
+
+  function nearbySummary(location) {
+    const categories = Array.isArray(location?.nearby?.categories) ? location.nearby.categories : [];
+    if (!categories.length) return '';
+    return categories.map((category) => {
+      if (category.error) return `${clean(category.label)} 확인 실패`;
+      const nearest = Number(category.nearestDistance || 0);
+      const count = Number(category.count || 0);
+      return `${clean(category.label)} ${count}곳${nearest ? `·최근접 ${distanceText(nearest)}` : ''}`;
+    }).join(' / ');
+  }
+
   function finalDecision(currentReport, location, trades) {
     const comparison = trades?.comparison || {};
     const total = riskScore(currentReport) + priceScore(comparison, trades) + evidenceScore(location, trades);
@@ -162,7 +180,8 @@
     else if (count > 0) list.push('가격 비교: 지역 참고시세라 최종 입찰가 판단에는 직접 반영하지 않음');
     else list.push('가격 비교: 실거래가 비교 정보 부족');
 
-    if (location?.x && location?.y) list.push('입지 확인: 주소 좌표 변환 완료');
+    const nearby = nearbySummary(location);
+    if (location?.x && location?.y) list.push(`입지 확인: 주소 좌표 변환 완료${nearby ? ` · ${nearby}` : ''}`);
     else list.push('입지 확인: 좌표 변환 정보 없음');
 
     if (count > 0) list.push(`실거래가 표본: ${count}건 · ${scope.label}`);
@@ -195,6 +214,8 @@
       avgRatio,
       comparisonJudgment: scope.priceComparable ? clean(comparison.judgment || '') : '지역 참고시세라 평균가 비율은 최종 판단에 직접 반영하지 않습니다.',
       hasLocation: Boolean(location?.x && location?.y),
+      nearbyComplete: Boolean(location?.nearby?.complete),
+      nearbySummary: nearbySummary(location) || '미확인',
     };
   }
 
@@ -228,6 +249,7 @@
           <div class="v2-info"><div class="k">실거래가 표본</div><div class="v">${esc(`${snapshot.tradeCount}건`)}</div></div>
           <div class="v2-info"><div class="k">시세 근거 범위</div><div class="v">${esc(snapshot.tradeScope)}</div></div>
           <div class="v2-info"><div class="k">최저가/평균가</div><div class="v">${esc(snapshot.avgRatio ? `${snapshot.avgRatio.toFixed(1)}%` : '-')}</div></div>
+          <div class="v2-info wide"><div class="k">주변시설 분석</div><div class="v">${esc(snapshot.nearbySummary)}</div></div>
         </div>
         <p class="v2-note">${esc(snapshot.tradeScopeNote)}</p>
         <ul class="v2-check-list">
