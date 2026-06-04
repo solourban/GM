@@ -28,6 +28,15 @@ const required = [
   [script, 'places.categorySearch', 'Kakao nearby category search'],
   [script, 'saveNearbyResult', 'nearby analysis persistence'],
   [script, 'data-nearby-summary', 'nearby analysis visible region'],
+  [script, 'v2-location-map-reserve', 'loading map space reservation'],
+  [script, 'min-height:1040px', 'desktop location card height reservation'],
+  [script, 'min-height:1460px', 'mobile location card height reservation'],
+  [script, 'min-height:400px', 'mobile nearby summary height reservation'],
+  [script, 'loadCachedLocation', 'same-case location cache restore'],
+  [script, 'commitWhenScrollIdle', 'scroll-idle location update'],
+  [script, 'MutationObserver', 'result rerender restore observer'],
+  [script, 'card.innerHTML = next.innerHTML', 'in-place location card update'],
+  [script, 'auction:result-card-change', 'targeted order notification'],
   [script, "mapProvider: 'kakao'", 'saved map provider'],
   [script, 'kakaoMapUrl: mapCoordUrl(doc, address)', 'Kakao map fallback link'],
   [script, 'kakaoSearchUrl: mapSearchUrl(doc, address)', 'search fallback link'],
@@ -42,6 +51,8 @@ const forbidden = [
   [script, 'appkey=', 'direct map API key in client'],
   [script, 'https://maps.google.com/maps?q=', 'Google iframe map source'],
   [script, '<iframe', 'iframe preview'],
+  [script, 'existing.outerHTML', 'full location card replacement'],
+  [script, 'setInterval(upsertLocationCard', 'periodic location card upsert'],
 ];
 
 const missing = required.filter(([source, needle]) => !source.includes(needle)).map(([, , label]) => label);

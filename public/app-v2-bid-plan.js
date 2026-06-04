@@ -113,7 +113,7 @@
       anchor.parentNode.insertBefore(card, anchor.nextSibling);
     }
 
-    if (card.previousElementSibling !== anchor) {
+    if (!card.dataset.resultOrderIndex && card.previousElementSibling !== anchor) {
       anchor.parentNode.insertBefore(card, anchor.nextSibling);
     }
 

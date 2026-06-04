@@ -15,6 +15,11 @@ const required = [
   [script, 'updateCardStatus', 'status-only update function'],
   [script, 'removeFinalJudgmentStatus', 'final judgment detach cleanup'],
   [script, 'card.dataset.caseKey !== caseKey(currentReport)', 'case change rerender guard'],
+  [script, 'if (!target) return;', 'temporary anchor absence preservation'],
+  [script, 'scheduleUpsert', 'targeted upsert scheduler'],
+  [script, 'MutationObserver', 'result rerender observer'],
+  [script, 'isUserScrolling', 'active scroll guard'],
+  [script, 'auction:result-card-change', 'targeted order notification'],
   [script, 'saveChecklist(data, currentReport)', 'case scoped localStorage save'],
   [script, 'document.addEventListener(\'change\'', 'change listener'],
   [script, 'document.addEventListener(\'input\'', 'input listener'],
@@ -24,6 +29,8 @@ const required = [
 const forbidden = [
   [script, 'outerHTML', 'full card outerHTML replacement'],
   [script, 'setInterval(upsertCard, 1200)', 'blind full rerender interval'],
+  [script, 'setInterval(', 'periodic checklist upsert'],
+  [script, '!currentReport || !target', 'temporary anchor removal branch'],
   [script, 'injectFinalJudgmentStatus', 'final judgment card injection'],
   [script, 'v2ExternalVerificationFinalStatus\');\n      box.className', 'final judgment injected info box'],
 ];
