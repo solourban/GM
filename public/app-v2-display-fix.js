@@ -32,6 +32,7 @@
 
   function insertAfter(card, anchor) {
     if (!card || !anchor?.parentNode) return;
+    if (card.dataset.resultOrderIndex) return;
     if (card.previousElementSibling === anchor) return;
     anchor.parentNode.insertBefore(card, anchor.nextSibling);
   }

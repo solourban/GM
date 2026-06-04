@@ -63,5 +63,6 @@ assertOrder(indexScripts, '/app-v2-molit-trades.js', '/app-v2-final-judgment.js'
 assertOrder(indexScripts, '/app-v2-final-judgment.js', '/app-v2-confidence.js');
 assertOrder(indexScripts, '/app-v2-confidence.js', '/app-v2-case-sync-status.js');
 assertOrder(indexScripts, '/app-v2-final-judgment.js', '/app-v2-final-copy-bridge.js');
+assertOrder(indexScripts, '/app-v2-map-provider-guard.js', '/app-v2-result-order.js');
 
 console.log(`Public script order guard passed. Checked ${indexScripts.length} scripts.`);

@@ -1,6 +1,7 @@
 (() => {
   const CARD_ID = 'v2LocationCard';
   const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
+  const CHANGE_EVENT = 'auction:result-card-change';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
   const NEARBY_CATEGORIES = [
     { id: 'subway', code: 'SW8', label: '지하철역', radius: 1500 },
@@ -8,6 +9,29 @@
     { id: 'hospital', code: 'HP8', label: '병원', radius: 1000 },
     { id: 'convenience', code: 'CS2', label: '편의점', radius: 500 },
   ];
+
+  function ensureLocationStyles() {
+    if (document.getElementById('v2LocationStabilityStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'v2LocationStabilityStyles';
+    style.textContent = `
+      #${CARD_ID} { overflow-anchor:none; }
+      #${CARD_ID}.v2-location-loading { min-height:1040px; }
+      #${CARD_ID} .v2-location-map-reserve { min-height:820px; margin-top:14px; border:1px solid var(--line); border-radius:18px; background:var(--bg); }
+      #${CARD_ID} [data-nearby-summary] { min-height:142px; align-content:start; }
+      @media (max-width:720px) {
+        #${CARD_ID}.v2-location-loading { min-height:1460px; }
+        #${CARD_ID} .v2-location-map-reserve { min-height:1240px; }
+        #${CARD_ID} [data-nearby-summary] { min-height:400px; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function notifyResultChange() {
+    document.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { id: CARD_ID } }));
+    window.__auctionResultOrder?.schedule?.(CARD_ID);
+  }
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -367,6 +391,7 @@
   function saveLocationResult(address, doc, attempts = []) {
     try {
       if (!doc) return;
+      const previous = JSON.parse(sessionStorage.getItem(LOCATION_STORAGE_KEY) || 'null');
       sessionStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify({
         caseKey: rawCaseKey(),
         queryAddress: address,
@@ -385,9 +410,38 @@
         kakaoMapUrl: mapCoordUrl(doc, address),
         kakaoSearchUrl: mapSearchUrl(doc, address),
         mapProvider: 'kakao',
+        nearby: previous?.caseKey === rawCaseKey() ? previous.nearby : undefined,
         savedAt: new Date().toISOString(),
       }));
     } catch (_) {}
+  }
+
+  function loadCachedLocation() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(LOCATION_STORAGE_KEY) || 'null');
+      if (!saved || saved.caseKey !== rawCaseKey() || !clean(saved.x) || !clean(saved.y)) return null;
+      return {
+        address: clean(saved.queryAddress || saved.roadAddress || saved.addressName),
+        attempts: Array.isArray(saved.attempts) ? saved.attempts : [],
+        data: {
+          documents: [{
+            addressName: saved.addressName,
+            roadAddress: saved.roadAddress,
+            buildingName: saved.buildingName,
+            x: saved.x,
+            y: saved.y,
+            region1: saved.region1,
+            region2: saved.region2,
+            region3: saved.region3,
+            bCode: saved.bCode,
+            hCode: saved.hCode,
+            zoneNo: saved.zoneNo,
+          }],
+        },
+      };
+    } catch (_) {
+      return null;
+    }
   }
 
   function clearLocationResult() {
@@ -398,9 +452,10 @@
 
   function renderLoading(addresses) {
     return `
-      <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
+      <section class="v2-result-card v2-location-card v2-location-loading" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}" data-location-state="loading">
         <div class="v2-loading"><span class="v2-spinner"></span><div><h3>입지 기초정보 조회 중</h3><p class="v2-note">카카오 주소검색 API로 좌표를 확인하고 있습니다. API 키는 서버에서만 사용됩니다.</p></div></div>
         <p class="v2-note">조회 주소 후보: ${esc(addresses.join(' / '))}</p>
+        <div class="v2-location-map-reserve" aria-hidden="true"></div>
       </section>
     `;
   }
@@ -444,7 +499,7 @@
   function renderError(addresses, message, attempts = []) {
     const primaryAddress = Array.isArray(addresses) ? addresses[0] : addresses;
     return `
-      <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
+      <section class="v2-result-card v2-location-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}" data-location-state="error">
         <span class="v2-badge">입지 기초정보</span>
         <h3>좌표 변환 확인 필요</h3>
         <p class="v2-note">${esc(message)}</p>
@@ -469,7 +524,7 @@
     const kakaoSearchUrl = mapSearchUrl(doc, address);
 
     return `
-      <section class="v2-result-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}">
+      <section class="v2-result-card v2-location-card" id="${CARD_ID}" data-case-key="${esc(rawCaseKey())}" data-location-state="ready">
         <div class="v2-result-head">
           <div>
             <span class="v2-badge">입지 기초정보</span>
@@ -503,16 +558,45 @@
   }
 
   function insertAfterAnchor(html) {
-    const anchor = findAnchor();
-    if (!anchor) return;
     const existing = document.getElementById(CARD_ID);
-    if (existing) existing.outerHTML = html;
-    else anchor.insertAdjacentHTML('afterend', html);
-    return document.getElementById(CARD_ID);
+    const anchor = findAnchor();
+    if (!existing && !anchor) return null;
+
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    const next = template.content.firstElementChild;
+    if (!next) return existing || null;
+
+    let card = existing;
+    if (card) {
+      card.className = next.className;
+      card.dataset.caseKey = next.dataset.caseKey || '';
+      card.dataset.locationState = next.dataset.locationState || '';
+      card.innerHTML = next.innerHTML;
+    } else {
+      card = next;
+      anchor.insertAdjacentElement('afterend', card);
+    }
+    notifyResultChange();
+    return card;
+  }
+
+  function commitWhenScrollIdle(html) {
+    return new Promise((resolve) => {
+      const commit = () => {
+        if (window.__auctionResultOrder?.isUserScrolling?.()) {
+          window.setTimeout(commit, 220);
+          return;
+        }
+        resolve(insertAfterAnchor(html));
+      };
+      commit();
+    });
   }
 
   let lastKey = '';
   let pendingKey = '';
+  let upsertTimer = 0;
 
   async function upsertLocationCard() {
     const state = appState();
@@ -527,25 +611,53 @@
       return;
     }
 
-    if (key === lastKey || key === pendingKey) return;
+    if (existing && key === lastKey) {
+      initKakaoMapPreviews(existing);
+      return;
+    }
+    if (key === pendingKey) return;
+
+    const cached = loadCachedLocation();
+    if (!existing && cached) {
+      const card = await commitWhenScrollIdle(renderSuccess(cached.address, cached.data, cached.attempts));
+      initKakaoMapPreviews(card || document);
+      lastKey = key;
+      return;
+    }
+
     pendingKey = key;
-    insertAfterAnchor(renderLoading(addresses));
+    await commitWhenScrollIdle(renderLoading(addresses));
 
     try {
       const result = await fetchGeocodeWithFallbacks(addresses);
       if (pendingKey !== key) return;
-      const card = insertAfterAnchor(renderSuccess(result.address, result.data, result.attempts));
+      const card = await commitWhenScrollIdle(renderSuccess(result.address, result.data, result.attempts));
       initKakaoMapPreviews(card || document);
       lastKey = key;
     } catch (e) {
       if (pendingKey !== key) return;
       clearLocationResult();
-      insertAfterAnchor(renderError(addresses, e.message || String(e), e.attempts || []));
+      await commitWhenScrollIdle(renderError(addresses, e.message || String(e), e.attempts || []));
       lastKey = key;
     } finally {
       if (pendingKey === key) pendingKey = '';
     }
   }
 
-  setInterval(upsertLocationCard, 1200);
+  function scheduleUpsert(delay = 0) {
+    window.clearTimeout(upsertTimer);
+    upsertTimer = window.setTimeout(upsertLocationCard, delay);
+  }
+
+  function observeResults() {
+    const root = document.getElementById('resultsSection');
+    if (!root || !window.MutationObserver) return;
+    const observer = new MutationObserver(() => scheduleUpsert(0));
+    observer.observe(root, { childList: true });
+  }
+
+  ensureLocationStyles();
+  observeResults();
+  document.addEventListener('DOMContentLoaded', () => scheduleUpsert(0));
+  scheduleUpsert(0);
 })();

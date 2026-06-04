@@ -1,6 +1,7 @@
 (() => {
   const CARD_ID = 'v2ExternalVerificationCard';
   const STORAGE_PREFIX = 'auction-note:v2:external-verification:';
+  const CHANGE_EVENT = 'auction:result-card-change';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -116,15 +117,21 @@
     document.getElementById('v2ExternalVerificationFinalStatus')?.remove();
   }
 
+  function notifyResultChange() {
+    document.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { id: CARD_ID } }));
+    window.__auctionResultOrder?.schedule?.(CARD_ID);
+  }
+
   function upsertCard() {
     const currentReport = report();
     const target = anchor();
     const existing = document.getElementById(CARD_ID);
     removeFinalJudgmentStatus();
-    if (!currentReport || !target) {
+    if (!currentReport) {
       existing?.remove();
       return;
     }
+    if (!target) return;
 
     const data = loadChecklist(currentReport);
     const nextSignature = signature(currentReport, data);
@@ -137,10 +144,12 @@
       card.dataset.caseKey = caseKey(currentReport);
       card.dataset.signature = nextSignature;
       target.insertAdjacentElement('afterend', card);
+      notifyResultChange();
     } else if (card.dataset.caseKey !== caseKey(currentReport)) {
       card.innerHTML = renderCardHtml(data);
       card.dataset.caseKey = caseKey(currentReport);
       card.dataset.signature = nextSignature;
+      notifyResultChange();
     } else {
       updateCardStatus(data);
     }
@@ -166,13 +175,28 @@
   document.addEventListener('change', (event) => { if (event.target.closest?.(`#${CARD_ID}`)) updateFromDom(); });
   document.addEventListener('input', (event) => { if (event.target.closest?.(`#${CARD_ID}`)) updateFromDom(); });
 
-  let lastReportKey = '';
-  setInterval(() => {
-    const nextKey = caseKey(report());
-    if (nextKey !== lastReportKey || document.getElementById('v2FinalJudgmentCard') || document.getElementById(CARD_ID)) {
-      lastReportKey = nextKey;
+  let upsertTimer = 0;
+
+  function scheduleUpsert(delay = 0) {
+    window.clearTimeout(upsertTimer);
+    upsertTimer = window.setTimeout(() => {
+      if (window.__auctionResultOrder?.isUserScrolling?.()) {
+        scheduleUpsert(220);
+        return;
+      }
       upsertCard();
-    }
-  }, 1200);
-  window.__auctionExternalChecklist = { loadChecklist, checkedCount, upsertCard };
+    }, delay);
+  }
+
+  function observeResults() {
+    const root = document.getElementById('resultsSection');
+    if (!root || !window.MutationObserver) return;
+    const observer = new MutationObserver(() => scheduleUpsert(0));
+    observer.observe(root, { childList: true });
+  }
+
+  observeResults();
+  document.addEventListener('DOMContentLoaded', () => scheduleUpsert(0));
+  scheduleUpsert(0);
+  window.__auctionExternalChecklist = { loadChecklist, checkedCount, upsertCard, scheduleUpsert };
 })();
