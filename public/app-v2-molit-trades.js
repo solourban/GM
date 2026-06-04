@@ -39,6 +39,29 @@
     } catch (_) {}
   }
 
+  function loadCachedTradeResult(location) {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem(TRADE_STORAGE_KEY) || 'null');
+      if (!cached) return null;
+      if (cached.location?.caseKey && location?.caseKey && cached.location.caseKey !== location.caseKey) return null;
+      if (clean(cached.lawdCd) !== lawdCdFromLocation(location)) return null;
+      return {
+        lawdCd: cached.lawdCd,
+        dealYmd: cached.dealYmd,
+        aptName: cached.aptName,
+        attempts: Array.isArray(cached.attempts) ? cached.attempts : [],
+        data: {
+          count: Number(cached.count || 0),
+          rawCount: Number(cached.rawCount || 0),
+          tradeTypes: Array.isArray(cached.tradeTypes) ? cached.tradeTypes : [],
+          trades: Array.isArray(cached.trades) ? cached.trades : [],
+        },
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function lawdCdFromLocation(location) {
     const digits = clean(location?.bCode).replace(/[^0-9]/g, '');
     return digits.length >= 5 ? digits.slice(0, 5) : '';
@@ -380,7 +403,16 @@
       return;
     }
 
-    if (key === lastKey || key === pendingKey) return;
+    if (!existing) {
+      const cached = loadCachedTradeResult(location);
+      if (cached) {
+        insertAfterAnchor(renderSuccess(cached, location));
+        lastKey = key;
+        return;
+      }
+    }
+
+    if ((existing && key === lastKey) || key === pendingKey) return;
     pendingKey = key;
     insertAfterAnchor(renderLoading(location));
 
