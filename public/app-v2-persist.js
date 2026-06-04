@@ -3,6 +3,7 @@
   const SCHEMA_VERSION = 3;
   const MAX_SAVED_CASES = 40;
   const MAX_AGE_DAYS = 90;
+  const MAX_SPEC_REVIEW_ITEMS = 80;
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -18,6 +19,7 @@
       malso: { date: '', type: '근저당권', holder: '', amount: '' },
       tenants: [{ name: '', moveIn: '', fixed: '', deposit: '' }],
       specials: [],
+      specReview: { occupants: [], specialRights: [], takeoverNotes: [] },
     };
   }
 
@@ -64,6 +66,39 @@
     return caseIdentityFromState()?.key || '';
   }
 
+  function safeSpecReview(value) {
+    const src = value && typeof value === 'object' ? value : {};
+    return {
+      occupants: Array.isArray(src.occupants) ? src.occupants.map((item) => ({
+        tenantName: clean(item?.tenantName),
+        occupantName: clean(item?.occupantName),
+        moveIn: clean(item?.moveIn),
+        fixed: clean(item?.fixed),
+        claimDate: clean(item?.claimDate),
+        deposit: clean(item?.deposit),
+        rent: clean(item?.rent),
+        occupiedPart: clean(item?.occupiedPart),
+        sourceId: clean(item?.sourceId),
+        confirmedAt: clean(item?.confirmedAt),
+      })).filter((item) => Object.values(item).some(clean)).slice(-MAX_SPEC_REVIEW_ITEMS) : [],
+      specialRights: Array.isArray(src.specialRights) ? src.specialRights.map((item) => ({
+        typeCandidate: clean(item?.typeCandidate),
+        holder: clean(item?.holder),
+        date: clean(item?.date),
+        amount: clean(item?.amount),
+        phrase: clean(item?.phrase),
+        sourceId: clean(item?.sourceId),
+        confirmedAt: clean(item?.confirmedAt),
+      })).filter((item) => Object.values(item).some(clean)).slice(-MAX_SPEC_REVIEW_ITEMS) : [],
+      takeoverNotes: Array.isArray(src.takeoverNotes) ? src.takeoverNotes.map((item) => ({
+        kind: clean(item?.kind),
+        phrase: clean(item?.phrase),
+        sourceId: clean(item?.sourceId),
+        confirmedAt: clean(item?.confirmedAt),
+      })).filter((item) => Object.values(item).some(clean)).slice(-MAX_SPEC_REVIEW_ITEMS) : [],
+    };
+  }
+
   function safeManual(manual) {
     const src = manual || {};
     const tenants = Array.isArray(src?.tenants) && src.tenants.length
@@ -89,6 +124,7 @@
         date: clean(special?.date),
         amount: clean(special?.amount),
       })) : [],
+      specReview: safeSpecReview(src?.specReview),
     };
   }
 
@@ -97,7 +133,8 @@
     const malsoHas = [safe.malso.date, safe.malso.holder, safe.malso.amount].some(clean);
     const tenantHas = safe.tenants.some((tenant) => [tenant.name, tenant.moveIn, tenant.fixed, tenant.deposit].some(clean));
     const specialHas = safe.specials.some((special) => [special.holder, special.date, special.amount].some(clean));
-    return malsoHas || tenantHas || specialHas;
+    const specReviewHas = safe.specReview.occupants.length || safe.specReview.specialRights.length || safe.specReview.takeoverNotes.length;
+    return malsoHas || tenantHas || specialHas || specReviewHas;
   }
 
   function loadCaseState(key) {

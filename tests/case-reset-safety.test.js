@@ -24,6 +24,7 @@ const requiredSessionKeys = [
   'auction-note:v2:location-geocode',
   'auction-note:v2:molit-trades',
   'auction-note:v2:final-judgment',
+  'auction-note:v2:spec-extraction:',
 ];
 const preservedResetSessionKeys = [
   'auction-note:v2:location-geocode',
@@ -58,12 +59,14 @@ requireIncludes('const ANALYSIS_SESSION_KEYS = [', 'analysis-only session key li
 requireIncludes('const TRANSIENT_CARD_IDS = [', 'transient card id list');
 requireIncludes('const ANALYSIS_CARD_IDS = [', 'analysis-only card id list');
 requireIncludes("const BID_PLAN_STORAGE_PREFIX = 'auction-note:v2.2:bid-plan:'", 'bid plan storage prefix');
+requireIncludes("const SPEC_DRAFT_STORAGE_PREFIX = 'auction-note:v2:spec-extraction:'", 'spec draft storage prefix');
 requireIncludes('function currentCaseBidPlanKeys(identity)', 'current case bid plan key candidates');
 requireIncludes('function currentCaseKey(identity = currentCaseIdentity())', 'currentCaseKey function');
 requireIncludes('function identityFromSearchForm()', 'form-based identity function');
 requireIncludes('function resetCaseRuntimeState(s)', 'resetCaseRuntimeState function');
 requireIncludes('function clearTransientCaseData()', 'clearTransientCaseData function');
 requireIncludes('function clearAnalysisDerivedData()', 'clearAnalysisDerivedData function');
+requireIncludes('function removeCurrentSpecDraft(identity)', 'current spec draft cleanup function');
 requireIncludes('TRANSIENT_SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key))', 'transient session cleanup loop');
 requireIncludes('ANALYSIS_SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key))', 'analysis session cleanup loop');
 requireIncludes('TRANSIENT_CARD_IDS.forEach((id) => document.getElementById(id)?.remove())', 'transient card cleanup loop');
@@ -75,9 +78,12 @@ requireIncludes('if (previous && previous !== identity.key) clearTransientCaseDa
 requireIncludes('clearTransientCaseData();\n    syncActiveCaseSession(identity);', 'transient cleanup before applying saved case state');
 requireIncludes('function resetCurrentCaseState()', 'current case reset function');
 requireIncludes('removeCurrentCaseStorage(identity);', 'current case storage reset');
+requireIncludes('removeCurrentSpecDraft(identity);', 'current case spec draft reset');
 requireIncludes('resetCaseRuntimeState(s);', 'runtime state reset call');
 requireIncludes('resetCaseRuntimeState(s);\n    clearAnalysisDerivedData();', 'analysis-only reset cleanup');
 requireIncludes('localStorage.removeItem(key);', 'case storage removal');
+requireIncludes('sessionStorage.removeItem(`${SPEC_DRAFT_STORAGE_PREFIX}${caseKey}`)', 'current spec draft session removal');
+requireIncludes('window.__auctionSpecExtractor?.clearDraft?.(caseKey);', 'loaded spec extractor draft reset');
 requireIncludes('currentCaseBidPlanKeys(identity).forEach((bidKey) => localStorage.removeItem(bidKey))', 'bid plan storage removal');
 requireIncludes('event.preventDefault();\n    event.stopPropagation();\n    resetCurrentCaseState();', 'single reset click handling');
 requireIncludes('저장 후보·외부검증 메모·실거래가 결과는 유지합니다.', 'reset preservation copy');
