@@ -34,13 +34,15 @@
 
   function loadKakaoSdk() {
     if (window.kakao?.maps?.services) return Promise.resolve();
+    if (window.__kakaoMapsSdkLoader) return window.__kakaoMapsSdkLoader;
     if (sdkPromise) return sdkPromise;
     sdkPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = '/api/kakao/maps-sdk.js';
       script.async = true;
       script.onload = () => {
-        if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
+        if (window.__kakaoMapsSdkLoader) window.__kakaoMapsSdkLoader.then(resolve, reject);
+        else if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
         else reject(new Error('Kakao 지도 SDK 로드 실패'));
       };
       script.onerror = () => reject(new Error('Kakao 지도 SDK 로드 실패'));

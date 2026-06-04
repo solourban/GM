@@ -4,6 +4,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8');
 const INDEX = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
+const SERVICE_STATUS = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-service-status.js'), 'utf8');
 
 function fail(message) {
   console.error(`Renewal regression guard failed: ${message}`);
@@ -79,5 +80,7 @@ requireBefore(INDEX, '/app-v2-confidence.js', '/app-v2-final-copy-bridge.js', 'f
 
 requireIncludes(SERVER, 'Cache-Control', 'no-store cache control header');
 requireIncludes(SERVER, 'X-Request-Id', 'request id response header');
+requireIncludes(SERVICE_STATUS, "if (!config?.hasKakaoMap)", 'Kakao map missing-service checklist');
+requireIncludes(SERVICE_STATUS, 'JavaScript SDK 도메인', 'Kakao JavaScript SDK domain setup guidance');
 
 console.log('Renewal regression guard passed.');
