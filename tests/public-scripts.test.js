@@ -56,6 +56,8 @@ indexScripts
   .forEach((src) => assertIncludes(checkedScripts, src, 'package.json test:public'));
 
 assertOrder(indexScripts, '/app-v2-request-id-bridge.js', '/app-v2-core.js');
+assertOrder(indexScripts, '/app-v2-request-id-bridge.js', '/app-v2-spec-extractor-parser.js');
+assertOrder(indexScripts, '/app-v2-spec-extractor-parser.js', '/app-v2-core.js');
 assertOrder(indexScripts, '/app-v2-core.js', '/app-v2-service-status.js');
 assertOrder(indexScripts, '/app-v2-core.js', '/app-v2-case-reset.js');
 assertOrder(indexScripts, '/app-v2-location.js', '/app-v2-molit-trades.js');
