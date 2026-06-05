@@ -53,7 +53,28 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
   'v2StepSave',
   'v2WorkflowPrevBtn',
   'v2WorkflowNextBtn',
+  'const CARD_STEP_BY_ID',
+  'function classifyCards',
+  'function applyStepVisibility',
+  'dataset.workflowManaged',
+  'v2-workflow-card-hidden',
+  "syncShell({ immediate: true })",
+  'visibleCardIds',
   'window.__auctionWorkflowShell',
+].forEach((needle) => requireIncludes(workflow, needle, needle));
+
+[
+  "step2InputCard: 'input'",
+  "v2LocationCard: 'market'",
+  "v2MolitTradeCard: 'market'",
+  "analysisCard: 'risk'",
+  "v2EssentialDocumentsCard: 'risk'",
+  "v2PreBidChecklistCard: 'risk'",
+  "v2BidRangeCard: 'bid'",
+  "v2FundingReviewCard: 'bid'",
+  "v2FinalJudgmentCard: 'judgment'",
+  "v2CopySummaryCard: 'save'",
+  "v2FinalCopyCard: 'save'",
 ].forEach((needle) => requireIncludes(workflow, needle, needle));
 
 [

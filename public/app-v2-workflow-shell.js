@@ -16,8 +16,30 @@
     { id: 'save', label: '저장/복사', wrapperId: 'v2StepSave', anchors: ['v2CopySummaryCard', 'v2FinalCopyCard'] },
   ];
 
+  const CARD_STEP_BY_ID = {
+    v2DateSourceCard: 'basic',
+    step2InputCard: 'input',
+    v2LocationCard: 'market',
+    v2MolitTradeCard: 'market',
+    analysisCard: 'risk',
+    allocationExplainCard: 'risk',
+    v2RiskBriefCard: 'risk',
+    v2EssentialDocumentsCard: 'risk',
+    v2ExternalVerificationCard: 'risk',
+    v2PreBidChecklistCard: 'risk',
+    v2BiddingSummaryCard: 'bid',
+    v2BidRangeCard: 'bid',
+    v2FundingReviewCard: 'bid',
+    v2BidPlanCard: 'bid',
+    v2FinalJudgmentCard: 'judgment',
+    v2DecisionConfidenceCard: 'judgment',
+    v2CaseSyncStatusCard: 'judgment',
+    v2CopySummaryCard: 'save',
+    v2FinalCopyCard: 'save',
+  };
+
   let activeStep = 'basic';
-  let syncing = false;
+  let syncFrame = 0;
 
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -50,6 +72,61 @@
 
   function firstRealCard() {
     return Array.from(root()?.children || []).find((node) => node.id !== SHELL_ID && node.classList?.contains('v2-result-card')) || root();
+  }
+
+  function isResultCard(node) {
+    return Boolean(
+      node
+      && node.nodeType === 1
+      && node.id !== SHELL_ID
+      && (node.classList?.contains('v2-result-card') || node.classList?.contains('v2-card'))
+    );
+  }
+
+  function resultCards() {
+    return Array.from(root()?.children || []).filter(isResultCard);
+  }
+
+  function stepExists(stepId) {
+    return STEPS.some((step) => step.id === stepId);
+  }
+
+  function stepForCard(card) {
+    if (!card || card.id === SHELL_ID) return '';
+    const explicit = clean(card.dataset.workflowStep);
+    if (stepExists(explicit)) return explicit;
+    if (CARD_STEP_BY_ID[card.id]) return CARD_STEP_BY_ID[card.id];
+    if (!card.id) return 'basic';
+    return '';
+  }
+
+  function classifyCards() {
+    resultCards().forEach((card) => {
+      const step = stepForCard(card);
+      if (!step) {
+        delete card.dataset.workflowManaged;
+        return;
+      }
+      card.dataset.workflowManaged = '1';
+      card.dataset.workflowStep = step;
+    });
+  }
+
+  function applyStepVisibility() {
+    resultCards().forEach((card) => {
+      const step = stepForCard(card);
+      if (!step) {
+        card.hidden = false;
+        card.classList.remove('v2-workflow-card-hidden');
+        card.removeAttribute('aria-hidden');
+        return;
+      }
+      const isVisible = step === activeStep;
+      card.hidden = !isVisible;
+      card.classList.toggle('v2-workflow-card-hidden', !isVisible);
+      if (isVisible) card.removeAttribute('aria-hidden');
+      else card.setAttribute('aria-hidden', 'true');
+    });
   }
 
   function anchorFor(step) {
@@ -143,6 +220,7 @@
       .v2-workflow-tab.active { border-color:var(--primary); background:var(--primary); color:#fff; }
       .v2-workflow-tab[aria-disabled="true"] { opacity:.48; }
       .v2-workflow-body { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+      .v2-workflow-card-hidden { display:none !important; }
       .v2-workflow-controls { display:flex; justify-content:space-between; gap:10px; margin-top:12px; }
       .v2-workflow-controls button { min-width:118px; }
       @media (max-width: 760px) {
@@ -168,42 +246,58 @@
     });
   }
 
-  function syncShell() {
-    if (syncing) return;
-    syncing = true;
-    window.requestAnimationFrame(() => {
-      syncing = false;
-      const resultRoot = root();
-      if (!resultRoot) return;
-      if (!hasCase()) {
-        shell()?.remove();
-        return;
-      }
+  function applyShell() {
+    syncFrame = 0;
+    const resultRoot = root();
+    if (!resultRoot) return;
+    if (!hasCase()) {
+      shell()?.remove();
+      resultCards().forEach((card) => {
+        card.hidden = false;
+        card.classList.remove('v2-workflow-card-hidden');
+        card.removeAttribute('aria-hidden');
+      });
+      return;
+    }
 
-      injectStyles();
-      let card = shell();
-      if (!card) {
-        card = document.createElement('section');
-        card.id = SHELL_ID;
-        card.className = 'v2-result-card v2-workflow-shell';
-        resultRoot.insertBefore(card, resultRoot.firstChild || null);
-      } else if (card.parentNode !== resultRoot) {
-        resultRoot.insertBefore(card, resultRoot.firstChild || null);
-      } else if (card !== resultRoot.firstElementChild) {
-        resultRoot.insertBefore(card, resultRoot.firstChild || null);
-      }
+    injectStyles();
+    let card = shell();
+    if (!card) {
+      card = document.createElement('section');
+      card.id = SHELL_ID;
+      card.className = 'v2-result-card v2-workflow-shell';
+      resultRoot.insertBefore(card, resultRoot.firstChild || null);
+    } else if (card.parentNode !== resultRoot) {
+      resultRoot.insertBefore(card, resultRoot.firstChild || null);
+    } else if (card !== resultRoot.firstElementChild) {
+      resultRoot.insertBefore(card, resultRoot.firstChild || null);
+    }
 
-      if (!stepById(activeStep) || !anchorFor(stepById(activeStep))) activeStep = 'basic';
-      card.innerHTML = renderShell();
-      bindShell(card);
-    });
+    classifyCards();
+    if (!stepById(activeStep) || !anchorFor(stepById(activeStep))) activeStep = 'basic';
+    card.innerHTML = renderShell();
+    bindShell(card);
+    applyStepVisibility();
+  }
+
+  function syncShell(options = {}) {
+    if (options.immediate) {
+      if (syncFrame) {
+        window.cancelAnimationFrame(syncFrame);
+        syncFrame = 0;
+      }
+      applyShell();
+      return;
+    }
+    if (syncFrame) return;
+    syncFrame = window.requestAnimationFrame(applyShell);
   }
 
   function moveTo(stepId) {
     const step = stepById(stepId);
-    const target = anchorFor(step);
     activeStep = step.id;
-    syncShell();
+    syncShell({ immediate: true });
+    const target = anchorFor(step);
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -225,5 +319,12 @@
     syncShell();
   });
   document.addEventListener('auction:result-card-change', syncShell);
-  window.__auctionWorkflowShell = { STEPS: [...STEPS], sync: syncShell, moveTo };
+  window.__auctionWorkflowShell = {
+    STEPS: [...STEPS],
+    CARD_STEP_BY_ID: { ...CARD_STEP_BY_ID },
+    sync: syncShell,
+    moveTo,
+    activeStep: () => activeStep,
+    visibleCardIds: () => resultCards().filter((card) => !card.hidden).map((card) => card.id || '(basic)'),
+  };
 })();
