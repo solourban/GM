@@ -25,23 +25,34 @@
     return v.replace(/지방법원/g, '').replace(/법원/g, '').trim();
   }
 
+  function optionHtml(selected) {
+    const normalizedSelected = normalize(selected);
+    return COURTS.map(([value, label]) => {
+      const active = normalize(value) === normalizedSelected || normalize(label) === normalizedSelected;
+      return `<option value="${value}" ${active ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+  }
+
+  function shouldRefreshOptions(select) {
+    const values = Array.from(select.options || []).map((option) => clean(option.value || option.textContent));
+    return COURTS.some(([value]) => !values.includes(value));
+  }
+
   function replaceCourtInput() {
     const current = document.getElementById('dateCourtV2');
-    if (!current || current.tagName === 'SELECT') return;
+    if (!current) return;
 
     const selected = normalize(current.value);
+    if (current.tagName === 'SELECT') {
+      if (shouldRefreshOptions(current)) current.innerHTML = optionHtml(selected);
+      return;
+    }
+
     const select = document.createElement('select');
     select.id = 'dateCourtV2';
     select.className = current.className;
     select.setAttribute('aria-label', '법원');
-
-    COURTS.forEach(([value, label]) => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      if (normalize(value) === selected || normalize(label) === selected) option.selected = true;
-      select.appendChild(option);
-    });
+    select.innerHTML = optionHtml(selected);
 
     current.replaceWith(select);
     select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -59,4 +70,11 @@
     replaceCourtInput();
     improveEmptyMessage();
   }, 400);
+
+  window.__auctionDateCourts = {
+    COURTS: COURTS.map(([value, label]) => [value, label]),
+    normalize,
+    optionHtml,
+    refresh: replaceCourtInput,
+  };
 })();

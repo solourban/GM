@@ -2,6 +2,7 @@
   const ORDER = [
     'analysisCard',
     'v2RiskBriefCard',
+    'v2EssentialDocumentsCard',
     'v2BiddingSummaryCard',
     'v2FinalJudgmentCard',
     'v2ExternalVerificationCard',
