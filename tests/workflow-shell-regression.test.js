@@ -8,6 +8,7 @@ const index = read('public/index.html');
 const pkg = read('package.json');
 const workflow = read('public/app-v2-workflow-shell.js');
 const essentialDocs = read('public/app-v2-essential-documents.js');
+const riskBrief = read('public/app-v2-risk-brief.js');
 const date = read('public/app-v2-date.js');
 const dateCourts = read('public/app-v2-date-courts.js');
 const resultOrder = read('public/app-v2-result-order.js');
@@ -110,6 +111,16 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
   "v2CopySummaryCard: 'save'",
   "v2FinalCopyCard: 'save'",
 ].forEach((needle) => requireIncludes(workflow, needle, needle));
+
+[
+  "const CARD_ID = 'v2RiskBriefCard'",
+  'function signature',
+  'function renderRiskBriefHtml',
+  'function notifyResultChange',
+  "card.className = 'v2-result-card v2-risk-brief-card'",
+  "card.dataset.workflowStep = 'risk'",
+  'card.dataset.signature !== nextSignature',
+].forEach((needle) => requireIncludes(riskBrief, needle, needle));
 
 [
   'v2EssentialDocumentsCard',

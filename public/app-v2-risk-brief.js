@@ -1,4 +1,6 @@
 (() => {
+  const CARD_ID = 'v2RiskBriefCard';
+  const CHANGE_EVENT = 'auction:result-card-change';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -77,27 +79,19 @@
     return '원본 서류 최종 확인 후 가격 검토 가능';
   }
 
-  function upsertRiskBrief() {
-    const report = state()?.report;
-    const summary = document.getElementById('v2BiddingSummaryCard');
-    if (!report || !summary) {
-      document.getElementById('v2RiskBriefCard')?.remove();
-      return;
-    }
+  function signature(report, reasons) {
+    return [
+      report?.risk?.level || 'ok',
+      actionLevel(report),
+      ...reasons,
+    ].map(clean).join('|');
+  }
 
-    let card = document.getElementById('v2RiskBriefCard');
-    if (!card) {
-      card = document.createElement('section');
-      card.id = 'v2RiskBriefCard';
-      card.className = 'v2-card';
-      summary.parentNode.insertBefore(card, summary.nextSibling);
-    }
-
-    const reasons = riskReasons(report);
-    card.innerHTML = `
+  function renderRiskBriefHtml(report, reasons) {
+    return `
       <span class="v2-badge">판단 근거</span>
       <h3>위험 판단 근거</h3>
-      <p class="v2-note">권리분석 결과에서 위험도에 영향을 준 항목만 추려 정리했습니다.</p>
+      <p class="v2-note">권리분석 결과에서 입찰 전 확인해야 할 리스크만 추렸습니다.</p>
       <div class="v2-grid one">
         <div class="v2-info-box"><span>현재 권장 조치</span><strong>${actionLevel(report)}</strong></div>
       </div>
@@ -105,6 +99,39 @@
         ${reasons.map((reason) => `<li>${reason}</li>`).join('')}
       </ul>
     `;
+  }
+
+  function notifyResultChange() {
+    document.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { id: CARD_ID } }));
+    window.__auctionResultOrder?.schedule?.(CARD_ID);
+  }
+
+  function upsertRiskBrief() {
+    const report = state()?.report;
+    const summary = document.getElementById('v2BiddingSummaryCard');
+    if (!report || !summary) {
+      document.getElementById(CARD_ID)?.remove();
+      return;
+    }
+
+    let card = document.getElementById(CARD_ID);
+    if (!card) {
+      card = document.createElement('section');
+      card.id = CARD_ID;
+      card.className = 'v2-result-card v2-risk-brief-card';
+      card.dataset.workflowStep = 'risk';
+      summary.parentNode.insertBefore(card, summary.nextSibling);
+    }
+
+    const reasons = riskReasons(report);
+    const nextSignature = signature(report, reasons);
+    card.className = 'v2-result-card v2-risk-brief-card';
+    card.dataset.workflowStep = 'risk';
+    if (card.dataset.signature !== nextSignature) {
+      card.innerHTML = renderRiskBriefHtml(report, reasons);
+      card.dataset.signature = nextSignature;
+      notifyResultChange();
+    }
   }
 
   setInterval(upsertRiskBrief, 500);
