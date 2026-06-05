@@ -5,6 +5,7 @@
   const BODY_ID = 'v2WorkflowBody';
   const PREV_ID = 'v2WorkflowPrevBtn';
   const NEXT_ID = 'v2WorkflowNextBtn';
+  const EMPTY_ID = 'v2WorkflowEmptyState';
   const HIDDEN_CLASS = 'v2-workflow-card-hidden';
 
   const STEPS = [
@@ -66,6 +67,10 @@
     return document.getElementById(SHELL_ID);
   }
 
+  function emptyState() {
+    return document.getElementById(EMPTY_ID);
+  }
+
   function hasCase() {
     const state = appState();
     return Boolean(state?.raw || document.getElementById('step2InputCard') || document.getElementById('analysisCard'));
@@ -80,6 +85,7 @@
       node
       && node.nodeType === 1
       && node.id !== SHELL_ID
+      && node.id !== EMPTY_ID
       && (node.classList?.contains('v2-result-card') || node.classList?.contains('v2-card'))
     );
   }
@@ -136,6 +142,26 @@
     });
   }
 
+  function syncEmptyState() {
+    const card = shell();
+    const existing = emptyState();
+    const step = stepById(activeStep);
+    if (!card || !hasCase() || activeStep === 'basic' || activeCards().length) {
+      existing?.remove();
+      return;
+    }
+
+    const placeholder = existing || document.createElement('section');
+    placeholder.id = EMPTY_ID;
+    placeholder.className = 'v2-result-card v2-workflow-empty-state';
+    placeholder.dataset.workflowEmptyState = activeStep;
+    placeholder.innerHTML = renderEmptyState(step);
+
+    if (!existing || placeholder.previousElementSibling !== card) {
+      card.insertAdjacentElement('afterend', placeholder);
+    }
+  }
+
   function addedCards(records) {
     const cards = [];
     Array.from(records || []).forEach((record) => {
@@ -170,6 +196,52 @@
     return Math.max(0, STEPS.findIndex((step) => step.id === id));
   }
 
+  function activeCards() {
+    return resultCards().filter((card) => stepForCard(card) === activeStep);
+  }
+
+  function emptyCopy(step) {
+    const copy = {
+      input: {
+        title: '내역 입력을 시작할 준비가 필요합니다',
+        note: '기본정보 카드에서 다음 단계 버튼을 눌러 명세서·권리 입력 카드를 열어 주세요.',
+      },
+      market: {
+        title: '시세·입지 참고정보를 기다리는 중입니다',
+        note: '주소 좌표와 실거래가 참고지표는 기본정보 조회 후 자동으로 표시됩니다. 주소가 없거나 연동 설정이 없으면 이 단계가 비어 있을 수 있습니다.',
+      },
+      risk: {
+        title: '리스크 검토 카드가 아직 없습니다',
+        note: '내역입력 단계에서 권리분석을 실행하면 권리분석, 필수 문서 확인, 외부검증 카드가 이 단계에 표시됩니다.',
+      },
+      bid: {
+        title: '입찰가 검토 카드가 아직 없습니다',
+        note: '권리분석 결과가 준비되면 검토 범위, 필요자금, 입찰 계획 카드가 이 단계에 표시됩니다.',
+      },
+      judgment: {
+        title: '최종판단 카드가 아직 없습니다',
+        note: '시세·입지와 리스크 검토가 준비되면 최종 판단과 신뢰도 카드가 이 단계에 표시됩니다.',
+      },
+      save: {
+        title: '저장·복사할 요약이 아직 없습니다',
+        note: '최종판단과 복사용 판단 메모가 준비되면 이 단계에서 확인할 수 있습니다.',
+      },
+    };
+    return copy[step.id] || {
+      title: `${step.label} 단계에 표시할 카드가 아직 없습니다`,
+      note: '앞 단계의 조회나 분석이 끝나면 이 단계에 관련 카드가 표시됩니다.',
+    };
+  }
+
+  function renderEmptyState(step) {
+    const copy = emptyCopy(step);
+    return `
+      <span class="v2-badge">대기 중</span>
+      <h3>${esc(copy.title)}</h3>
+      <p class="v2-note">${esc(copy.note)}</p>
+    `;
+  }
+
   function valueFromBasic(keys) {
     const basic = appState()?.raw?.basic || {};
     for (const key of keys) {
@@ -194,7 +266,7 @@
     return `
       <div id="${TABS_ID}" class="v2-workflow-tabs" role="tablist" aria-label="검토 단계">
         ${STEPS.map((step) => {
-          const available = Boolean(anchorFor(step));
+          const available = hasCase() || Boolean(anchorFor(step));
           const active = step.id === activeStep;
           return `<button type="button" role="tab" class="v2-workflow-tab${active ? ' active' : ''}" data-workflow-step="${esc(step.id)}" aria-selected="${active ? 'true' : 'false'}" ${available ? '' : 'aria-disabled="true"'}>${esc(step.label)}</button>`;
         }).join('')}
@@ -245,6 +317,7 @@
       .v2-workflow-tab[aria-disabled="true"] { opacity:.48; }
       .v2-workflow-body { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
       .${HIDDEN_CLASS} { display:none !important; }
+      .v2-workflow-empty-state { margin-top:-4px; border-style:dashed; background:var(--surface); }
       .v2-workflow-controls { display:flex; justify-content:space-between; gap:10px; margin-top:12px; }
       .v2-workflow-controls button { min-width:118px; }
       @media (max-width: 760px) {
@@ -276,6 +349,7 @@
     if (!resultRoot) return;
     if (!hasCase()) {
       shell()?.remove();
+      emptyState()?.remove();
       resultCards().forEach((card) => {
         card.hidden = false;
         card.classList.remove(HIDDEN_CLASS);
@@ -298,10 +372,11 @@
     }
 
     classifyCards();
-    if (!stepById(activeStep) || !anchorFor(stepById(activeStep))) activeStep = 'basic';
+    if (!stepById(activeStep)) activeStep = 'basic';
     card.innerHTML = renderShell();
     bindShell(card);
     applyStepVisibility();
+    syncEmptyState();
   }
 
   function syncShell(options = {}) {
@@ -321,7 +396,7 @@
     const step = stepById(stepId);
     activeStep = step.id;
     syncShell({ immediate: true });
-    const target = anchorFor(step);
+    const target = anchorFor(step) || emptyState() || shell();
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -352,6 +427,7 @@
     sync: syncShell,
     moveTo,
     activeStep: () => activeStep,
+    emptyStateId: EMPTY_ID,
     visibleCardIds: () => resultCards().filter((card) => !card.hidden).map((card) => card.id || '(basic)'),
   };
 })();

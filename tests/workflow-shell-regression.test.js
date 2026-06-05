@@ -44,6 +44,7 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
   'v2CaseSummaryBar',
   'v2WorkflowTabs',
   'v2WorkflowBody',
+  'v2WorkflowEmptyState',
   'v2StepBasic',
   'v2StepInput',
   'v2StepMarket',
@@ -61,12 +62,26 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
   'function applyStepVisibility',
   'function addedCards',
   'function primeAddedCards',
+  'function activeCards',
+  'function emptyCopy',
+  'function renderEmptyState',
+  'function syncEmptyState',
+  'dataset.workflowEmptyState',
   'dataset.workflowManaged',
   "${HIDDEN_CLASS} { display:none !important; }",
   'primeAddedCards(records)',
   "syncShell({ immediate: true })",
   'visibleCardIds',
+  'emptyStateId',
   'window.__auctionWorkflowShell',
+].forEach((needle) => requireIncludes(workflow, needle, needle));
+
+[
+  '시세·입지 참고정보를 기다리는 중입니다',
+  '리스크 검토 카드가 아직 없습니다',
+  '입찰가 검토 카드가 아직 없습니다',
+  '최종판단 카드가 아직 없습니다',
+  '저장·복사할 요약이 아직 없습니다',
 ].forEach((needle) => requireIncludes(workflow, needle, needle));
 
 [
