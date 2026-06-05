@@ -72,6 +72,8 @@ const requiredScripts = [
   '/app-v2-final-judgment.js',
   '/app-v2-confidence.js',
   '/app-v2-final-copy-bridge.js',
+  '/app-v2-workflow-shell.js',
+  '/app-v2-essential-documents.js',
   '/app-v2-result-order.js',
 ];
 
@@ -92,6 +94,9 @@ requireBefore(INDEX, '/app-v2-location.js', '/app-v2-molit-trades.js', 'MOLIT mu
 requireBefore(INDEX, '/app-v2-molit-trades.js', '/app-v2-final-judgment.js', 'final judgment must load after MOLIT');
 requireBefore(INDEX, '/app-v2-final-judgment.js', '/app-v2-confidence.js', 'confidence must load after final judgment');
 requireBefore(INDEX, '/app-v2-confidence.js', '/app-v2-final-copy-bridge.js', 'final copy bridge must load after confidence');
+requireBefore(INDEX, '/app-v2-date-courts.js', '/app-v2-workflow-shell.js', 'workflow shell must load after date court helpers');
+requireBefore(INDEX, '/app-v2-workflow-shell.js', '/app-v2-essential-documents.js', 'essential document card must load after workflow shell');
+requireBefore(INDEX, '/app-v2-essential-documents.js', '/app-v2-result-order.js', 'result order must load after essential document card');
 requireBefore(INDEX, '/app-v2-map-provider-guard.js', '/app-v2-result-order.js', 'result order must load after result feature scripts');
 
 requireIncludes(SERVER, 'Cache-Control', 'no-store cache control header');

@@ -12,6 +12,7 @@ const bidPlan = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-bid-plan.js'),
 const expectedOrder = [
   'analysisCard',
   'v2RiskBriefCard',
+  'v2EssentialDocumentsCard',
   'v2BiddingSummaryCard',
   'v2FinalJudgmentCard',
   'v2ExternalVerificationCard',
