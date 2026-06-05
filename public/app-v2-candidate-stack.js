@@ -28,6 +28,10 @@
     return window.__auctionV2?.state?.activeTab || document.querySelector('.v2-tab.active')?.dataset?.tab || 'search';
   }
 
+  function resultRoot() {
+    return window.__auctionV2?.tabResultsRoot?.() || document.getElementById('v2TabResultsSection');
+  }
+
   function stackKey(caseNo) {
     return compact(caseNo || 'unknown');
   }
@@ -204,22 +208,6 @@
     return loadSavedCandidates().some((item) => stackKey(item.caseNo) === key);
   }
 
-  function panelByTab(tab) {
-    const exact = document.querySelector(`.v2-panel[data-panel="${tab}"]`);
-    if (exact) return exact;
-    return Array.from(document.querySelectorAll('.v2-panel')).find((panel) => {
-      if (tab === 'date') return panel.textContent.includes('매각기일 추천');
-      if (tab === 'saved') return panel.textContent.includes('저장 후보');
-      return false;
-    }) || null;
-  }
-
-  function findDateAnchor() {
-    const panel = panelByTab('date');
-    if (!panel) return null;
-    return panel.querySelector('#v2DateSourceCard') || panel.querySelector('.v2-card') || panel;
-  }
-
   function parseCaseNo(value) {
     const text = clean(value);
     const match = text.match(/(\d{4})\s*타경\s*(\d+)/);
@@ -254,7 +242,7 @@
     const top = topCandidates(items, 3);
 
     return `
-      <div class="v2-card" id="v2CandidateRankingCard">
+      <section class="v2-result-card" id="v2CandidateRankingCard">
         <span class="v2-badge">임시 후보 랭킹</span>
         <h3>우선 검토 후보 요약</h3>
         <p class="v2-note">현재 임시 비교 목록 기준의 단순 랭킹입니다. 실제 입찰 판단은 권리분석과 원본 서류 확인 후 결정해야 합니다.</p>
@@ -268,7 +256,7 @@
         <ol class="v2-list">
           ${top.map(({ item, score, decision }) => `<li>${esc(item.caseNo || '-')} · 점수 ${score} · ${esc(decision)}</li>`).join('')}
         </ol>
-      </div>
+      </section>
     `;
   }
 
@@ -315,7 +303,7 @@
     const items = loadStack();
     const savedCount = loadSavedCandidates().length;
     return `
-      <section class="v2-card" id="v2CandidateStackCard">
+      <section class="v2-result-card" id="v2CandidateStackCard">
         <div class="v2-result-head">
           <div>
             <span class="v2-badge">임시 비교 목록</span>
@@ -349,16 +337,16 @@
       return;
     }
 
-    const anchor = findDateAnchor();
-    if (!anchor) return;
+    const root = resultRoot();
+    if (!root) return;
 
-    const existing = document.getElementById('v2CandidateStackCard');
+    const existing = root.querySelector('#v2CandidateStackCard');
     document.getElementById('v2CandidateRankingCard')?.remove();
     document.getElementById('v2SavedCandidateCard')?.remove();
     document.getElementById('v2SavedTopFiveCard')?.remove();
 
     if (!existing) {
-      anchor.insertAdjacentHTML('afterend', renderCard());
+      root.insertAdjacentHTML('beforeend', renderCard());
     } else {
       existing.outerHTML = renderCard();
     }

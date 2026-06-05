@@ -69,6 +69,9 @@
       .v2-form-message.info { background:var(--accent-soft); color:var(--accent); }
       .v2-form-message.warn { background:#fff7e6; color:#9a6700; border:1px solid #fedf89; }
       .v2-form-message.error { background:#fff1f0; color:#b42318; border:1px solid #fecdca; }
+      .v2-tab-results-section { display:none; padding-top:32px; scroll-margin-top:100px; }
+      .v2-tab-results-section.active { display:block; }
+      .v2-tab-results-section:empty { display:none; }
       .results-section { display:block !important; padding-top:32px; scroll-margin-top:100px; }
       .v2-result-card { border-radius:18px; margin-bottom:16px; box-shadow:0 12px 28px rgba(0,0,0,.05); }
       .v2-result-card.step2, .v2-result-card.analysis { border-left:4px solid var(--accent); }
@@ -154,13 +157,41 @@
           <p class="v2-note">Step 1 — 조회 결과는 아래 결과 영역에 고정 표시됩니다.</p>
         </div>
       </section>
-      <section class="v2-panel ${state.activeTab === 'bulk' ? 'active' : ''}"><div class="v2-card"><h3>여러 사건 일괄조회</h3><p>기본 조회 안정화 이후 연결합니다.</p></div></section>
-      <section class="v2-panel ${state.activeTab === 'date' ? 'active' : ''}"><div class="v2-card"><h3>매각기일 추천</h3><p>대법원 목록 API 검증 후 다시 연결합니다.</p></div></section>
-      <section class="v2-panel ${state.activeTab === 'saved' ? 'active' : ''}"><div class="v2-card"><h3>저장 후보 TOP 5</h3><p>저장 구조 안정화 이후 연결합니다.</p></div></section>
+      <section class="v2-panel ${state.activeTab === 'bulk' ? 'active' : ''}" data-panel="bulk"><div class="v2-card"><h3>여러 사건 일괄조회</h3><p>기본 조회 안정화 이후 연결합니다.</p></div></section>
+      <section class="v2-panel ${state.activeTab === 'date' ? 'active' : ''}" data-panel="date"><div class="v2-card"><h3>매각기일 추천</h3><p>대법원 목록 API 검증 후 다시 연결합니다.</p></div></section>
+      <section class="v2-panel ${state.activeTab === 'saved' ? 'active' : ''}" data-panel="saved"><div class="v2-card"><h3>저장 후보 TOP 5</h3><p>저장 구조 안정화 이후 연결합니다.</p></div></section>
     `;
     bindHomeControls();
     loadCourts();
     renderFormMessage();
+    syncTabResultsVisibility();
+  }
+
+  function ensureTabResultsSection() {
+    let section = $('v2TabResultsSection');
+    if (section) return section;
+    section = document.createElement('section');
+    section.id = 'v2TabResultsSection';
+    section.className = 'container v2-tab-results-section';
+    section.setAttribute('aria-live', 'polite');
+    const hero = document.querySelector('.hero');
+    const results = $('resultsSection');
+    if (hero) hero.insertAdjacentElement('afterend', section);
+    else if (results?.parentNode) results.parentNode.insertBefore(section, results);
+    else document.body.appendChild(section);
+    return section;
+  }
+
+  function syncTabResultsVisibility() {
+    const section = ensureTabResultsSection();
+    if (!section) return null;
+    const previousTab = section.dataset.activeTab || '';
+    const activeTab = state.activeTab || 'search';
+    const show = activeTab !== 'search';
+    if (!show || (previousTab && previousTab !== activeTab)) section.innerHTML = '';
+    section.dataset.activeTab = activeTab;
+    section.classList.toggle('active', show);
+    return section;
   }
 
   async function loadCourts() {
@@ -502,6 +533,7 @@
         state.activeTab = tab.dataset.tab;
         ensureHeaderTabs();
         ensureHomePanels();
+        syncTabResultsVisibility();
       }
     });
     document.querySelector('.brand')?.addEventListener('click', (event) => {
@@ -509,6 +541,7 @@
       state.activeTab = 'search';
       ensureHeaderTabs();
       ensureHomePanels();
+      syncTabResultsVisibility();
       window.scrollTo({ top:0, behavior:'smooth' });
     });
   }
@@ -519,7 +552,7 @@
     ensureHomePanels();
     bindGlobal();
     renderResults();
-    window.__auctionV2 = { state, renderResults };
+    window.__auctionV2 = { state, renderResults, tabResultsRoot: ensureTabResultsSection, syncTabResultsVisibility };
   }
 
   document.addEventListener('DOMContentLoaded', boot);

@@ -142,9 +142,25 @@
     return window.__auctionV2?.state?.activeTab || '';
   }
 
+  function resultRoot() {
+    return window.__auctionV2?.tabResultsRoot?.() || document.getElementById('v2TabResultsSection');
+  }
+
+  function renderControls(items) {
+    return `
+      <div class="v2-card" id="v2SavedTabControlsCard">
+        <span class="v2-badge">저장 후보</span>
+        <h3>저장 후보 TOP 5</h3>
+        <p class="v2-note">저장한 입찰 검토 후보를 물건종류별로 좁혀 확인합니다.</p>
+        ${items.length ? propertyTypes()?.render(items, selectedPropertyType, 'data-saved-property-type') || '' : ''}
+        <p class="v2-note">저장 후보는 현재 브라우저에 보관됩니다.</p>
+      </div>
+    `;
+  }
+
   function renderEmpty() {
     return `
-      <div class="v2-card" id="v2SavedTabRuntimeCard">
+      <section class="v2-result-card" id="v2SavedTabRuntimeCard">
         <span class="v2-badge">검토 우선순위</span>
         <h3>저장 후보 검토 우선순위 TOP 5</h3>
         <p class="v2-note">아직 저장된 후보가 없습니다. 매각기일 추천 또는 임시 비교 목록에서 입찰 검토 후보를 저장하면 이 탭에서 다음 확인 순서를 볼 수 있습니다.</p>
@@ -153,7 +169,7 @@
           <div class="v2-info"><div class="k">보관 방식</div><div class="v">브라우저 localStorage</div></div>
           <div class="v2-info"><div class="k">판단 기준</div><div class="v">참고지표</div></div>
         </div>
-      </div>
+      </section>
     `;
   }
 
@@ -164,7 +180,7 @@
     const rightsCount = filteredItems.filter(hasRightsCheck).length;
     const priceCount = filteredItems.filter(hasPriceCheck).length;
     return `
-      <div class="v2-card" id="v2SavedTabRuntimeCard">
+      <section class="v2-result-card" id="v2SavedTabRuntimeCard">
         <span class="v2-badge">검토 우선순위</span>
         <h3>저장 후보 검토 우선순위 TOP 5</h3>
         <p class="v2-note">저장 후보를 감정가 대비 최저가 비율, 유찰횟수, 용도, 매각기일, 메모, 권리분석, 시세 확인 여부를 참고지표로 정렬합니다.</p>
@@ -174,7 +190,6 @@
           <div class="v2-info"><div class="k">권리분석 확인</div><div class="v">${rightsCount}건</div></div>
           <div class="v2-info"><div class="k">시세 확인</div><div class="v">${priceCount}건</div></div>
         </div>
-        ${propertyTypes()?.render(items, selectedPropertyType, 'data-saved-property-type') || ''}
         ${top.length ? '' : '<p class="v2-note">선택한 물건종류에 해당하는 저장 후보가 없습니다.</p>'}
         <div class="v2-detail-table-wrap">
           <table class="v2-detail-table">
@@ -204,7 +219,7 @@
           </table>
         </div>
         <p class="v2-note">기초 정보 기준 검토 우선순위입니다. 입찰 적합 여부는 권리분석·시세·점유·자금 검토 후 판단해야 합니다.</p>
-      </div>
+      </section>
     `;
   }
 
@@ -212,12 +227,20 @@
     if (activeTab() !== 'saved') return;
     const panel = findSavedPanel();
     if (!panel) return;
+    const root = resultRoot();
+    if (!root) return;
     const items = loadSavedCandidates();
-    const html = items.length ? renderSaved(items) : renderEmpty();
     const signature = `${selectedPropertyType}:${items.length}:${items.map((item) => `${compact(item.caseNo)}:${candidateScore(item)}:${clean(loadMemo(item)).length}`).join('|')}`;
-    if (panel.dataset.savedTabSignature === signature && panel.querySelector('#v2SavedTabRuntimeCard')) return;
+    if (
+      panel.dataset.savedTabSignature === signature
+      && root.dataset.savedTabSignature === signature
+      && panel.querySelector('#v2SavedTabControlsCard')
+      && root.querySelector('#v2SavedTabRuntimeCard')
+    ) return;
     panel.dataset.savedTabSignature = signature;
-    panel.innerHTML = html;
+    root.dataset.savedTabSignature = signature;
+    panel.innerHTML = renderControls(items);
+    root.innerHTML = items.length ? renderSaved(items) : renderEmpty();
   }
 
   function removeSaved(caseNo) {
