@@ -13,6 +13,12 @@ const required = [
   [script, 'data-external-count', 'live count marker'],
   [script, 'data-external-status', 'live status marker'],
   [script, 'updateCardStatus', 'status-only update function'],
+  [script, 'function renderChecklistRows', 'compact row renderer'],
+  [script, 'v2-external-row', 'external row class'],
+  [script, 'data-external-item', 'external row marker'],
+  [script, "document.getElementById('v2EssentialDocumentsCard')", 'risk-step anchor after essential documents'],
+  [script, "card.className = 'v2-result-card v2-external-checklist-card'", 'result-card class'],
+  [script, "card.dataset.workflowStep = 'risk'", 'risk workflow step marker'],
   [script, 'removeFinalJudgmentStatus', 'final judgment detach cleanup'],
   [script, 'card.dataset.caseKey !== caseKey(currentReport)', 'case change rerender guard'],
   [script, 'if (!target) return;', 'temporary anchor absence preservation'],
@@ -33,6 +39,7 @@ const forbidden = [
   [script, '!currentReport || !target', 'temporary anchor removal branch'],
   [script, 'injectFinalJudgmentStatus', 'final judgment card injection'],
   [script, 'v2ExternalVerificationFinalStatus\');\n      box.className', 'final judgment injected info box'],
+  [script, 'v2-detail-table-wrap', 'dense table checklist layout'],
 ];
 
 const missing = required.filter(([source, needle]) => !source.includes(needle)).map(([, , label]) => label);

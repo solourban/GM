@@ -1,5 +1,6 @@
 (() => {
   const CARD_ID = 'v2ExternalVerificationCard';
+  const STYLE_ID = 'v2ExternalVerificationStyles';
   const STORAGE_PREFIX = 'auction-note:v2:external-verification:';
   const CHANGE_EVENT = 'auction:result-card-change';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -59,10 +60,13 @@
   }
 
   function anchor() {
-    return document.getElementById('v2FinalJudgmentCard')
+    return document.getElementById('v2EssentialDocumentsCard')
+      || document.getElementById('v2RiskBriefCard')
+      || document.getElementById('analysisCard')
+      || document.getElementById('v2BiddingSummaryCard')
+      || document.getElementById('v2FinalJudgmentCard')
       || document.getElementById('v2MolitTradeCard')
       || document.getElementById('v2LocationCard')
-      || document.getElementById('v2BiddingSummaryCard')
       || null;
   }
 
@@ -70,33 +74,56 @@
     return `${caseKey(currentReport)}:${ITEMS.map((item) => `${item.id}:${payload.checks?.[item.id] ? 1 : 0}:${clean(payload.memos?.[item.id]).length}`).join('|')}`;
   }
 
+  function injectStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      .v2-external-checklist-card .v2-note { max-width:760px; }
+      .v2-external-list { display:grid; gap:10px; margin-top:14px; }
+      .v2-external-row { display:grid; grid-template-columns:minmax(150px,.75fr) minmax(0,1.3fr) minmax(190px,.9fr); gap:12px; align-items:center; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--bg); }
+      .v2-external-check { display:flex; align-items:center; gap:8px; font-weight:900; }
+      .v2-external-check input { width:18px; height:18px; accent-color:var(--accent); }
+      .v2-external-row strong, .v2-external-row span { display:block; }
+      .v2-external-row span { margin-top:4px; color:var(--ink-3); font-size:12px; line-height:1.45; }
+      .v2-external-row p { margin:0; color:var(--ink-2); font-size:13px; line-height:1.55; }
+      .v2-external-row .v2-input { width:100%; }
+      @media (max-width: 780px) {
+        .v2-external-row { grid-template-columns:1fr; align-items:start; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function renderChecklistRows(data) {
+    return `
+      <div class="v2-external-list">
+        ${ITEMS.map((item) => `
+          <div class="v2-external-row" data-external-item="${esc(item.id)}">
+            <label class="v2-external-check">
+              <input type="checkbox" data-external-check="${esc(item.id)}" ${data.checks?.[item.id] ? 'checked' : ''} aria-label="${esc(item.title)} 확인">
+              <span>${esc(item.title)}</span>
+            </label>
+            <p>${esc(item.guide)}<span>${esc(item.source)}</span></p>
+            <input class="v2-input" type="text" data-external-memo="${esc(item.id)}" value="${esc(data.memos?.[item.id] || '')}" placeholder="확인 결과 메모">
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderCardHtml(data = loadChecklist()) {
     const count = checkedCount(data);
     const tone = statusTone(count);
     return `
       <span class="v2-badge">외부 검증</span>
-      <h3>입찰 전 5대 외부 검증 체크리스트</h3>
-      <p class="v2-note">권리분석 이후 실제 입찰가를 정하기 전, 외부 서비스와 현장성 정보를 따로 확인합니다. 아래 항목은 자동 확정값이 아니라 확인 기록입니다.</p>
+      <h3>외부 검증 체크리스트</h3>
+      <p class="v2-note">권리분석과 필수 문서 확인 뒤, 시세·현장성·대출 기준을 따로 기록합니다. 아래 항목은 자동 확정값이 아니라 확인 기록입니다.</p>
       <div class="v2-grid compact">
         <div class="v2-info"><div class="k">확인 상태</div><div class="v"><span class="v2-pill ${tone}" data-external-count>${count}/5</span></div></div>
         <div class="v2-info wide"><div class="k">판단 안내</div><div class="v" data-external-status>${esc(statusText(count))}</div></div>
       </div>
-      <div class="v2-detail-table-wrap">
-        <table class="v2-detail-table">
-          <thead><tr><th>확인</th><th>항목</th><th>참고처</th><th>확인 내용</th><th>메모</th></tr></thead>
-          <tbody>
-            ${ITEMS.map((item) => `
-              <tr>
-                <td><input type="checkbox" data-external-check="${esc(item.id)}" ${data.checks?.[item.id] ? 'checked' : ''} aria-label="${esc(item.title)} 확인"></td>
-                <td>${esc(item.title)}</td>
-                <td>${esc(item.source)}</td>
-                <td>${esc(item.guide)}</td>
-                <td><input class="v2-input" type="text" data-external-memo="${esc(item.id)}" value="${esc(data.memos?.[item.id] || '')}" placeholder="확인 결과 메모"></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
+      ${renderChecklistRows(data)}
       <p class="v2-note">확인처의 댓글·호가·통계는 참고자료입니다. 최종 입찰 판단은 등기부, 매각물건명세서, 점유관계, 현장조사, 대출 가능액을 함께 봐야 합니다.</p>
     `;
   }
@@ -135,22 +162,28 @@
 
     const data = loadChecklist(currentReport);
     const nextSignature = signature(currentReport, data);
+    injectStyles();
     let card = existing;
     if (!card) {
       card = document.createElement('section');
       card.id = CARD_ID;
-      card.className = 'v2-card';
+      card.className = 'v2-result-card v2-external-checklist-card';
+      card.dataset.workflowStep = 'risk';
       card.innerHTML = renderCardHtml(data);
       card.dataset.caseKey = caseKey(currentReport);
       card.dataset.signature = nextSignature;
       target.insertAdjacentElement('afterend', card);
       notifyResultChange();
     } else if (card.dataset.caseKey !== caseKey(currentReport)) {
+      card.className = 'v2-result-card v2-external-checklist-card';
+      card.dataset.workflowStep = 'risk';
       card.innerHTML = renderCardHtml(data);
       card.dataset.caseKey = caseKey(currentReport);
       card.dataset.signature = nextSignature;
       notifyResultChange();
     } else {
+      card.className = 'v2-result-card v2-external-checklist-card';
+      card.dataset.workflowStep = 'risk';
       updateCardStatus(data);
     }
   }
