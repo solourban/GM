@@ -113,11 +113,26 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
 
 [
   'v2EssentialDocumentsCard',
+  'v2EssentialDocumentsCopyStatus',
   'https://www.courtauction.go.kr/',
+  'const DOCUMENTS',
+  'function caseInfo',
+  'function searchCopyText',
+  'function renderCaseGuide',
+  'function renderDocumentRows',
+  'function copySearchText',
   '매각물건명세서',
   '현황조사보고서',
   '감정평가서',
   '확인 필요',
+  '공식 사이트에서 사건 검색',
+  '검색값 복사',
+  'data-document-kind',
+  'data-document-status="확인 필요"',
+  '문서 존재 여부와 공개 상태는 자동 판정하지 않습니다',
+  '매각물건명세서의 임차인·배당요구·인수 문구',
+  'caseInfo',
+  'searchCopyText',
   "dataset.workflowStep = 'risk'",
 ].forEach((needle) => requireIncludes(essentialDocs, needle, needle));
 
