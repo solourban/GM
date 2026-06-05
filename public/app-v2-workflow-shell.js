@@ -5,6 +5,7 @@
   const BODY_ID = 'v2WorkflowBody';
   const PREV_ID = 'v2WorkflowPrevBtn';
   const NEXT_ID = 'v2WorkflowNextBtn';
+  const HIDDEN_CLASS = 'v2-workflow-card-hidden';
 
   const STEPS = [
     { id: 'basic', label: '기본정보', wrapperId: 'v2StepBasic', anchors: ['resultsSection'] },
@@ -100,32 +101,55 @@
     return '';
   }
 
+  function classifyCard(card) {
+    const step = stepForCard(card);
+    if (!step) {
+      delete card.dataset.workflowManaged;
+      return '';
+    }
+    card.dataset.workflowManaged = '1';
+    card.dataset.workflowStep = step;
+    return step;
+  }
+
   function classifyCards() {
-    resultCards().forEach((card) => {
-      const step = stepForCard(card);
-      if (!step) {
-        delete card.dataset.workflowManaged;
-        return;
-      }
-      card.dataset.workflowManaged = '1';
-      card.dataset.workflowStep = step;
-    });
+    resultCards().forEach(classifyCard);
+  }
+
+  function setCardVisibility(card, step = stepForCard(card)) {
+    if (!step) {
+      card.hidden = false;
+      card.classList.remove(HIDDEN_CLASS);
+      card.removeAttribute('aria-hidden');
+      return;
+    }
+    const isVisible = step === activeStep;
+    card.hidden = !isVisible;
+    card.classList.toggle(HIDDEN_CLASS, !isVisible);
+    if (isVisible) card.removeAttribute('aria-hidden');
+    else card.setAttribute('aria-hidden', 'true');
   }
 
   function applyStepVisibility() {
     resultCards().forEach((card) => {
-      const step = stepForCard(card);
-      if (!step) {
-        card.hidden = false;
-        card.classList.remove('v2-workflow-card-hidden');
-        card.removeAttribute('aria-hidden');
-        return;
-      }
-      const isVisible = step === activeStep;
-      card.hidden = !isVisible;
-      card.classList.toggle('v2-workflow-card-hidden', !isVisible);
-      if (isVisible) card.removeAttribute('aria-hidden');
-      else card.setAttribute('aria-hidden', 'true');
+      setCardVisibility(card);
+    });
+  }
+
+  function addedCards(records) {
+    const cards = [];
+    Array.from(records || []).forEach((record) => {
+      Array.from(record.addedNodes || []).forEach((node) => {
+        if (isResultCard(node)) cards.push(node);
+      });
+    });
+    return cards;
+  }
+
+  function primeAddedCards(records) {
+    addedCards(records).forEach((card) => {
+      const step = classifyCard(card);
+      setCardVisibility(card, step);
     });
   }
 
@@ -220,7 +244,7 @@
       .v2-workflow-tab.active { border-color:var(--primary); background:var(--primary); color:#fff; }
       .v2-workflow-tab[aria-disabled="true"] { opacity:.48; }
       .v2-workflow-body { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
-      .v2-workflow-card-hidden { display:none !important; }
+      .${HIDDEN_CLASS} { display:none !important; }
       .v2-workflow-controls { display:flex; justify-content:space-between; gap:10px; margin-top:12px; }
       .v2-workflow-controls button { min-width:118px; }
       @media (max-width: 760px) {
@@ -254,7 +278,7 @@
       shell()?.remove();
       resultCards().forEach((card) => {
         card.hidden = false;
-        card.classList.remove('v2-workflow-card-hidden');
+        card.classList.remove(HIDDEN_CLASS);
         card.removeAttribute('aria-hidden');
       });
       return;
@@ -310,7 +334,10 @@
     const resultRoot = root();
     if (!resultRoot || resultRoot.dataset.workflowObserved === '1' || !window.MutationObserver) return;
     resultRoot.dataset.workflowObserved = '1';
-    const observer = new MutationObserver(syncShell);
+    const observer = new MutationObserver((records) => {
+      primeAddedCards(records);
+      syncShell({ immediate: true });
+    });
     observer.observe(resultRoot, { childList: true });
   }
 
@@ -318,7 +345,7 @@
     observe();
     syncShell();
   });
-  document.addEventListener('auction:result-card-change', syncShell);
+  document.addEventListener('auction:result-card-change', () => syncShell({ immediate: true }));
   window.__auctionWorkflowShell = {
     STEPS: [...STEPS],
     CARD_STEP_BY_ID: { ...CARD_STEP_BY_ID },
