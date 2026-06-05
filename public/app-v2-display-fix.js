@@ -37,6 +37,18 @@
     anchor.parentNode.insertBefore(card, anchor.nextSibling);
   }
 
+  function markBidCard(card, className) {
+    if (!card) return;
+    card.className = `v2-result-card ${className}`;
+    card.dataset.workflowStep = 'bid';
+  }
+
+  function setCardHtml(card, signature, html) {
+    if (!card || card.dataset.signature === signature) return;
+    card.innerHTML = html;
+    card.dataset.signature = signature;
+  }
+
   function isManualMalsoAmountMissing() {
     const s = state();
     return !clean(s?.manual?.malso?.amount);
@@ -182,11 +194,19 @@
     if (!card) {
       card = document.createElement('section');
       card.id = 'v2BiddingSummaryCard';
-      card.className = 'v2-card';
       analysis.parentNode.insertBefore(card, analysis.nextSibling);
     }
+    markBidCard(card, 'v2-bidding-summary-card');
 
-    card.innerHTML = `
+    setCardHtml(card, [
+      level,
+      minBid,
+      inheritedTotal,
+      practicalBurden,
+      tenants,
+      inheritedItems,
+      decisionMessage(report, inheritedTotal, minBid),
+    ].join('|'), `
       <span class="v2-badge">입찰 판단</span>
       <h3>입찰 전 핵심 요약</h3>
       <p class="v2-note">권리분석 결과를 입찰 판단 기준으로 다시 정리한 요약입니다. 원본 서류 확인을 대체하지 않습니다.</p>
@@ -200,7 +220,7 @@
         <li>입력 임차인 ${tenants}명, 인수 가능 항목 ${inheritedItems}건 기준입니다.</li>
         <li>${decisionMessage(report, inheritedTotal, minBid)}</li>
       </ul>
-    `;
+    `);
   }
 
   function upsertBidRange() {
@@ -223,14 +243,21 @@
     if (!card) {
       card = document.createElement('section');
       card.id = 'v2BidRangeCard';
-      card.className = 'v2-card';
       summary.parentNode.insertBefore(card, summary.nextSibling);
     }
+    markBidCard(card, 'v2-bid-range-card');
 
-    const riskBrief = document.getElementById('v2RiskBriefCard');
-    insertAfter(card, riskBrief || summary);
+    insertAfter(card, summary);
 
-    card.innerHTML = `
+    setCardHtml(card, [
+      lower,
+      upper,
+      base,
+      inheritedTotal,
+      upperAfterInherited,
+      upperRate,
+      bidRangeMessage(report, lower, upper, base, inheritedTotal),
+    ].join('|'), `
       <span class="v2-badge">가격 검토</span>
       <h3>입찰가 검토 기준</h3>
       <p class="v2-note">자동 산식으로 만든 참고 범위입니다. 실제 입찰가는 실거래가, 현장 상태, 명도비, 경쟁률을 별도로 반영해야 합니다.</p>
@@ -244,7 +271,7 @@
         <li>${bidRangeMessage(report, lower, upper, base, inheritedTotal)}</li>
         <li>입찰가를 정할 때는 낙찰가가 아니라 낙찰가 + 인수금액 + 취득비용 + 수리·명도비용 기준으로 다시 계산하세요.</li>
       </ul>
-    `;
+    `);
   }
 
   function upsertFundingReview() {
@@ -271,14 +298,24 @@
     if (!card) {
       card = document.createElement('section');
       card.id = 'v2FundingReviewCard';
-      card.className = 'v2-card';
       const anchor = bidRange || riskBrief || summary;
       anchor.parentNode.insertBefore(card, anchor.nextSibling);
     }
+    markBidCard(card, 'v2-funding-review-card');
 
-    insertAfter(card, bidRange || riskBrief || summary);
+    insertAfter(card, bidRange || summary || riskBrief);
 
-    card.innerHTML = `
+    setCardHtml(card, [
+      minBid,
+      bidDepositRate,
+      inheritedTotal,
+      upper,
+      minBidDeposit,
+      upperBidDeposit,
+      minTotal,
+      upperTotal,
+      fundingMessage(report, minTotal, upperTotal),
+    ].join('|'), `
       <span class="v2-badge">자금 검토</span>
       <h3>입찰 전 자금 검토</h3>
       <p class="v2-note">현재 입력값 기준의 단순 추정입니다. 대출 가능액, 잔금기한, 세금, 수리·명도비는 별도로 확인해야 합니다.</p>
@@ -292,7 +329,7 @@
         <li>입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.</li>
         <li>${fundingMessage(report, minTotal, upperTotal)}</li>
       </ul>
-    `;
+    `);
   }
 
   function upsertChecklist() {
@@ -309,26 +346,25 @@
     if (!card) {
       card = document.createElement('section');
       card.id = 'v2PreBidChecklistCard';
-      card.className = 'v2-card';
+      markBidCard(card, 'v2-pre-bid-checklist-card');
       const funding = document.getElementById('v2FundingReviewCard');
       const bidRange = document.getElementById('v2BidRangeCard');
-      const riskBrief = document.getElementById('v2RiskBriefCard');
-      summary.parentNode.insertBefore(card, funding?.nextSibling || bidRange?.nextSibling || riskBrief?.nextSibling || summary.nextSibling);
+      summary.parentNode.insertBefore(card, funding?.nextSibling || bidRange?.nextSibling || summary.nextSibling);
     }
+    markBidCard(card, 'v2-pre-bid-checklist-card');
 
     const funding = document.getElementById('v2FundingReviewCard');
     const bidRange = document.getElementById('v2BidRangeCard');
-    const riskBrief = document.getElementById('v2RiskBriefCard');
-    insertAfter(card, funding || bidRange || riskBrief || summary);
+    insertAfter(card, funding || bidRange || summary);
 
-    card.innerHTML = `
+    setCardHtml(card, items.join('|'), `
       <span class="v2-badge">확인 목록</span>
       <h3>입찰 전 확인 체크리스트</h3>
       <p class="v2-note">분석 결과에서 파생된 확인 항목입니다. 입찰 전 원본 서류와 현장 확인 기준으로 하나씩 점검하세요.</p>
       <ul class="v2-list">
         ${items.map((item) => `<li>□ ${item}</li>`).join('')}
       </ul>
-    `;
+    `);
   }
 
   function run() {

@@ -5,13 +5,13 @@
     'v2EssentialDocumentsCard',
     'v2ExternalVerificationCard',
     'v2BiddingSummaryCard',
-    'v2FinalJudgmentCard',
-    'v2DecisionConfidenceCard',
     'v2BidRangeCard',
     'v2FundingReviewCard',
     'v2PreBidChecklistCard',
-    'v2CopySummaryCard',
     'v2BidPlanCard',
+    'v2FinalJudgmentCard',
+    'v2DecisionConfidenceCard',
+    'v2CopySummaryCard',
   ];
   const CHANGE_EVENT = 'auction:result-card-change';
   const SCROLL_IDLE_MS = 220;
