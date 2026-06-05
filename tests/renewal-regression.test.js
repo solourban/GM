@@ -5,6 +5,8 @@ const ROOT = path.join(__dirname, '..');
 const SERVER = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8');
 const INDEX = fs.readFileSync(path.join(ROOT, 'public', 'index.html'), 'utf8');
 const SERVICE_STATUS = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-service-status.js'), 'utf8');
+const MOLIT = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-molit-trades.js'), 'utf8');
+const FINAL_JUDGMENT = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-final-judgment.js'), 'utf8');
 
 function fail(message) {
   console.error(`Renewal regression guard failed: ${message}`);
@@ -13,6 +15,10 @@ function fail(message) {
 
 function requireIncludes(content, needle, label) {
   if (!content.includes(needle)) fail(`${label} is missing.`);
+}
+
+function requireExcludes(content, needle, label) {
+  if (content.includes(needle)) fail(`${label} must not appear.`);
 }
 
 function requireBefore(content, first, second, label) {
@@ -92,5 +98,34 @@ requireIncludes(SERVER, 'Cache-Control', 'no-store cache control header');
 requireIncludes(SERVER, 'X-Request-Id', 'request id response header');
 requireIncludes(SERVICE_STATUS, "if (!config?.hasKakaoMap)", 'Kakao map missing-service checklist');
 requireIncludes(SERVICE_STATUS, 'JavaScript SDK 도메인', 'Kakao JavaScript SDK domain setup guidance');
+
+[
+  [MOLIT, '실거래가 참고지표', 'MOLIT reference badge'],
+  [MOLIT, '국토부 실거래가 참고지표', 'MOLIT reference title'],
+  [MOLIT, '참고지표 성격', 'reference nature field'],
+  [MOLIT, '수익 예측이나 적정가 확정값이 아닙니다.', 'no-profit/no-fair-price copy'],
+  [MOLIT, '표본 해석', 'sample interpretation label'],
+  [MOLIT, '가격 참고 메모', 'price reference memo label'],
+  [MOLIT, '동일 단지 여부', 'same-complex uncertainty label'],
+  [MOLIT, '면적 매칭 주의', 'area matching caution label'],
+  [MOLIT, '표본 수', 'sample count label'],
+  [MOLIT, '동일 단지 여부 미확인', 'same-complex unconfirmed copy'],
+  [MOLIT, '전용면적 매칭 전까지', 'area matching warning copy'],
+  [FINAL_JUDGMENT, '우선검토', 'softened positive decision label'],
+  [FINAL_JUDGMENT, '실거래가 참고지표', 'final judgment reference wording'],
+  [FINAL_JUDGMENT, '실거래가 표본 수', 'final judgment sample count label'],
+  [FINAL_JUDGMENT, '가격 참고', 'final judgment price reference wording'],
+  [FINAL_JUDGMENT, '수익 예측이나 적정가 확정값이 아니며', 'final no-profit/no-fair-price copy'],
+].forEach(([content, needle, label]) => requireIncludes(content, needle, label));
+
+[
+  [MOLIT, '가격 비교 판단', 'MOLIT price judgment label'],
+  [MOLIT, '거래 판단', 'MOLIT trade judgment label'],
+  [MOLIT, '추가 검토할 만합니다', 'MOLIT recommendation-like copy'],
+  [MOLIT, '가격 매력', 'MOLIT attractiveness copy'],
+  [MOLIT, '실거래가·시세 확인', 'old MOLIT badge'],
+  [FINAL_JUDGMENT, '적극검토', 'strong positive decision label'],
+  [FINAL_JUDGMENT, '가격 매력', 'final attractiveness copy'],
+].forEach(([content, needle, label]) => requireExcludes(content, needle, label));
 
 console.log('Renewal regression guard passed.');

@@ -173,14 +173,14 @@
       label: '표본 없음',
       priceComparable: false,
       judgment: '최근 조회 범위에서 표시 가능한 거래가 없어 단지명 필터 해제 또는 계약월 확대가 필요합니다.',
-      comparison: '실거래 표본이 없어 가격 비교 판단을 보류합니다.',
+      comparison: '실거래 표본이 없어 가격 참고 메모를 만들지 않습니다.',
     };
 
     if (hasExactFilter && !veryBroad) return {
       level: 'specific',
       label: '동일 단지·건물 후보',
       priceComparable: true,
-      judgment: count >= 5 ? '동일 단지·건물 후보 기준 거래가 여러 건 확인되어 시세 참고자료로 활용할 수 있습니다.' : '동일 단지·건물 후보 거래가 일부 확인되지만 동·층·면적 확인이 필요합니다.',
+      judgment: count >= 5 ? '단지명·건물명 후보 기준 거래가 여러 건 확인되었습니다. 그래도 동·층·전용면적 매칭은 별도 확인해야 합니다.' : '단지명·건물명 후보 거래가 일부 확인되지만 표본 수가 적어 동·층·전용면적 재확인이 필요합니다.',
       comparison: '',
     };
 
@@ -188,8 +188,8 @@
       level: 'regional',
       label: '지역 참고시세',
       priceComparable: false,
-      judgment: '동일 건물 확정값이 아니라 법정동·행정구역 단위 거래가 확인되었습니다. 시세 방향 참고자료로만 활용하세요.',
-      comparison: '지역 평균가 기준 비교값입니다. 동일 단지·동·층·면적 매칭 전까지 최종 입찰가 판단에는 직접 반영하지 마세요.',
+      judgment: '동일 건물 확정값이 아니라 법정동·행정구역 단위 거래입니다. 후보를 좁히기 위한 참고지표로만 사용하세요.',
+      comparison: '지역 평균가 기준 참고값입니다. 동일 단지·동·층·전용면적 매칭 전까지 최종 입찰가 판단에는 직접 반영하지 마세요.',
     };
   }
 
@@ -200,11 +200,11 @@
     const avgRatio = minBidWon && avgTradeWon ? (minBidWon / avgTradeWon) * 100 : 0;
     const minRatio = minBidWon && minTradeWon ? (minBidWon / minTradeWon) * 100 : 0;
 
-    let judgment = scope?.comparison || '실거래 표본 또는 경매 최저가가 부족해 가격 비교 판단을 보류합니다.';
+    let judgment = scope?.comparison || '실거래 표본 또는 경매 최저가가 부족해 가격 참고 메모를 만들지 않습니다.';
     if (scope?.priceComparable && minBidWon && avgRatio > 0) {
-      if (avgRatio <= 70) judgment = '경매 최저가가 동일 단지·건물 후보 평균 실거래가 대비 낮은 편입니다. 권리·명도·수리비를 반영해 추가 검토할 만합니다.';
-      else if (avgRatio <= 90) judgment = '경매 최저가가 동일 단지·건물 후보 평균 실거래가 대비 보통 범위입니다. 비용 반영 후 입찰가를 신중히 정해야 합니다.';
-      else judgment = '경매 최저가가 동일 단지·건물 후보 평균 실거래가에 근접하거나 높습니다. 추가 비용 반영 시 가격 매력이 낮을 수 있습니다.';
+      if (avgRatio <= 70) judgment = '경매 최저가가 동일 단지·건물 후보 평균 거래금액보다 낮게 표시됩니다. 권리·명도·수리비 확인 전에는 참고 비율로만 보세요.';
+      else if (avgRatio <= 90) judgment = '경매 최저가가 동일 단지·건물 후보 평균 거래금액의 중간 범위에 있습니다. 비용 반영 후 별도 입찰가 검토가 필요합니다.';
+      else judgment = '경매 최저가가 동일 단지·건물 후보 평균 거래금액에 근접하거나 높게 표시됩니다. 비용과 원본 조건을 먼저 재확인하세요.';
     }
 
     return {
@@ -220,6 +220,19 @@
     };
   }
 
+  function areaReferenceText(stats) {
+    if (stats.minArea && stats.maxArea) {
+      return `${stats.minArea.toFixed(2)}㎡ ~ ${stats.maxArea.toFixed(2)}㎡ 표본입니다. 대상 물건 전용면적과 일치하는지 확인하세요.`;
+    }
+    return '전용면적 표본이 부족합니다. 대상 물건 면적과 직접 매칭하지 마세요.';
+  }
+
+  function complexReferenceText(scope) {
+    if (scope.level === 'specific') return '단지명·건물명 후보 적용 · 동·층·전용면적 재확인 필요';
+    if (scope.level === 'regional') return '동일 단지 여부 미확인 · 법정동/행정구역 단위 참고';
+    return '동일 단지 여부 미확인';
+  }
+
   function renderStatsSummary(trades, result) {
     const stats = tradeStats(trades);
     const scope = tradeScope(result, trades);
@@ -228,17 +241,20 @@
     const minRatioLabel = comparison.minRatio ? `${comparison.minRatio.toFixed(1)}%${comparison.priceComparable ? '' : ' · 참고'}` : '-';
     return `
       <div class="v2-grid compact">
-        ${info('시세 근거 범위', scope.label, 'wide')}
-        ${info('거래 판단', scope.judgment, 'wide')}
-        ${info('가격 비교 판단', comparison.judgment, 'wide')}
+        ${info('참고 범위', scope.label, 'wide')}
+        ${info('참고지표 성격', '수익 예측이나 적정가 확정값이 아닙니다.', 'wide')}
+        ${info('표본 해석', scope.judgment, 'wide')}
+        ${info('가격 참고 메모', comparison.judgment, 'wide')}
+        ${info('동일 단지 여부', complexReferenceText(scope), 'wide')}
+        ${info('면적 매칭 주의', areaReferenceText(stats), 'wide')}
         ${info('경매 최저가', formatWon(comparison.minBidWon))}
-        ${info('평균 실거래가', comparison.avgTradeWon ? formatWon(comparison.avgTradeWon) : '-')}
-        ${info('최저가/평균가', avgRatioLabel)}
-        ${info('최저가/최저실거래', minRatioLabel)}
-        ${info('거래 건수', `${stats.count}건`)}
+        ${info('평균 거래금액', comparison.avgTradeWon ? formatWon(comparison.avgTradeWon) : '-')}
+        ${info('최저가/평균가 참고비율', avgRatioLabel)}
+        ${info('최저가/최저거래 참고비율', minRatioLabel)}
+        ${info('표본 수', `${stats.count}건`)}
         ${info('최저 거래금액', formatManwon(stats.minPrice))}
         ${info('최고 거래금액', formatManwon(stats.maxPrice))}
-        ${info('평균 거래금액', formatManwon(stats.avgPrice))}
+        ${info('평균 거래금액(만원)', formatManwon(stats.avgPrice))}
         ${info('전용면적 범위', stats.minArea && stats.maxArea ? `${stats.minArea.toFixed(2)}㎡ ~ ${stats.maxArea.toFixed(2)}㎡` : '-')}
       </div>
     `;
@@ -247,7 +263,7 @@
   function renderWaiting(reason, location = null) {
     return `
       <section class="v2-result-card" id="${CARD_ID}">
-        <span class="v2-badge">실거래가·시세 확인</span>
+        <span class="v2-badge">실거래가 참고지표</span>
         <h3>국토부 실거래가 조회 대기</h3>
         <p class="v2-note">${esc(reason)}</p>
         <div class="v2-grid compact">
@@ -274,7 +290,7 @@
   function renderError(message, location) {
     return `
       <section class="v2-result-card" id="${CARD_ID}">
-        <span class="v2-badge">실거래가·시세 확인</span>
+        <span class="v2-badge">실거래가 참고지표</span>
         <h3>실거래가 조회 확인 필요</h3>
         <p class="v2-note">${esc(message)}</p>
         <div class="v2-grid compact">
@@ -346,8 +362,8 @@
       <section class="v2-result-card" id="${CARD_ID}">
         <div class="v2-result-head">
           <div>
-            <span class="v2-badge">실거래가·시세 확인</span>
-            <h3>국토부 실거래가 조회 결과</h3>
+            <span class="v2-badge">실거래가 참고지표</span>
+            <h3>국토부 실거래가 참고지표</h3>
             <p class="v2-note">법정동코드 기준 최근 계약월을 순차 조회했습니다. API 키는 브라우저에 노출되지 않습니다.</p>
           </div>
         </div>
@@ -360,7 +376,7 @@
           ${info('유형별 결과', renderTypeSummary(result.data?.tradeTypes), 'wide')}
         </div>
         ${renderTradeRows(trades)}
-        <p class="v2-note">실거래가는 참고용입니다. 동일 단지·동·층·면적 여부, 계약해제 여부, 시점 차이를 별도 확인해야 합니다.</p>
+        <p class="v2-note">실거래가는 참고지표입니다. 수익 예측이나 적정가 확정값이 아니며 동일 단지·동·층·전용면적, 계약해제 여부, 시점 차이를 별도 확인해야 합니다.</p>
       </section>
     `;
   }
