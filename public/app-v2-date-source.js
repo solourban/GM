@@ -175,6 +175,14 @@
     return document.querySelector('.v2-panel[data-panel="search"]');
   }
 
+  function isSearchActive() {
+    return appState()?.activeTab === 'search' || document.querySelector('.v2-tab.active[data-tab="search"]');
+  }
+
+  function resultRoot() {
+    return document.getElementById('resultsSection');
+  }
+
   function renderComparison(candidate) {
     const fetched = getFetchedCase();
     const result = compareCandidate(candidate, fetched);
@@ -205,7 +213,7 @@
   function renderCard(candidate) {
     const label = sourceLabel(candidate);
     return `
-      <section class="v2-card" id="v2DateSourceCard">
+      <section class="v2-result-card" id="v2DateSourceCard">
         <div class="v2-result-head">
           <div>
             <span class="v2-badge">${esc(label)}</span>
@@ -252,11 +260,15 @@
 
   function upsertSourceCard() {
     const panel = findSearchPanel();
-    const searchCard = panel?.querySelector('.v2-card');
-    if (!panel || !searchCard) return;
+    const root = resultRoot();
+    if (!panel || !root) return;
 
     const candidate = loadCandidate();
     const existing = document.getElementById('v2DateSourceCard');
+    if (!isSearchActive()) {
+      existing?.remove();
+      return;
+    }
     if (!candidate?.caseNo) {
       existing?.remove();
       return;
@@ -264,7 +276,7 @@
 
     const activeMemo = document.activeElement?.id === 'v2DateCandidateMemo';
     if (!existing) {
-      searchCard.insertAdjacentHTML('afterend', renderCard(candidate));
+      root.insertAdjacentHTML('afterbegin', renderCard(candidate));
     } else if (!activeMemo) {
       existing.outerHTML = renderCard(candidate);
     }

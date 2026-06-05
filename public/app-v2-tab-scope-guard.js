@@ -30,6 +30,10 @@
     return activeButton?.dataset?.tab || 'search';
   }
 
+  function tabResultsRoot() {
+    return app()?.tabResultsRoot?.() || document.getElementById('v2TabResultsSection');
+  }
+
   function removeByIds(ids) {
     ids.forEach((id) => document.getElementById(id)?.remove());
   }
@@ -47,23 +51,29 @@
     });
   }
 
-  function moveAllowedCardsIntoActivePanel() {
+  function moveAllowedCardsIntoTabResults() {
     const tab = activeTab();
-    const activePanel = document.querySelector(`.v2-panel.active[data-panel="${tab}"]`) || document.querySelector('.v2-panel.active');
-    if (!activePanel) return;
+    const root = tabResultsRoot();
+    if (!root) return;
 
     if (tab === 'date') {
       const stack = document.getElementById('v2CandidateStackCard');
       const ranking = document.getElementById('v2CandidateRankingCard');
-      const anchor = document.getElementById('v2DateSourceCard') || activePanel.querySelector('.v2-card') || activePanel;
-      if (stack && !activePanel.contains(stack)) anchor.insertAdjacentElement('afterend', stack);
-      if (ranking && !activePanel.contains(ranking)) stack?.insertAdjacentElement('afterend', ranking);
+      if (stack && !root.contains(stack)) root.appendChild(stack);
+      if (ranking && !root.contains(ranking)) root.appendChild(ranking);
+    }
+
+    if (tab === 'saved') {
+      SAVED_CARD_IDS.forEach((id) => {
+        const node = document.getElementById(id);
+        if (node && !root.contains(node)) root.appendChild(node);
+      });
     }
   }
 
   function scopeFeatureCards() {
     removeOutOfScopeCards();
-    moveAllowedCardsIntoActivePanel();
+    moveAllowedCardsIntoTabResults();
   }
 
   function renameDateResetButtons() {

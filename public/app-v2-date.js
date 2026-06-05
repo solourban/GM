@@ -92,6 +92,10 @@
     return window.__auctionPropertyTypes || null;
   }
 
+  function resultRoot() {
+    return window.__auctionV2?.tabResultsRoot?.() || document.getElementById('v2TabResultsSection');
+  }
+
   function candidateDiscountRate(item) {
     const minBid = numberValue(item?.minBid);
     const appraisal = numberValue(item?.appraisal);
@@ -197,7 +201,7 @@
     const avgMinBid = average(items.map((item) => item.minBid));
 
     return `
-      <div class="v2-card">
+      <section class="v2-result-card">
         <span class="v2-badge">후보 비교</span>
         <h3>매각기일 후보 비교 요약</h3>
         <p class="v2-note">조회된 후보 목록 안에서 먼저 볼 만한 기준을 단순 비교한 값입니다. 실제 입찰 판단은 단일 사건 조회 후 권리분석으로 확인하세요.</p>
@@ -212,7 +216,7 @@
           <li>현재 표시 후보: ${items.length}건 / 전체 ${state.items.length}건</li>
           <li>${selectedComparisonText(avgMinBid)}</li>
         </ul>
-      </div>
+      </section>
     `;
   }
 
@@ -220,7 +224,7 @@
     const item = state.selectedCandidate;
     if (!item) return '';
     return `
-      <div class="v2-card">
+      <section class="v2-result-card">
         <span class="v2-badge">최근 선택 후보</span>
         <h3>${esc(item.caseNo || '사건번호 미확인')}</h3>
         <p class="v2-note">선택한 매각기일 후보입니다. 물건검색에서 기본정보 조회 후 권리분석을 진행하세요.</p>
@@ -230,14 +234,14 @@
           <div class="v2-info-box"><span>최저가</span><strong>${formatWon(item.minBid)}</strong></div>
           <div class="v2-info-box"><span>감정가</span><strong>${formatWon(item.appraisal)}</strong></div>
         </div>
-      </div>
+      </section>
     `;
   }
 
   function renderSortControls(items) {
     if (!items.length) return '';
     return `
-      <div class="v2-card">
+      <div class="v2-step-section" id="v2DateSortControls">
         <span class="v2-badge">목록 정렬</span>
         <h3>후보 정렬·필터</h3>
         <div class="v2-form" style="grid-template-columns:minmax(180px,1fr);">
@@ -288,9 +292,39 @@
     `;
   }
 
-  function render(panel) {
-    const messageClass = state.message ? `v2-form-message show ${state.messageType}` : 'v2-form-message';
+  function renderEmptyState() {
+    return `
+      <section class="v2-result-card" id="v2DateEmptyStateCard">
+        <h3>아직 조회된 후보가 없습니다.</h3>
+        <p class="v2-note">조건을 선택한 뒤 매각기일 조회를 눌러주세요.</p>
+      </section>
+    `;
+  }
+
+  function renderResultsArea() {
     const displayItems = visibleItems();
+    const hasResult = state.meta || state.items.length;
+    return `
+      ${renderCandidateComparison()}
+      ${renderSelectedCandidate()}
+      ${state.loading ? `<section class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>매각기일 목록을 조회 중입니다.</h3><p class="v2-note">조회 결과는 이 영역에 표시됩니다.</p></div></div></section>` : ''}
+      ${hasResult ? `
+        <section class="v2-result-card" id="v2DateResultCard">
+          <span class="v2-badge">매각기일</span>
+          <h3>조회 결과</h3>
+          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / 표시 ${displayItems.length}건 · 전체 ${state.items.length}건</p>
+          <p class="v2-note">검증 상태: 요청 법원과 응답 법원이 다르면 결과를 표시하지 않습니다.</p>
+          ${renderSortControls(state.items)}
+          ${renderRows(displayItems)}
+          <p class="v2-note">관심 물건은 “이 사건 조회”로 물건검색 탭에 값을 옮긴 뒤, 기본정보 조회 버튼을 눌러 권리분석을 진행하세요.</p>
+        </section>
+      ` : (state.loading ? '' : renderEmptyState())}
+    `;
+  }
+
+  function render(panel) {
+    if (!panel) return;
+    const messageClass = state.message ? `v2-form-message show ${state.messageType}` : 'v2-form-message';
     panel.innerHTML = `
       <div class="v2-card">
         <h3>매각기일 추천</h3>
@@ -306,21 +340,12 @@
         <div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>
         <p class="v2-note">매각기일 조회는 물건검색 결과와 권리분석 결과를 변경하지 않습니다.</p>
       </div>
-      ${renderCandidateComparison()}
-      ${renderSelectedCandidate()}
-      ${state.loading ? `<div class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>매각기일 목록을 조회 중입니다.</h3><p class="v2-note">조회 결과는 이 영역에 표시됩니다.</p></div></div></div>` : ''}
-      ${state.meta || state.items.length ? `
-        <div class="v2-result-card">
-          <span class="v2-badge">매각기일</span>
-          <h3>조회 결과</h3>
-          <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / 표시 ${displayItems.length}건 · 전체 ${state.items.length}건</p>
-          <p class="v2-note">검증 상태: 요청 법원과 응답 법원이 다르면 결과를 표시하지 않습니다.</p>
-          ${renderSortControls(state.items)}
-          ${renderRows(displayItems)}
-          <p class="v2-note">관심 물건은 “이 사건 조회”로 물건검색 탭에 값을 옮긴 뒤, 기본정보 조회 버튼을 눌러 권리분석을 진행하세요.</p>
-        </div>
-      ` : ''}
     `;
+    const root = resultRoot();
+    if (root && panel.classList.contains('active')) {
+      root.innerHTML = renderResultsArea();
+      window.setTimeout(() => window.__auctionCandidateStack?.upsertCard?.(), 0);
+    }
     bind(panel);
   }
 
@@ -466,7 +491,8 @@
       el.addEventListener('change', captureForm);
     });
 
-    const sort = panel.querySelector('#dateSortModeV2');
+    const root = resultRoot() || panel;
+    const sort = root.querySelector('#dateSortModeV2');
     if (sort && !sort.dataset.bound) {
       sort.dataset.bound = '1';
       sort.addEventListener('change', () => {
@@ -475,7 +501,7 @@
       });
     }
 
-    panel.querySelectorAll('[data-date-property-type]').forEach((button) => {
+    root.querySelectorAll('[data-date-property-type]').forEach((button) => {
       if (button.dataset.bound) return;
       button.dataset.bound = '1';
       button.addEventListener('click', () => {
@@ -490,7 +516,7 @@
       btn.addEventListener('click', () => fetchDateRecommendations(panel));
     }
 
-    panel.querySelectorAll('[data-date-search-case]').forEach((caseButton) => {
+    root.querySelectorAll('[data-date-search-case]').forEach((caseButton) => {
       if (caseButton.dataset.bound) return;
       caseButton.dataset.bound = '1';
       caseButton.addEventListener('click', () => openSearchTabWithCase(caseButton.dataset.dateSearchCase));

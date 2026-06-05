@@ -26,6 +26,10 @@
     return appState()?.activeTab || '';
   }
 
+  function resultRoot() {
+    return window.__auctionV2?.tabResultsRoot?.() || document.getElementById('v2TabResultsSection');
+  }
+
   function compact(value) {
     return clean(value).replace(/\s+/g, '').replace(/[^0-9가-힣A-Za-z]/g, '');
   }
@@ -258,7 +262,7 @@
     const successfulRows = state.rows.filter((row) => row.ok);
     const displayRows = visibleRows();
     return `
-      <section class="v2-card" id="${RESULT_ID}">
+      <section class="v2-result-card" id="${RESULT_ID}">
         <span class="v2-badge">일괄조회 결과</span>
         <h3>여러 사건 조회 결과</h3>
         <p class="v2-note">성공한 사건은 단건조회로 열거나 임시 비교 목록·저장 후보로 보낼 수 있습니다.</p>
@@ -292,7 +296,6 @@
         ${state.restored ? '<p class="v2-note">이전 일괄조회 입력/결과를 복원했습니다.</p>' : ''}
         ${state.message ? `<div class="v2-form-message show warn">${esc(state.message)}</div>` : ''}
       </div>
-      ${renderResults()}
     `;
   }
 
@@ -305,6 +308,8 @@
     if (input) state.inputText = String(input.value || '').slice(0, 3000);
     if (court) state.selectedCourt = clean(court.value);
     panel.innerHTML = renderCard();
+    const root = resultRoot();
+    if (root) root.innerHTML = renderResults();
     bindEvents();
     state.rendered = true;
   }
