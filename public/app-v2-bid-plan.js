@@ -95,7 +95,9 @@
     const checklist = document.getElementById('v2PreBidChecklistCard');
     const copy = document.getElementById('v2CopySummaryCard');
     const funding = document.getElementById('v2FundingReviewCard');
-    const anchor = copy || checklist || funding;
+    const bidRange = document.getElementById('v2BidRangeCard');
+    const summary = document.getElementById('v2BiddingSummaryCard');
+    const anchor = checklist || funding || bidRange || summary || copy;
 
     if (!report || !anchor) {
       document.getElementById('v2BidPlanCard')?.remove();
@@ -109,9 +111,10 @@
     if (!card) {
       card = document.createElement('section');
       card.id = 'v2BidPlanCard';
-      card.className = 'v2-card';
       anchor.parentNode.insertBefore(card, anchor.nextSibling);
     }
+    card.className = 'v2-result-card v2-bid-plan-card';
+    card.dataset.workflowStep = 'bid';
 
     if (!card.dataset.resultOrderIndex && card.previousElementSibling !== anchor) {
       anchor.parentNode.insertBefore(card, anchor.nextSibling);
