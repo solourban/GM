@@ -242,24 +242,41 @@
     `;
   }
 
-  function valueFromBasic(keys) {
-    const basic = appState()?.raw?.basic || {};
+  function valueFromBasic(keys, rawKeys = []) {
+    const raw = appState()?.raw || {};
+    const basic = raw.basic || {};
     for (const key of keys) {
       const value = clean(basic[key]);
+      if (value) return value;
+    }
+    for (const key of rawKeys) {
+      const value = clean(raw[key]);
       if (value) return value;
     }
     return '-';
   }
 
+  function summaryData() {
+    return [
+      { label: '법원', value: valueFromBasic(['법원', '법원명'], ['court', 'requestedCourt']) },
+      { label: '사건', value: valueFromBasic(['사건번호', '사건'], ['caseNo']) },
+      { label: '매각기일', value: valueFromBasic(['매각기일', '기일']) },
+      { label: '최저가', value: valueFromBasic(['최저매각가격', '최저가']) },
+      { label: '물건종별', value: valueFromBasic(['물건종별', '용도']) },
+      { label: '감정가', value: valueFromBasic(['감정평가액', '감정가']) },
+      { label: '유찰', value: valueFromBasic(['유찰횟수']) },
+      { label: '소재지', value: valueFromBasic(['소재지', '주소']), className: 'wide' },
+    ];
+  }
+
+  function renderSummaryItem(item) {
+    const value = clean(item.value) || '-';
+    const classAttr = item.className ? ` class="${esc(item.className)}"` : '';
+    return `<div${classAttr} title="${esc(value)}"><span>${esc(item.label)}</span><strong>${esc(value)}</strong></div>`;
+  }
+
   function renderSummary() {
-    return `
-      <div id="${SUMMARY_ID}" class="v2-workflow-summary">
-        <div><span>법원</span><strong>${esc(valueFromBasic(['법원', '법원명']))}</strong></div>
-        <div><span>사건</span><strong>${esc(valueFromBasic(['사건번호', '사건']))}</strong></div>
-        <div><span>매각기일</span><strong>${esc(valueFromBasic(['매각기일', '기일']))}</strong></div>
-        <div><span>최저가</span><strong>${esc(valueFromBasic(['최저매각가격', '최저가']))}</strong></div>
-      </div>
-    `;
+    return `<div id="${SUMMARY_ID}" class="v2-workflow-summary">${summaryData().map(renderSummaryItem).join('')}</div>`;
   }
 
   function renderTabs() {
@@ -309,6 +326,7 @@
       .v2-workflow-shell { position:sticky; top:88px; z-index:8; margin-bottom:16px; padding:16px; border:1px solid var(--line); border-radius:8px; background:rgba(255,255,255,.96); box-shadow:var(--shadow-sm); }
       .v2-workflow-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
       .v2-workflow-summary div { min-width:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+      .v2-workflow-summary .wide { grid-column:span 2; }
       .v2-workflow-summary span { display:block; margin-bottom:4px; color:var(--muted); font-size:12px; }
       .v2-workflow-summary strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
       .v2-workflow-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
@@ -324,6 +342,10 @@
         .v2-workflow-shell { position:relative; top:auto; padding:12px; }
         .v2-workflow-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
         .v2-workflow-controls button { min-width:0; flex:1; }
+      }
+      @media (max-width: 520px) {
+        .v2-workflow-summary { grid-template-columns:1fr; }
+        .v2-workflow-summary .wide { grid-column:auto; }
       }
     `;
     document.head.appendChild(style);
@@ -428,6 +450,7 @@
     moveTo,
     activeStep: () => activeStep,
     emptyStateId: EMPTY_ID,
+    summarySnapshot: () => summaryData().reduce((acc, item) => ({ ...acc, [item.label]: clean(item.value) || '-' }), {}),
     visibleCardIds: () => resultCards().filter((card) => !card.hidden).map((card) => card.id || '(basic)'),
   };
 })();

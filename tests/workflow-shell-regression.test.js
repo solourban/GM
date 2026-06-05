@@ -66,6 +66,8 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
   'function emptyCopy',
   'function renderEmptyState',
   'function syncEmptyState',
+  'function summaryData',
+  'function renderSummaryItem',
   'dataset.workflowEmptyState',
   'dataset.workflowManaged',
   "${HIDDEN_CLASS} { display:none !important; }",
@@ -73,7 +75,18 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
   "syncShell({ immediate: true })",
   'visibleCardIds',
   'emptyStateId',
+  'summarySnapshot',
   'window.__auctionWorkflowShell',
+].forEach((needle) => requireIncludes(workflow, needle, needle));
+
+[
+  "valueFromBasic(['법원', '법원명'], ['court', 'requestedCourt'])",
+  "valueFromBasic(['사건번호', '사건'], ['caseNo'])",
+  "label: '물건종별'",
+  "label: '감정가'",
+  "label: '유찰'",
+  "label: '소재지'",
+  "className: 'wide'",
 ].forEach((needle) => requireIncludes(workflow, needle, needle));
 
 [
