@@ -222,11 +222,47 @@
     return indexed.filter(({ row }) => row.ok && propertyTypes().matches(row, state.propertyType));
   }
 
+  function renderMobileRows(rows) {
+    return `
+      <div class="v2-mobile-card-list" id="v2BulkMobileCards">
+        ${rows.map(({ row, index }) => {
+          const basic = row.raw?.basic || {};
+          const caseNo = rowCaseNo(row);
+          return `
+            <article class="v2-mobile-item-card">
+              <div class="v2-mobile-item-head">
+                <div>
+                  <span class="v2-pill ${row.ok ? 'no' : 'yes'}">${row.ok ? '성공' : '실패'}</span>
+                  <h4>${esc(caseNo || row.raw || '사건번호 확인 필요')}</h4>
+                </div>
+                <strong>${esc(row.court || '-')}</strong>
+              </div>
+              <div class="v2-mobile-item-grid">
+                <span><small>물건종별</small><b>${esc(basic['물건종별'] || '-')}</b></span>
+                <span><small>매각기일</small><b>${esc(basic['매각기일'] || '-')}</b></span>
+                <span><small>최저가</small><b>${esc(basic['최저매각가격'] || '-')}</b></span>
+                <span><small>소재지</small><b>${esc(basic['소재지'] || row.error || '-')}</b></span>
+              </div>
+              ${row.ok ? `
+                <div class="v2-mobile-actions">
+                  <button type="button" class="v2-small-btn" data-bulk-action="open" data-index="${index}" data-court="${esc(row.court)}" data-year="${esc(row.year)}" data-serial="${esc(row.serial)}">단건조회</button>
+                  <button type="button" class="v2-small-btn" data-bulk-action="temp" data-index="${index}">임시비교</button>
+                  <button type="button" class="v2-small-btn" data-bulk-action="save" data-index="${index}">저장후보</button>
+                </div>
+              ` : ''}
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   function renderRows(rows) {
     if (!state.rows.length) return '<p class="v2-note">아직 일괄조회 결과가 없습니다.</p>';
     if (!rows.length) return '<p class="v2-note">선택한 물건종류에 해당하는 일괄조회 성공 건이 없습니다.</p>';
     return `
-      <div class="v2-detail-table-wrap">
+      ${renderMobileRows(rows)}
+      <div class="v2-detail-table-wrap v2-bulk-table-wrap">
         <table class="v2-detail-table">
           <thead><tr><th>상태</th><th>법원</th><th>사건번호</th><th>물건종별</th><th>소재지</th><th>최저가</th><th>매각기일</th><th>관리</th></tr></thead>
           <tbody>

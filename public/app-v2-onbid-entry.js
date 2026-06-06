@@ -107,6 +107,42 @@
     };
   }
 
+  function renderMobileItems(items) {
+    return `
+      <div class="v2-mobile-card-list" id="v2OnbidMobileCards">
+        ${items.map((item) => {
+          const row = normalizeItem(item);
+          const statusMethod = [row.status, row.method].filter(Boolean).join(' / ');
+          const numbers = [row.cltrMngNo, row.pbctNo].filter(Boolean).join(' / ');
+          const detailBtn = row.cltrMngNo
+            ? `<button class="v2-small-btn" data-onbid-action="detail" data-cltr-mng-no="${esc(row.cltrMngNo)}" data-pbct-cdtn-no="${esc(row.pbctNo)}">상세조회</button>`
+            : '<span class="v2-note">번호 없음</span>';
+          return `
+            <article class="v2-mobile-item-card">
+              <div class="v2-mobile-item-head">
+                <div>
+                  <span class="v2-badge">${esc(row.status || '공매')}</span>
+                  <h4>${esc(row.name || '물건명 확인 필요')}</h4>
+                </div>
+                <strong>${esc(row.method || '-')}</strong>
+              </div>
+              <div class="v2-mobile-item-grid">
+                <span><small>최저입찰가</small><b>${esc(formatMoney(row.price))}</b></span>
+                <span><small>감정가</small><b>${esc(formatMoney(row.appraisal))}</b></span>
+                <span><small>입찰기간</small><b>${esc(row.period || '-')}</b></span>
+                <span><small>공고기관</small><b>${esc(row.org || '-')}</b></span>
+                <span><small>관리/공고번호</small><b>${esc(numbers || '-')}</b></span>
+                <span><small>상태/방식</small><b>${esc(statusMethod || '-')}</b></span>
+              </div>
+              <p class="v2-note">${esc(row.address || '소재지 확인 필요')}</p>
+              <div class="v2-mobile-actions">${detailBtn}</div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   async function loadConfig() {
     try {
       const res = await fetch('/api/config', { headers: { Accept: 'application/json' } });
@@ -222,7 +258,8 @@
         <div class="v">${esc(String(onbidState.items.length))}건 표시 / 전체 ${esc(String(onbidState.totalCount || onbidState.items.length))}건</div>
         <p class="v2-note">상세 조회는 같은 온비드 탭 안에 표시합니다.${onbidState.requestId ? ` 요청ID: ${esc(onbidState.requestId)}` : ''}</p>
       </div>
-      <div class="v2-table-wrap" style="grid-column:1/-1">
+      ${renderMobileItems(onbidState.items)}
+      <div class="v2-table-wrap v2-onbid-table-wrap" style="grid-column:1/-1">
         <table class="v2-table">
           <thead><tr><th>물건명</th><th>소재지</th><th>최저입찰가</th><th>감정가</th><th>입찰기간</th><th>상태/방식</th><th>공고기관</th><th>관리/공고번호</th><th>상세</th></tr></thead>
           <tbody>

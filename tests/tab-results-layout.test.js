@@ -40,7 +40,7 @@ assert(
   'date results must provide mobile cards instead of relying only on a wide table'
 );
 assert(
-  core.includes('.v2-date-card-list{display:grid') && core.includes('.v2-date-table-wrap{display:none}'),
+  core.includes('.v2-date-card-list,.v2-mobile-card-list{display:grid') && core.includes('.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}'),
   'mobile date result layout must hide the wide table and show card rows'
 );
 assert(
@@ -61,6 +61,10 @@ assert(
   'bulk lookup results must be written to the shared tab results outlet'
 );
 assert(
+  bulk.includes('function renderMobileRows(rows)') && bulk.includes('id="v2BulkMobileCards"') && bulk.includes('v2-bulk-table-wrap'),
+  'bulk lookup results must provide mobile cards and keep the wide table desktop-only'
+);
+assert(
   !bulk.includes('${renderResults()}'),
   'bulk result card must not be appended inside the green input panel'
 );
@@ -72,6 +76,10 @@ assert(
 assert(
   saved.includes('root.innerHTML = items.length ? renderSaved(items) : renderEmpty()'),
   'saved tab results must be written to the shared tab results outlet'
+);
+assert(
+  saved.includes('function renderSavedMobileCards(top)') && saved.includes('id="v2SavedMobileCards"') && saved.includes('v2-saved-table-wrap'),
+  'saved tab results must provide mobile cards and keep the wide table desktop-only'
 );
 
 assert(
@@ -93,6 +101,14 @@ assert(
 assert(
   onbid.includes('function resultRoot()') && onbid.includes('id="v2OnbidResultCard"'),
   'onbid tab must render results through the shared result area'
+);
+assert(
+  onbid.includes('function renderMobileItems(items)') && onbid.includes('id="v2OnbidMobileCards"') && onbid.includes('v2-onbid-table-wrap'),
+  'onbid results must provide mobile cards and keep the wide table desktop-only'
+);
+assert(
+  core.includes('.v2-date-card-list,.v2-mobile-card-list{display:grid') && core.includes('.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}'),
+  'shared mobile result cards must show while wide tab result tables are hidden on mobile'
 );
 assert(
   !onbid.slice(onbid.indexOf('function renderPanel()'), onbid.indexOf('function syncTab()')).includes('v2OnbidResultArea'),
