@@ -173,6 +173,37 @@
     `;
   }
 
+  function renderSavedMobileCards(top) {
+    return `
+      <div class="v2-mobile-card-list" id="v2SavedMobileCards">
+        ${top.map(({ item, score }, index) => `
+          <article class="v2-mobile-item-card">
+            <div class="v2-mobile-item-head">
+              <div>
+                <span class="v2-badge">${index + 1}순위 · ${score}점</span>
+                <h4>${esc(item.caseNo || '사건번호 확인 필요')}</h4>
+              </div>
+              <strong>${esc(item.saleDate || '-')}</strong>
+            </div>
+            <div class="v2-mobile-item-grid">
+              <span><small>용도</small><b>${esc(propertyTypes()?.usageOf(item) || item.usage || '-')}</b></span>
+              <span><small>가격비율</small><b>${percent(discountRate(item))}</b></span>
+              <span><small>최저가</small><b>${esc(item.minBid || formatWon(item.minBid))}</b></span>
+              <span><small>유찰</small><b>${failCount(item) || '-'}</b></span>
+              <span><small>권리</small><b>${statusLabel(hasRightsCheck(item))}</b></span>
+              <span><small>시세</small><b>${statusLabel(hasPriceCheck(item))}</b></span>
+            </div>
+            <p class="v2-note">${esc(decision(item, score))}</p>
+            <div class="v2-mobile-actions">
+              <button type="button" class="v2-small-btn" data-saved-tab-action="search" data-case-no="${esc(item.caseNo || '')}">조회하기</button>
+              <button type="button" class="v2-small-btn" data-saved-tab-action="remove" data-case-no="${esc(item.caseNo || '')}">삭제</button>
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderSaved(items) {
     const filteredItems = propertyTypes()?.filter(items, selectedPropertyType) || [...items];
     const top = topCandidates(filteredItems, 5);
@@ -191,7 +222,8 @@
           <div class="v2-info"><div class="k">시세 확인</div><div class="v">${priceCount}건</div></div>
         </div>
         ${top.length ? '' : '<p class="v2-note">선택한 물건종류에 해당하는 저장 후보가 없습니다.</p>'}
-        <div class="v2-detail-table-wrap">
+        ${top.length ? renderSavedMobileCards(top) : ''}
+        <div class="v2-detail-table-wrap v2-saved-table-wrap">
           <table class="v2-detail-table">
             <thead><tr><th>순위</th><th>사건번호</th><th>점수</th><th>용도</th><th>매각기일</th><th>최저가/감정가</th><th>가격비율</th><th>유찰</th><th>메모</th><th>권리</th><th>시세</th><th>판단</th><th>관리</th></tr></thead>
             <tbody>

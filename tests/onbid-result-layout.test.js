@@ -18,6 +18,9 @@ requireIncludes(front, 'function resultRoot()', 'shared tab result root helper')
 requireIncludes(front, 'function renderResultsArea()', 'below-hero onbid result renderer');
 requireIncludes(front, 'id="v2OnbidResultCard"', 'Onbid result card id');
 requireIncludes(front, 'id="v2OnbidResultArea"', 'Onbid result area id');
+requireIncludes(front, 'function renderMobileItems(items)', 'Onbid mobile result card renderer');
+requireIncludes(front, 'id="v2OnbidMobileCards"', 'Onbid mobile result card list');
+requireIncludes(front, 'v2-onbid-table-wrap', 'Onbid desktop table wrapper');
 requireIncludes(front, 'root.innerHTML = renderResultsArea()', 'Onbid result root write');
 requireIncludes(layout, 'v2OnbidResultCard', 'tab layout guard must cover Onbid result card');
 
