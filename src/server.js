@@ -48,6 +48,18 @@ function logException(scope, req, error, extra = {}) {
   });
 }
 
+function cloneWithoutInternalFields(value) {
+  if (Array.isArray(value)) return value.map(cloneWithoutInternalFields);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !['rawApis', 'debug', '_internalCsNo'].includes(key))
+    .map(([key, item]) => [key, cloneWithoutInternalFields(item)]));
+}
+
+function sanitizeFetchCaseResult(result) {
+  return cloneWithoutInternalFields(result || {});
+}
+
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => {
   req.requestId = req.headers['x-request-id'] || createRequestId();
@@ -447,57 +459,106 @@ function xmlItemsByName(xml, name) {
 }
 
 function normalizeOnbidListItem(itemXml) {
+  const cltrNo = pickXml(itemXml, ['CLTR_NO', 'cltrNo', 'CLTR_MNG_NO', 'cltrMngNo']);
+  const plnmNo = pickXml(itemXml, ['PLNM_NO', 'plnmNo']);
+  const pbctNo = pickXml(itemXml, ['PBCT_NO', 'pbctNo', 'PBCT_CDTN_NO', 'pbctCdtnNo']);
+  const sido = pickXml(itemXml, ['SIDO', 'sido', 'LCTN_SDNM', 'lctnSdnm']);
+  const signgu = pickXml(itemXml, ['SIGNGU', 'signgu', 'LCTN_SGGNM', 'lctnSggnm']);
+  const rawAddress = pickXml(itemXml, ['LDNM_ADRS', 'NMRD_ADRS', 'ldnmAdrs', 'nmrdAdrs', 'LCTN_FULL_ADDR', 'lctnFullAddr']);
+  const pbctBegnDtm = pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm', 'BID_STRT_DTM', 'bidStrtDtm']);
+  const pbctClsDtm = pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm', 'BID_END_DTM', 'bidEndDtm']);
+  const statNm = pickXml(itemXml, ['STAT_NM', 'statNm', 'BID_STAT_NM', 'bidStatNm']);
   return {
-    cltrNo: pickXml(itemXml, ['CLTR_NO', 'cltrNo']),
-    plnmNo: pickXml(itemXml, ['PLNM_NO', 'plnmNo']),
-    pbctNo: pickXml(itemXml, ['PBCT_NO', 'pbctNo']),
+    cltrNo,
+    cltrMngNo: cltrNo,
+    plnmNo,
+    pbctNo,
+    pbctCdtnNo: pbctNo,
     cltrNm: pickXml(itemXml, ['CLTR_NM', 'cltrNm']),
     ctgrFullNm: pickXml(itemXml, ['CTGR_FULL_NM', 'ctgrFullNm']),
-    pbctBegnDtm: pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm']),
-    pbctClsDtm: pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm']),
+    pbctBegnDtm,
+    pbctClsDtm,
+    bidStrtDtm: pbctBegnDtm,
+    bidEndDtm: pbctClsDtm,
+    bidPrdYmdStart: pbctBegnDtm,
+    bidPrdYmdEnd: pbctClsDtm,
     minBidPrc: pickXml(itemXml, ['MIN_BID_PRC', 'minBidPrc']),
     apslAsesAvgAmt: pickXml(itemXml, ['APSL_ASES_AVG_AMT', 'apslAsesAvgAmt']),
-    sido: pickXml(itemXml, ['SIDO', 'sido']),
-    signgu: pickXml(itemXml, ['SIGNGU', 'signgu']),
+    sido,
+    signgu,
+    lctnSdnm: sido,
+    lctnSggnm: signgu,
     lot: pickXml(itemXml, ['LOT', 'lot']),
-    rawAddress: pickXml(itemXml, ['LDNM_ADRS', 'NMRD_ADRS', 'ldnmAdrs', 'nmrdAdrs']),
-    statNm: pickXml(itemXml, ['STAT_NM', 'statNm']),
+    rawAddress,
+    lctnFullAddr: rawAddress,
+    statNm,
+    bidStatNm: statNm,
+    dspsMthodNm: pickXml(itemXml, ['DSPS_MTHOD_NM', 'dspsMthodNm']),
+    pbctOrgNm: pickXml(itemXml, ['PBCT_ORG_NM', 'pbctOrgNm', 'RQST_ORG_NM', 'rqstOrgNm']),
   };
 }
 
 function normalizeOnbidDetailItem(itemXml) {
+  const cltrNo = pickXml(itemXml, ['CLTR_NO', 'cltrNo', 'CLTR_MNG_NO', 'cltrMngNo']);
+  const plnmNo = pickXml(itemXml, ['PLNM_NO', 'plnmNo']);
+  const pbctNo = pickXml(itemXml, ['PBCT_NO', 'pbctNo', 'PBCT_CDTN_NO', 'pbctCdtnNo']);
+  const ldnmAdrs = pickXml(itemXml, ['LDNM_ADRS', 'ldnmAdrs', 'LCTN_FULL_ADDR', 'lctnFullAddr']);
+  const nmrdAdrs = pickXml(itemXml, ['NMRD_ADRS', 'nmrdAdrs']);
+  const pbctBegnDtm = pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm', 'BID_STRT_DTM', 'bidStrtDtm']);
+  const pbctClsDtm = pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm', 'BID_END_DTM', 'bidEndDtm']);
+  const statNm = pickXml(itemXml, ['STAT_NM', 'statNm', 'BID_STAT_NM', 'bidStatNm']);
   return {
-    cltrNo: pickXml(itemXml, ['CLTR_NO', 'cltrNo']),
-    plnmNo: pickXml(itemXml, ['PLNM_NO', 'plnmNo']),
-    pbctNo: pickXml(itemXml, ['PBCT_NO', 'pbctNo']),
+    cltrNo,
+    cltrMngNo: cltrNo,
+    plnmNo,
+    pbctNo,
+    pbctCdtnNo: pbctNo,
     cltrNm: pickXml(itemXml, ['CLTR_NM', 'cltrNm']),
     ctgrFullNm: pickXml(itemXml, ['CTGR_FULL_NM', 'ctgrFullNm']),
     goodsNm: pickXml(itemXml, ['GOODS_NM', 'goodsNm']),
-    ldnmAdrs: pickXml(itemXml, ['LDNM_ADRS', 'ldnmAdrs']),
-    nmrdAdrs: pickXml(itemXml, ['NMRD_ADRS', 'nmrdAdrs']),
+    ldnmAdrs,
+    nmrdAdrs,
+    lctnFullAddr: ldnmAdrs || nmrdAdrs,
     minBidPrc: pickXml(itemXml, ['MIN_BID_PRC', 'minBidPrc']),
     apslAsesAvgAmt: pickXml(itemXml, ['APSL_ASES_AVG_AMT', 'apslAsesAvgAmt']),
-    pbctBegnDtm: pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm']),
-    pbctClsDtm: pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm']),
-    statNm: pickXml(itemXml, ['STAT_NM', 'statNm']),
+    pbctBegnDtm,
+    pbctClsDtm,
+    bidStrtDtm: pbctBegnDtm,
+    bidEndDtm: pbctClsDtm,
+    statNm,
+    bidStatNm: statNm,
+    dspsMthodNm: pickXml(itemXml, ['DSPS_MTHOD_NM', 'dspsMthodNm']),
+    pbctOrgNm: pickXml(itemXml, ['PBCT_ORG_NM', 'pbctOrgNm', 'RQST_ORG_NM', 'rqstOrgNm']),
   };
 }
 
-async function fetchOnbid(endpoint, params) {
-  const serviceKey = requireOnbidKey({ requestId: null }, { status: () => ({ json: () => {} }) });
-  if (!serviceKey) throw new Error('온비드 API 키가 없습니다.');
-
+async function fetchOnbid(endpoint, params, serviceKey) {
   const url = new URL(endpoint);
   url.searchParams.set('ServiceKey', serviceKey);
   Object.entries(params || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
   });
 
-  const res = await fetch(url.toString());
-  const text = await res.text();
-  if (!res.ok) throw new Error('온비드 API 응답 오류');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    const text = await res.text();
+    if (!res.ok) throw new Error('온비드 API 응답 오류');
 
-  return text;
+    return text;
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('온비드 API 응답 시간 초과');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function numberInRange(value, fallback, min, max) {
+  const number = Number(String(value || '').replace(/[^0-9]/g, ''));
+  if (!Number.isFinite(number) || number < min) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(number)));
 }
 
 app.get('/api/onbid/items', async (req, res) => {
@@ -505,25 +566,30 @@ app.get('/api/onbid/items', async (req, res) => {
     const key = requireOnbidKey(req, res);
     if (!key) return;
 
-    const query = sanitizeOnbidParam(req.query.query, 60);
-    const sido = sanitizeOnbidParam(req.query.sido, 30);
-    const pageNo = sanitizeOnbidParam(req.query.pageNo || '1', 10);
-    const numOfRows = sanitizeOnbidParam(req.query.numOfRows || '10', 10);
+    const query = sanitizeOnbidParam(req.query.query || req.query.keyword, 60);
+    const sido = sanitizeOnbidParam(req.query.sido || req.query.lctnSdnm, 30);
+    const signgu = sanitizeOnbidParam(req.query.signgu || req.query.lctnSggnm, 30);
+    const bidStart = sanitizeOnbidParam(req.query.bidPrdYmdStart, 8);
+    const bidEnd = sanitizeOnbidParam(req.query.bidPrdYmdEnd, 8);
+    const pageNo = String(numberInRange(req.query.pageNo, 1, 1, 100));
+    const numOfRows = String(numberInRange(req.query.numOfRows, 10, 1, 20));
 
     const xml = await fetchOnbid(ONBID_LIST_ENDPOINT, {
-      ServiceKey: key,
       pageNo,
       numOfRows,
       CLTR_NM: query,
       SIDO: sido,
+      SIGNGU: signgu,
+      PBCT_BEGN_DTM: bidStart,
+      PBCT_CLS_DTM: bidEnd,
       _type: 'xml',
-    });
+    }, key);
 
     const items = xmlItemsByName(xml, 'item').map(normalizeOnbidListItem);
-    return res.json({ ok: true, count: items.length, items, requestId: req.requestId });
+    return res.json({ ok: true, count: items.length, totalCount: items.length, pageNo: Number(pageNo), numOfRows: Number(numOfRows), items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/items', req, e);
-    return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.', { detail: e.message }));
+    return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.'));
   }
 });
 
@@ -532,24 +598,23 @@ app.get('/api/onbid/detail', async (req, res) => {
     const key = requireOnbidKey(req, res);
     if (!key) return;
 
-    const cltrNo = sanitizeOnbidParam(req.query.cltrNo, 40);
+    const cltrNo = sanitizeOnbidParam(req.query.cltrNo || req.query.cltrMngNo, 40);
     const plnmNo = sanitizeOnbidParam(req.query.plnmNo, 40);
-    const pbctNo = sanitizeOnbidParam(req.query.pbctNo, 40);
+    const pbctNo = sanitizeOnbidParam(req.query.pbctNo || req.query.pbctCdtnNo, 40);
     if (!cltrNo && !plnmNo && !pbctNo) return res.status(400).json(errorBody(req, '온비드 상세 조회에 필요한 물건번호가 없습니다.'));
 
     const xml = await fetchOnbid(ONBID_DETAIL_ENDPOINT, {
-      ServiceKey: key,
       CLTR_NO: cltrNo,
       PLNM_NO: plnmNo,
       PBCT_NO: pbctNo,
       _type: 'xml',
-    });
+    }, key);
 
     const items = xmlItemsByName(xml, 'item').map(normalizeOnbidDetailItem);
-    return res.json({ ok: true, count: items.length, item: items[0] || null, items, requestId: req.requestId });
+    return res.json({ ok: true, count: items.length, item: items[0] || null, detail: items[0] || null, items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/detail', req, e);
-    return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.', { detail: e.message }));
+    return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.'));
   }
 });
 
@@ -559,11 +624,11 @@ app.post('/api/fetch', async (req, res) => {
     if (!jiwonNm || !saYear || !saSer) {
       return res.status(400).json(errorBody(req, '법원, 연도, 사건번호를 모두 입력하세요.'));
     }
-    const result = await fetchCase({ jiwonNm, saYear, saSer });
+    const result = sanitizeFetchCaseResult(await fetchCase({ jiwonNm, saYear, saSer }));
     return res.json({ ok: true, raw: result, elapsed: result.elapsed, requestId: req.requestId });
   } catch (e) {
     logException('fetch', req, e);
-    return res.status(500).json(errorBody(req, e.message || '조회 실패'));
+    return res.status(500).json(errorBody(req, '사건 조회 중 오류가 발생했습니다.'));
   }
 });
 

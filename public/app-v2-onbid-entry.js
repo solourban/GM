@@ -26,6 +26,10 @@
     return window.__auctionV2?.state || null;
   }
 
+  function resultRoot() {
+    return window.__auctionV2?.tabResultsRoot?.() || document.getElementById('v2TabResultsSection');
+  }
+
   function statusPill(ok, readyLabel = '준비됨', failLabel = '설정 필요') {
     return `<span class="v2-pill ${ok ? 'ok' : 'warn'}">${esc(ok ? readyLabel : failLabel)}</span>`;
   }
@@ -64,7 +68,7 @@
     const bidStart = itemValue(item, ['bidStrtDtm', 'bidPrdYmdStart', 'BID_STRT_DTM', '입찰시작일']);
     const bidEnd = itemValue(item, ['bidEndDtm', 'bidPrdYmdEnd', 'BID_END_DTM', '입찰종료일']);
     const org = itemValue(item, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', 'RQST_ORG_NM', '공고기관']);
-    const cltrMngNo = itemValue(item, ['cltrMngNo', 'CLTR_MNG_NO', '물건관리번호']);
+    const cltrMngNo = itemValue(item, ['cltrMngNo', 'cltrNo', 'CLTR_MNG_NO', 'CLTR_NO', '물건관리번호']);
     const pbctNo = itemValue(item, ['pbctNo', 'pbctCdtnNo', 'PBCT_NO', 'PBCT_CDTN_NO', '공고번호']);
     const method = itemValue(item, ['dspsMthodNm', 'dspsMthodCdNm', 'DSPS_MTHOD_NM', '처분방식']);
     const status = itemValue(item, ['bidStatNm', 'bidStatCdNm', 'BID_STAT_NM', '입찰상태']);
@@ -76,7 +80,9 @@
       period: [formatDate(bidStart), formatDate(bidEnd)].filter(Boolean).join(' ~ '),
       org,
       cltrMngNo,
+      cltrNo: cltrMngNo,
       pbctNo,
+      pbctCdtnNo: pbctNo,
       method,
       status,
     };
@@ -94,7 +100,7 @@
       method: itemValue(detail, ['dspsMthodNm', 'dspsMthodCdNm', 'DSPS_MTHOD_NM', '처분방식']),
       status: itemValue(detail, ['bidStatNm', 'bidStatCdNm', 'BID_STAT_NM', '입찰상태']),
       org: itemValue(detail, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', 'RQST_ORG_NM', '공고기관']),
-      cltrMngNo: itemValue(detail, ['cltrMngNo', 'CLTR_MNG_NO', '물건관리번호']),
+      cltrMngNo: itemValue(detail, ['cltrMngNo', 'cltrNo', 'CLTR_MNG_NO', 'CLTR_NO', '물건관리번호']),
       pbctNo: itemValue(detail, ['pbctNo', 'pbctCdtnNo', 'PBCT_NO', 'PBCT_CDTN_NO', '공고번호']),
       bidStart: itemValue(detail, ['bidStrtDtm', 'bidPrdYmdStart', 'BID_STRT_DTM', '입찰시작일']),
       bidEnd: itemValue(detail, ['bidEndDtm', 'bidPrdYmdEnd', 'BID_END_DTM', '입찰종료일']),
@@ -138,8 +144,8 @@
 
   function buildDetailParams(cltrMngNo, pbctCdtnNo) {
     const params = new URLSearchParams();
-    params.set('cltrMngNo', clean(cltrMngNo));
-    if (clean(pbctCdtnNo)) params.set('pbctCdtnNo', clean(pbctCdtnNo));
+    params.set('cltrNo', clean(cltrMngNo));
+    if (clean(pbctCdtnNo)) params.set('pbctNo', clean(pbctCdtnNo));
     return params;
   }
 
@@ -189,7 +195,7 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || '온비드 공매 상세 조회에 실패했습니다.');
       onbidState.detailStatus = 'success';
-      onbidState.detail = data.detail || {};
+      onbidState.detail = data.detail || data.item || {};
       onbidState.detailRequestId = clean(data.requestId || '');
     } catch (error) {
       onbidState.detailStatus = 'error';
@@ -268,6 +274,18 @@
     `;
   }
 
+  function renderResultsArea() {
+    return `
+      <section class="v2-result-card" id="v2OnbidResultCard">
+        <span class="v2-badge">온비드 결과</span>
+        <h3>공매 물건 조회 결과</h3>
+        <p class="v2-note">공매 결과와 상세정보는 법원경매 사건 결과와 분리해 표시합니다.</p>
+        <div class="v2-grid compact" id="v2OnbidResultArea">${renderResults()}</div>
+      </section>
+      ${renderDetail()}
+    `;
+  }
+
   function renderPanel() {
     const config = onbidState.config || {};
     const ready = Boolean(config.hasOnbid);
@@ -302,9 +320,7 @@
               ${ready ? '<span class="v2-note">기본 10건만 우선 조회합니다.</span>' : '<span class="v2-note">ONBID_API_KEY 설정 후 조회할 수 있습니다.</span>'}
             </div>
           </div>
-          <div class="v2-grid compact" id="v2OnbidResultArea">${renderResults()}</div>
         </div>
-        ${renderDetail()}
       </section>
     `;
   }
@@ -330,6 +346,8 @@
     const old = document.getElementById(PANEL_ID);
     if (old) old.remove();
     panels.insertAdjacentHTML('beforeend', renderPanel());
+    const root = resultRoot();
+    if (root && state()?.activeTab === TAB) root.innerHTML = renderResultsArea();
   }
 
   async function syncPanel() {
