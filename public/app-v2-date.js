@@ -257,10 +257,43 @@
     `;
   }
 
+  function renderMobileCards(items) {
+    return `
+      <div class="v2-date-card-list">
+        ${items.map((item) => {
+          const parsed = parseCaseNo(item.caseNo || '');
+          const disabled = parsed ? '' : 'disabled';
+          const isSelected = state.selectedCandidate && sameCase(state.selectedCandidate.caseNo, item.caseNo);
+          const reasons = Array.isArray(item.reasons) ? item.reasons.join(', ') : '';
+          return `
+            <article class="v2-date-item-card" data-selected-candidate="${isSelected ? '1' : '0'}">
+              <div class="v2-date-item-head">
+                <div>
+                  <span class="v2-badge">${isSelected ? '선택됨' : `점수 ${esc(item.score ?? '-')}`}</span>
+                  <h4>${esc(item.caseNo || '사건번호 확인 필요')}</h4>
+                </div>
+                <strong>${esc(item.saleDate || '-')}</strong>
+              </div>
+              <div class="v2-date-item-grid">
+                <span><small>용도</small><b>${esc(item.usage || '-')}</b></span>
+                <span><small>최저가</small><b>${formatWon(item.minBid)}</b></span>
+                <span><small>감정가</small><b>${formatWon(item.appraisal)}</b></span>
+                <span><small>할인율</small><b>${percent(candidateDiscountRate(item))}</b></span>
+              </div>
+              <p class="v2-date-item-reasons">${esc(reasons || '추가 확인 필요')}</p>
+              <button type="button" class="v2-small-btn" data-date-search-case="${esc(item.caseNo || '')}" ${disabled}>이 사건 조회</button>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   function renderRows(items) {
     if (!items.length) return '<p class="v2-note">현재 정렬/필터 조건에 맞는 매각기일 후보가 없습니다.</p>';
     return `
-      <div class="v2-detail-table-wrap">
+      ${renderMobileCards(items)}
+      <div class="v2-detail-table-wrap v2-date-table-wrap">
         <table class="v2-detail-table">
           <thead>
             <tr><th>상태</th><th>점수</th><th>사건번호</th><th>매각기일</th><th>용도</th><th>최저가</th><th>감정가</th><th>할인율</th><th>유찰</th><th>사유</th><th>연결</th></tr>
@@ -305,8 +338,6 @@
     const displayItems = visibleItems();
     const hasResult = state.meta || state.items.length;
     return `
-      ${renderCandidateComparison()}
-      ${renderSelectedCandidate()}
       ${state.loading ? `<section class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>매각기일 목록을 조회 중입니다.</h3><p class="v2-note">조회 결과는 이 영역에 표시됩니다.</p></div></div></section>` : ''}
       ${hasResult ? `
         <section class="v2-result-card" id="v2DateResultCard">
@@ -318,6 +349,8 @@
           ${renderRows(displayItems)}
           <p class="v2-note">관심 물건은 “이 사건 조회”로 물건검색 탭에 값을 옮긴 뒤, 기본정보 조회 버튼을 눌러 권리분석을 진행하세요.</p>
         </section>
+        ${renderCandidateComparison()}
+        ${renderSelectedCandidate()}
       ` : (state.loading ? '' : renderEmptyState())}
     `;
   }
@@ -328,7 +361,7 @@
     panel.innerHTML = `
       <div class="v2-card">
         <h3>매각기일 추천</h3>
-        <p>법원과 기간을 기준으로 이번에 볼 만한 매각기일 후보를 조회합니다. 결과는 후보 선별용이며, 단일 사건 조회로 다시 검토해야 합니다.</p>
+        <p>법원과 기간을 선택해 매각기일 후보를 조회합니다.</p>
         <div class="v2-form v2-date-search-form">
           <label class="v2-field"><span>법원</span><select id="dateCourtV2">${renderCourtOptions()}</select></label>
           <label class="v2-field"><span>시작일</span><input id="dateStartV2" type="date" value="${esc(state.form.start)}"></label>
@@ -336,9 +369,8 @@
           <label class="v2-field"><span>용도</span><select id="dateUsageV2"><option value="all" ${selected(state.form.usage, 'all')}>전체</option><option value="20100" ${selected(state.form.usage, '20100')}>주거형</option><option value="20104" ${selected(state.form.usage, '20104')}>아파트</option></select></label>
           <button id="dateFetchV2" class="v2-btn" ${state.loading ? 'disabled' : ''}>${state.loading ? '조회 중...' : '매각기일 조회'}</button>
         </div>
-        <p class="v2-note">법원과 기간을 선택해 매각기일 후보를 조회합니다. 결과는 단일 사건 조회로 다시 확인하세요.</p>
         <div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>
-        <p class="v2-note">매각기일 조회는 물건검색 결과와 권리분석 결과를 변경하지 않습니다.</p>
+        <p class="v2-note">조회 결과는 단일 사건 조회로 다시 확인하세요. 기존 물건검색·권리분석 결과는 변경하지 않습니다.</p>
       </div>
     `;
     const root = resultRoot();
