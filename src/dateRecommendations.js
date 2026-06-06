@@ -244,11 +244,37 @@ function parseHtmlItems(text, requestedCourt) {
   return out;
 }
 
+function canonicalDateItemKey(item) {
+  const court = clean(item?.boCd || item?.court || item?.rawCourt);
+  const caseNo = clean(item?.caseNo).replace(/\s+/g, '');
+  if (caseNo) return `${court}|${caseNo}`;
+  return `${court}|${clean(item?.saleDate)}|${clean(item?.usage)}|${clean(item?.address)}`;
+}
+
+function itemCompletenessScore(item) {
+  let score = 0;
+  if (clean(item?.address) && clean(item.address) !== '주소 확인 필요') score += 5;
+  if (money(item?.appraisal)) score += 4;
+  if (money(item?.minBid)) score += 4;
+  if (clean(item?.saleDate)) score += 3;
+  if (clean(item?.usage) && clean(item.usage) !== '용도 확인 필요') score += 3;
+  if (Array.isArray(item?.reasons) && item.reasons.length) score += 1;
+  score += Math.max(0, Number(item?.score || 0)) / 100;
+  return score;
+}
+
+function betterDateItem(left, right) {
+  if (!left) return right;
+  if (!right) return left;
+  return itemCompletenessScore(right) > itemCompletenessScore(left) ? right : left;
+}
+
 function extractItems(response, requestedCourt, requestedCourtCode) {
   const items = [];
   const rejected = [];
   const courtCodeMismatches = {};
   const rawCourtNames = {};
+  let duplicateCount = 0;
 
   if (response.json) {
     const direct = response.json?.data?.dlt_srchResult;
@@ -261,8 +287,7 @@ function extractItems(response, requestedCourt, requestedCourtCode) {
     items.push(...parseHtmlItems(response.text, requestedCourt));
   }
 
-  const seen = new Set();
-  const valid = [];
+  const seen = new Map();
   for (const item of items) {
     if (item.rawCourt) rawCourtNames[item.rawCourt] = (rawCourtNames[item.rawCourt] || 0) + 1;
     if (item.invalid) {
@@ -270,13 +295,16 @@ function extractItems(response, requestedCourt, requestedCourtCode) {
       if (item.boCd) courtCodeMismatches[item.boCd] = (courtCodeMismatches[item.boCd] || 0) + 1;
       continue;
     }
-    const key = `${item.court}|${item.caseNo}|${item.address}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    valid.push(item);
+    const key = canonicalDateItemKey(item);
+    if (seen.has(key)) {
+      duplicateCount += 1;
+      seen.set(key, betterDateItem(seen.get(key), item));
+      continue;
+    }
+    seen.set(key, item);
   }
 
-  return { items: valid, rawCount: items.length, rejected: rejected.slice(0, 10), courtCodeMismatches, rawCourtNames };
+  return { items: [...seen.values()], rawCount: items.length, duplicateCount, rejected: rejected.slice(0, 10), courtCodeMismatches, rawCourtNames };
 }
 
 function usageCodes(usage) {
@@ -297,7 +325,7 @@ function buildPayload({ cortOfcCd, startYmd, endYmd, usage, maxBidRate, useUsage
       mvprpDspslPlcAdongSdCd: '', mvprpDspslPlcAdongSggCd: '', mvprpDspslPlcAdongEmdCd: '', rdDspslPlcAdongSdCd: '', rdDspslPlcAdongSggCd: '', rdDspslPlcAdongEmdCd: '',
       jdbnCd: '', execrOfcDvsCd: '', ...codes, cortAuctnMbrsId: '', aeeEvlAmtMin: '', aeeEvlAmtMax: '', lwsDspslPrcRateMin: '', lwsDspslPrcRateMax: rateMax,
       flbdNcntMin: '', flbdNcntMax: '', objctArDtsMin: '', objctArDtsMax: '', mvprpArtclKndCd: '', mvprpArtclNm: '', mvprpAtchmPlcTypCd: '', notifyLoc: 'on', lafjOrderBy: '',
-      pgmId: 'PGJ151F01', csNo: '', cortStDvs: '3', statNum: 1, bidBgngYmd: startYmd, bidEndYmd: endYmd,
+      pgmId: 'PGJ151F01', csNo: '', cortStDvs: '1', statNum: 1, bidBgngYmd: startYmd, bidEndYmd: endYmd,
       dspslDxdyYmd: '', fstDspslHm: '', scndDspslHm: '', thrdDspslHm: '', fothDspslHm: '', dspslPlcNm: '', lwsDspslPrcMin: '', lwsDspslPrcMax: '',
       grbxTypCd: '', gdsVendNm: '', fuelKndCd: '', carMdyrMax: '', carMdyrMin: '', carMdlNm: '',
     },
@@ -348,6 +376,7 @@ async function findAuctionsByDate(options = {}) {
         attempt.textLength = response.text.length;
         attempt.rawHasCaseNo = /(20\d{2})\s*타경/.test(clean(response.text));
         attempt.rawCount = extracted.rawCount;
+        attempt.duplicateCount = extracted.duplicateCount;
         attempt.count = extracted.items.length;
         attempt.rejected = extracted.rejected;
         attempt.rawCourtNames = extracted.rawCourtNames;
@@ -387,4 +416,7 @@ async function findAuctionsByDate(options = {}) {
   };
 }
 
-module.exports = { findAuctionsByDate };
+module.exports = {
+  findAuctionsByDate,
+  __test: { buildPayload, extractItems, canonicalDateItemKey },
+};

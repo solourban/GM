@@ -36,6 +36,18 @@ assert(
   'date results must be written to the shared tab results outlet'
 );
 assert(
+  date.includes('function renderMobileCards(items)') && date.includes('v2-date-card-list') && date.includes('v2-date-table-wrap'),
+  'date results must provide mobile cards instead of relying only on a wide table'
+);
+assert(
+  core.includes('.v2-date-card-list{display:grid') && core.includes('.v2-date-table-wrap{display:none}'),
+  'mobile date result layout must hide the wide table and show card rows'
+);
+assert(
+  core.includes('.site-header{padding:6px 0}') && core.includes('.v2-tab:nth-child(n+4){grid-column:span 3}'),
+  'mobile sticky header must stay compact with balanced tab rows'
+);
+assert(
   dateSource.includes('function resultRoot()') && dateSource.includes("root.insertAdjacentHTML('afterbegin', renderCard(candidate))"),
   'selected date candidate source card must render below the search hero'
 );
