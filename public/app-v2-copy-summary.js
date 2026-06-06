@@ -36,6 +36,11 @@
     return n ? `${Math.round(n).toLocaleString('ko-KR')}원` : '-';
   }
 
+  function signedWon(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? `${Math.round(n).toLocaleString('ko-KR')}원` : '-';
+  }
+
   function manwon(value) {
     const n = Number(value || 0);
     return n ? `${Math.round(n).toLocaleString('ko-KR')}만원` : '-';
@@ -66,12 +71,43 @@
   }
 
   function loadPlannedBid(report) {
+    const snapshot = loadBidPlanSnapshot(report);
+    return snapshot?.plannedBid || 0;
+  }
+
+  function loadBidPlanSnapshot(report) {
+    try {
+      if (window.__auctionBidPlan?.currentSnapshot) {
+        const snapshot = window.__auctionBidPlan.currentSnapshot(report);
+        if (snapshot) return snapshot;
+      }
+    } catch (_) {}
+
     try {
       const inputValue = clean(document.getElementById('v2PlannedBidInput')?.value || '');
-      if (inputValue) return numberValue(inputValue);
-      return numberValue(localStorage.getItem(bidPlanStorageKey(report)) || '');
+      const raw = localStorage.getItem(bidPlanStorageKey(report)) || '';
+      let stored = raw;
+      if (clean(raw).startsWith('{')) stored = JSON.parse(raw);
+      const plannedBid = numberValue(inputValue || (stored && typeof stored === 'object' ? stored.plannedBid : stored));
+      const expectedSalePrice = numberValue(stored && typeof stored === 'object' ? stored.expectedSalePrice : '');
+      const inheritedTotal = numberValue(report?.inherited?.total);
+      const bidDepositRate = numberValue(report?.basic?.['입찰보증금률']) || 10;
+      const bidDeposit = Math.round(plannedBid * bidDepositRate / 100);
+      return {
+        plannedBid,
+        expectedSalePrice,
+        bidDeposit,
+        totalBurden: plannedBid + inheritedTotal,
+        message: plannedBidMessage({
+          plannedBid,
+          minBid: numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']),
+          upper: numberValue(report?.bidRec?.upper),
+          inheritedTotal,
+          riskLevel: report?.risk?.level || 'ok',
+        }),
+      };
     } catch (_) {
-      return 0;
+      return { plannedBid: 0 };
     }
   }
 
@@ -395,10 +431,11 @@
     const practicalBurden = minBid + inheritedTotal;
     const upper = numberValue(report?.bidRec?.upper);
     const upperTotal = upper ? upper + inheritedTotal : 0;
-    const plannedBid = loadPlannedBid(report);
+    const bidPlan = loadBidPlanSnapshot(report);
+    const plannedBid = bidPlan?.plannedBid || 0;
     const plannedBidDepositRate = numberValue(report?.basic?.['입찰보증금률']) || 10;
-    const plannedBidDeposit = Math.round(plannedBid * plannedBidDepositRate / 100);
-    const plannedTotal = plannedBid + inheritedTotal;
+    const plannedBidDeposit = bidPlan?.bidDeposit ?? Math.round(plannedBid * plannedBidDepositRate / 100);
+    const plannedTotal = bidPlan?.totalBurden ?? plannedBid + inheritedTotal;
     const plannedMessage = plannedBidMessage({
       plannedBid,
       minBid,
@@ -422,11 +459,18 @@
     appendSavedTopFiveSummary(lines);
     if (plannedBid) {
       lines.push('');
-      lines.push('내 입찰가 시뮬레이션:');
+      lines.push('입찰가·자금 계산:');
       lines.push(`- 입찰 예정가: ${money(plannedBid)}`);
       lines.push(`- 입찰보증금(${plannedBidDepositRate}%): ${money(plannedBidDeposit)}`);
-      lines.push(`- 입찰가+인수 추정금액: ${money(plannedTotal)}`);
-      lines.push(`- 판단: ${plannedMessage}`);
+      lines.push(`- 입찰가+인수 포함 부담: ${money(plannedTotal)}`);
+      if (bidPlan?.totalAcquisitionCost) lines.push(`- 총 취득비용: ${money(bidPlan.totalAcquisitionCost)}`);
+      if (bidPlan?.loanAmount) lines.push(`- 대출 반영액: ${money(bidPlan.loanAmount)}`);
+      if (bidPlan?.requiredCash) lines.push(`- 필요 현금: ${money(bidPlan.requiredCash)}`);
+      if (bidPlan?.expectedSalePrice) lines.push(`- 예상 매도가: ${money(bidPlan.expectedSalePrice)}`);
+      if (bidPlan?.expectedSalePrice) lines.push(`- 세후수익: ${signedWon(bidPlan.afterTaxProfit)}`);
+      if (bidPlan?.expectedSalePrice && bidPlan?.requiredCash) lines.push(`- 수익률: ${ratio(bidPlan.roi)}`);
+      lines.push(`- 판단: ${bidPlan?.message || plannedMessage}`);
+      lines.push('- 주의: 대출 가능 여부와 세금은 참고값이며 금융기관·세무 확인이 필요합니다.');
     }
     lines.push(`핵심 판단: ${mainDecision(report, inheritedTotal, minBid)}`);
     lines.push('');
