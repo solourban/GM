@@ -54,6 +54,20 @@
     return n ? `${Math.round(n).toLocaleString('ko-KR')}원` : '-';
   }
 
+  function ratioText(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) && n ? `${n.toFixed(1)}%` : '-';
+  }
+
+  function bidPlanSnapshot(currentReport) {
+    try {
+      const snapshot = window.__auctionBidPlan?.currentSnapshot?.(currentReport);
+      return snapshot?.plannedBid ? snapshot : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function riskText(level) {
     if (level === 'danger') return '높음';
     if (level === 'warn') return '주의';
@@ -171,10 +185,12 @@
     const comparison = trades?.comparison || {};
     const count = tradeCount(trades);
     const scope = tradeScope(trades);
+    const bidPlan = bidPlanSnapshot(currentReport);
 
     list.push(`권리 위험도: ${riskText(riskLevel)}`);
     if (inheritedTotal > 0) list.push(`인수 추정금액: ${money(inheritedTotal)} 확인 필요`);
     else list.push('인수 추정금액: 현재 입력값 기준 0원');
+    if (bidPlan) list.push(`입찰가 산정: 필요 현금 ${money(bidPlan.requiredCash)} / 세후수익 ${money(bidPlan.afterTaxProfit)}`);
 
     if (scope.priceComparable && comparison.judgment) list.push(`가격 참고: ${clean(comparison.judgment)}`);
     else if (count > 0) list.push('가격 참고: 지역 참고시세라 최종 입찰가 판단에는 직접 반영하지 않음');
@@ -190,7 +206,7 @@
     if (scope.level === 'regional') list.push('주의: 동일 단지·동·층·전용면적 매칭 전까지 평균가 비율은 참고값으로만 사용');
     if (scope.level === 'specific') list.push('주의: 동일 단지 후보라도 동·층·전용면적 매칭 필요');
 
-    return list.slice(0, 6);
+    return list.slice(0, 7);
   }
 
   function buildSnapshot(currentReport, location, trades) {
@@ -200,6 +216,7 @@
     const count = tradeCount(trades);
     const scope = tradeScope(trades);
     const avgRatio = scope.priceComparable ? Number(comparison.avgRatio || 0) : 0;
+    const bidPlan = bidPlanSnapshot(currentReport);
     return {
       decision,
       reasons: reasons(currentReport, location, trades),
@@ -217,6 +234,15 @@
       hasLocation: Boolean(location?.x && location?.y),
       nearbyComplete: Boolean(location?.nearby?.complete),
       nearbySummary: nearbySummary(location) || '미확인',
+      bidPlan: bidPlan ? {
+        plannedBid: bidPlan.plannedBid,
+        expectedSalePrice: bidPlan.expectedSalePrice,
+        loanAmount: bidPlan.loanAmount,
+        requiredCash: bidPlan.requiredCash,
+        afterTaxProfit: bidPlan.afterTaxProfit,
+        roi: bidPlan.roi,
+        message: clean(bidPlan.message || ''),
+      } : null,
     };
   }
 
@@ -232,6 +258,17 @@
     if (tone === 'ok') return 'ok';
     if (tone === 'danger') return 'danger';
     return 'warn';
+  }
+
+  function bidPlanSummaryHtml(snapshot) {
+    const plan = snapshot.bidPlan;
+    if (!plan) return '';
+    return `
+      <div class="v2-info"><div class="k">입찰 예정가</div><div class="v">${esc(money(plan.plannedBid))}</div></div>
+      <div class="v2-info"><div class="k">필요 현금</div><div class="v">${esc(money(plan.requiredCash))}</div></div>
+      <div class="v2-info"><div class="k">세후수익</div><div class="v">${esc(money(plan.afterTaxProfit))}</div></div>
+      <div class="v2-info"><div class="k">수익률</div><div class="v">${esc(plan.expectedSalePrice ? ratioText(plan.roi) : '-')}</div></div>
+    `;
   }
 
   function renderCard(currentReport, location, trades) {
@@ -251,8 +288,10 @@
           <div class="v2-info"><div class="k">참고 범위</div><div class="v">${esc(snapshot.tradeScope)}</div></div>
           <div class="v2-info"><div class="k">최저가/평균가 참고비율</div><div class="v">${esc(snapshot.avgRatio ? `${snapshot.avgRatio.toFixed(1)}%` : '-')}</div></div>
           <div class="v2-info wide"><div class="k">주변시설 분석</div><div class="v">${esc(snapshot.nearbySummary)}</div></div>
+          ${bidPlanSummaryHtml(snapshot)}
         </div>
         <p class="v2-note">${esc(snapshot.tradeScopeNote)}</p>
+        ${snapshot.bidPlan ? `<p class="v2-note">${esc(snapshot.bidPlan.message || '입찰가 산정은 참고 계산이며 대출 가능 여부와 세금은 별도 확인이 필요합니다.')}</p>` : ''}
         <ul class="v2-check-list">
           ${snapshot.reasons.map((item) => `<li>${esc(item)}</li>`).join('')}
         </ul>
