@@ -12,6 +12,7 @@ const bulk = read('public/app-v2-bulk-tab.js');
 const saved = read('public/app-v2-saved-tab.js');
 const stack = read('public/app-v2-candidate-stack.js');
 const scopeGuard = read('public/app-v2-tab-scope-guard.js');
+const onbid = read('public/app-v2-onbid-entry.js');
 
 assert(
   core.includes('function ensureTabResultsSection()') && core.includes('v2TabResultsSection'),
@@ -76,6 +77,14 @@ assert(
 assert(
   !scopeGuard.includes("anchor.insertAdjacentElement('afterend', stack)"),
   'tab scope guard must not move candidate cards back into the green panel'
+);
+assert(
+  onbid.includes('function resultRoot()') && onbid.includes('id="v2OnbidResultCard"'),
+  'onbid tab must render results through the shared result area'
+);
+assert(
+  !onbid.slice(onbid.indexOf('function renderPanel()'), onbid.indexOf('function syncTab()')).includes('v2OnbidResultArea'),
+  'onbid result area must not be appended inside the green input panel'
 );
 
 console.log('tab results layout guard passed');
