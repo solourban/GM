@@ -17,4 +17,9 @@
       #v2HomePanels {
         min-height: 0 !important;
       }
-      .v
+      .v2-panel {
+        margin-top: 0 !important;
+      }
+      .v2-card {
+        min-height: 0 !important;
+      }
