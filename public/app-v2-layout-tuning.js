@@ -15,4 +15,4 @@
         width: 100% !important;
       }
       #v2HomePanels {
-        min-height: 0 !important;
+       
