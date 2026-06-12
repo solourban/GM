@@ -25,8 +25,11 @@ function sectionBetween(source, startNeedle, endNeedle, label) {
 requireIncludes(server, 'req.query.query || req.query.keyword', 'keyword alias support');
 requireIncludes(server, 'req.query.sido || req.query.lctnSdnm', 'sido alias support');
 requireIncludes(server, 'req.query.signgu || req.query.lctnSggnm', 'signgu alias support');
-requireIncludes(server, 'PBCT_BEGN_DTM: bidStart', 'bid start forwarding');
-requireIncludes(server, 'PBCT_CLS_DTM: bidEnd', 'bid end forwarding');
+requireIncludes(server, 'bidPrdYmdStart: bidStart', 'bid start forwarding');
+requireIncludes(server, 'bidPrdYmdEnd: bidEnd', 'bid end forwarding');
+requireIncludes(server, "resultType: 'json'", 'Onbid JSON response forwarding');
+requireIncludes(server, 'ONBID_DEFAULT_PRPT_DIV_CD', 'Onbid default property type forwarding');
+requireIncludes(server, 'pvctTrgtYn', 'Onbid private-contract flag forwarding');
 requireIncludes(server, 'numberInRange(req.query.numOfRows, 10, 1, 20)', 'Onbid numOfRows cap');
 requireIncludes(server, 'cltrMngNo: cltrNo', 'list/detail cltr alias');
 requireIncludes(server, 'pbctCdtnNo: pbctNo', 'list/detail pbct alias');
