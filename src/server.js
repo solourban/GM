@@ -434,9 +434,11 @@ app.get('/api/molit/trades', async (req, res) => {
   }
 });
 
-const ONBID_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstListSrvc2';
-const ONBID_LIST_ENDPOINT = `${ONBID_BASE_URL}/getOnbidRlstList`; 
-const ONBID_DETAIL_ENDPOINT = `${ONBID_BASE_URL}/getOnbidRlstDtl`;
+const ONBID_LIST_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstListSrvc2';
+const ONBID_DETAIL_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstDtlSrvc2';
+const ONBID_LIST_ENDPOINT = `${ONBID_LIST_BASE_URL}/getRlstCltrList2`;
+const ONBID_DETAIL_ENDPOINT = `${ONBID_DETAIL_BASE_URL}/getRlstDtlInf2`;
+const ONBID_DEFAULT_PRPT_DIV_CD = '0007,0010,0005,0004,0002,0003,0006,0008,0011';
 
 function sanitizeOnbidParam(value, max = 80) {
   return String(value || '')
@@ -458,83 +460,157 @@ function xmlItemsByName(xml, name) {
   return [...String(xml || '').matchAll(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`, 'gi'))].map((m) => m[1]);
 }
 
+function normalizeOnbidScalar(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'object') return '';
+  return String(value).trim();
+}
+
+function pickOnbid(item, keys) {
+  if (typeof item === 'string') return pickXml(item, keys);
+  if (!item || typeof item !== 'object') return '';
+  const entries = Object.entries(item);
+  for (const key of keys) {
+    const direct = normalizeOnbidScalar(item[key]);
+    if (direct) return direct;
+    const lowerKey = String(key).toLowerCase();
+    const match = entries.find(([entryKey]) => entryKey.toLowerCase() === lowerKey);
+    const indirect = normalizeOnbidScalar(match?.[1]);
+    if (indirect) return indirect;
+  }
+  return '';
+}
+
+function onbidResponseBody(payload) {
+  return payload?.response?.body || payload?.body || payload || {};
+}
+
+function onbidItemsFromResponse(payload) {
+  if (payload?.rawXml) return xmlItemsByName(payload.rawXml, 'item');
+  const body = onbidResponseBody(payload);
+  const items = body?.items?.item || body?.items || body?.item || [];
+  if (Array.isArray(items)) return items;
+  if (items && typeof items === 'object') return [items];
+  return [];
+}
+
+function onbidTotalCount(payload, fallback) {
+  const total = Number(onbidResponseBody(payload)?.totalCount);
+  return Number.isFinite(total) ? total : fallback;
+}
+
+function normalizeYmd(value) {
+  return String(value || '').replace(/[^0-9]/g, '').slice(0, 8);
+}
+
+function onbidMatchesFilters(item, { query, sido, signgu, bidStart, bidEnd }) {
+  const text = [
+    item.cltrNm,
+    item.onbidCltrNm,
+    item.lctnFullAddr,
+    item.rawAddress,
+    item.ldnmAdrs,
+    item.nmrdAdrs,
+  ].filter(Boolean).join(' ');
+  if (query && !text.includes(query)) return false;
+  if (sido && !String(item.lctnSdnm || item.sido || '').includes(sido)) return false;
+  if (signgu && !String(item.lctnSggnm || item.signgu || '').includes(signgu)) return false;
+
+  const startsAt = normalizeYmd(item.pbctBegnDtm || item.bidStrtDtm || item.bidPrdYmdStart);
+  const endsAt = normalizeYmd(item.pbctClsDtm || item.bidEndDtm || item.bidPrdYmdEnd);
+  if (bidStart && endsAt && endsAt < bidStart) return false;
+  if (bidEnd && startsAt && startsAt > bidEnd) return false;
+  return true;
+}
+
 function normalizeOnbidListItem(itemXml) {
-  const cltrNo = pickXml(itemXml, ['CLTR_NO', 'cltrNo', 'CLTR_MNG_NO', 'cltrMngNo']);
-  const plnmNo = pickXml(itemXml, ['PLNM_NO', 'plnmNo']);
-  const pbctNo = pickXml(itemXml, ['PBCT_NO', 'pbctNo', 'PBCT_CDTN_NO', 'pbctCdtnNo']);
-  const sido = pickXml(itemXml, ['SIDO', 'sido', 'LCTN_SDNM', 'lctnSdnm']);
-  const signgu = pickXml(itemXml, ['SIGNGU', 'signgu', 'LCTN_SGGNM', 'lctnSggnm']);
-  const rawAddress = pickXml(itemXml, ['LDNM_ADRS', 'NMRD_ADRS', 'ldnmAdrs', 'nmrdAdrs', 'LCTN_FULL_ADDR', 'lctnFullAddr']);
-  const pbctBegnDtm = pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm', 'BID_STRT_DTM', 'bidStrtDtm']);
-  const pbctClsDtm = pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm', 'BID_END_DTM', 'bidEndDtm']);
-  const statNm = pickXml(itemXml, ['STAT_NM', 'statNm', 'BID_STAT_NM', 'bidStatNm']);
+  const cltrNo = pickOnbid(itemXml, ['cltrMngNo', 'CLTR_MNG_NO', 'cltrNo', 'CLTR_NO']);
+  const plnmNo = pickOnbid(itemXml, ['plnmNo', 'PLNM_NO']);
+  const pbctNo = pickOnbid(itemXml, ['pbctCdtnNo', 'PBCT_CDTN_NO', 'pbctNo', 'PBCT_NO']);
+  const sido = pickOnbid(itemXml, ['lctnSdnm', 'LCTN_SDNM', 'sido', 'SIDO']);
+  const signgu = pickOnbid(itemXml, ['lctnSggnm', 'LCTN_SGGNM', 'signgu', 'SIGNGU']);
+  const rawAddress = pickOnbid(itemXml, ['ldnmAdrs', 'LDNM_ADRS', 'nmrdAdrs', 'NMRD_ADRS', 'lctnFullAddr', 'LCTN_FULL_ADDR']);
+  const pbctBegnDtm = pickOnbid(itemXml, ['pbctBegnDtm', 'PBCT_BEGN_DTM', 'bidStrtDtm', 'BID_STRT_DTM', 'bidPrdYmdStart']);
+  const pbctClsDtm = pickOnbid(itemXml, ['pbctClsDtm', 'PBCT_CLS_DTM', 'bidEndDtm', 'BID_END_DTM', 'bidPrdYmdEnd']);
+  const statNm = pickOnbid(itemXml, ['pbctStatNm', 'PBCT_STAT_NM', 'statNm', 'STAT_NM', 'bidStatNm', 'BID_STAT_NM']);
   return {
     cltrNo,
     cltrMngNo: cltrNo,
     plnmNo,
     pbctNo,
     pbctCdtnNo: pbctNo,
-    cltrNm: pickXml(itemXml, ['CLTR_NM', 'cltrNm']),
-    ctgrFullNm: pickXml(itemXml, ['CTGR_FULL_NM', 'ctgrFullNm']),
+    cltrNm: pickOnbid(itemXml, ['cltrNm', 'onbidCltrNm', 'CLTR_NM', 'ONBID_CLTR_NM']),
+    onbidCltrNm: pickOnbid(itemXml, ['onbidCltrNm', 'cltrNm', 'ONBID_CLTR_NM', 'CLTR_NM']),
+    ctgrFullNm: pickOnbid(itemXml, ['ctgrFullNm', 'CTGR_FULL_NM', 'cltrUsgLclsCtgrNm']),
     pbctBegnDtm,
     pbctClsDtm,
     bidStrtDtm: pbctBegnDtm,
     bidEndDtm: pbctClsDtm,
     bidPrdYmdStart: pbctBegnDtm,
     bidPrdYmdEnd: pbctClsDtm,
-    minBidPrc: pickXml(itemXml, ['MIN_BID_PRC', 'minBidPrc']),
-    apslAsesAvgAmt: pickXml(itemXml, ['APSL_ASES_AVG_AMT', 'apslAsesAvgAmt']),
+    minBidPrc: pickOnbid(itemXml, ['minBidPrc', 'lowstBidPrc', 'MIN_BID_PRC', 'LOWST_BID_PRC']),
+    apslAsesAvgAmt: pickOnbid(itemXml, ['apslAsesAvgAmt', 'apslEvlAmt', 'APSL_ASES_AVG_AMT', 'APSL_EVL_AMT']),
     sido,
     signgu,
     lctnSdnm: sido,
     lctnSggnm: signgu,
-    lot: pickXml(itemXml, ['LOT', 'lot']),
+    lot: pickOnbid(itemXml, ['lot', 'LOT']),
     rawAddress,
+    ldnmAdrs: pickOnbid(itemXml, ['ldnmAdrs', 'LDNM_ADRS']),
+    nmrdAdrs: pickOnbid(itemXml, ['nmrdAdrs', 'NMRD_ADRS']),
     lctnFullAddr: rawAddress,
     statNm,
     bidStatNm: statNm,
-    dspsMthodNm: pickXml(itemXml, ['DSPS_MTHOD_NM', 'dspsMthodNm']),
-    pbctOrgNm: pickXml(itemXml, ['PBCT_ORG_NM', 'pbctOrgNm', 'RQST_ORG_NM', 'rqstOrgNm']),
+    dspsMthodNm: pickOnbid(itemXml, ['dspsMthodNm', 'DSPS_MTHOD_NM']),
+    pbctOrgNm: pickOnbid(itemXml, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', 'RQST_ORG_NM']),
   };
 }
 
 function normalizeOnbidDetailItem(itemXml) {
-  const cltrNo = pickXml(itemXml, ['CLTR_NO', 'cltrNo', 'CLTR_MNG_NO', 'cltrMngNo']);
-  const plnmNo = pickXml(itemXml, ['PLNM_NO', 'plnmNo']);
-  const pbctNo = pickXml(itemXml, ['PBCT_NO', 'pbctNo', 'PBCT_CDTN_NO', 'pbctCdtnNo']);
-  const ldnmAdrs = pickXml(itemXml, ['LDNM_ADRS', 'ldnmAdrs', 'LCTN_FULL_ADDR', 'lctnFullAddr']);
-  const nmrdAdrs = pickXml(itemXml, ['NMRD_ADRS', 'nmrdAdrs']);
-  const pbctBegnDtm = pickXml(itemXml, ['PBCT_BEGN_DTM', 'pbctBegnDtm', 'BID_STRT_DTM', 'bidStrtDtm']);
-  const pbctClsDtm = pickXml(itemXml, ['PBCT_CLS_DTM', 'pbctClsDtm', 'BID_END_DTM', 'bidEndDtm']);
-  const statNm = pickXml(itemXml, ['STAT_NM', 'statNm', 'BID_STAT_NM', 'bidStatNm']);
+  const cltrNo = pickOnbid(itemXml, ['cltrMngNo', 'CLTR_MNG_NO', 'cltrNo', 'CLTR_NO']);
+  const plnmNo = pickOnbid(itemXml, ['plnmNo', 'PLNM_NO']);
+  const pbctNo = pickOnbid(itemXml, ['pbctCdtnNo', 'PBCT_CDTN_NO', 'pbctNo', 'PBCT_NO']);
+  const ldnmAdrs = pickOnbid(itemXml, ['ldnmAdrs', 'LDNM_ADRS', 'lctnFullAddr', 'LCTN_FULL_ADDR']);
+  const nmrdAdrs = pickOnbid(itemXml, ['nmrdAdrs', 'NMRD_ADRS']);
+  const pbctBegnDtm = pickOnbid(itemXml, ['pbctBegnDtm', 'PBCT_BEGN_DTM', 'bidStrtDtm', 'BID_STRT_DTM']);
+  const pbctClsDtm = pickOnbid(itemXml, ['pbctClsDtm', 'PBCT_CLS_DTM', 'bidEndDtm', 'BID_END_DTM']);
+  const statNm = pickOnbid(itemXml, ['pbctStatNm', 'PBCT_STAT_NM', 'statNm', 'STAT_NM', 'bidStatNm', 'BID_STAT_NM']);
+  const landArea = pickOnbid(itemXml, ['landSqms', 'LAND_SQMS']);
+  const bldArea = pickOnbid(itemXml, ['bldSqms', 'BLD_SQMS']);
   return {
     cltrNo,
     cltrMngNo: cltrNo,
     plnmNo,
     pbctNo,
     pbctCdtnNo: pbctNo,
-    cltrNm: pickXml(itemXml, ['CLTR_NM', 'cltrNm']),
-    ctgrFullNm: pickXml(itemXml, ['CTGR_FULL_NM', 'ctgrFullNm']),
-    goodsNm: pickXml(itemXml, ['GOODS_NM', 'goodsNm']),
+    cltrNm: pickOnbid(itemXml, ['cltrNm', 'onbidCltrNm', 'CLTR_NM', 'ONBID_CLTR_NM']),
+    onbidCltrNm: pickOnbid(itemXml, ['onbidCltrNm', 'cltrNm', 'ONBID_CLTR_NM', 'CLTR_NM']),
+    ctgrFullNm: pickOnbid(itemXml, ['ctgrFullNm', 'CTGR_FULL_NM', 'cltrUsgLclsCtgrNm']),
+    goodsNm: pickOnbid(itemXml, ['goodsNm', 'GOODS_NM']),
     ldnmAdrs,
     nmrdAdrs,
     lctnFullAddr: ldnmAdrs || nmrdAdrs,
-    minBidPrc: pickXml(itemXml, ['MIN_BID_PRC', 'minBidPrc']),
-    apslAsesAvgAmt: pickXml(itemXml, ['APSL_ASES_AVG_AMT', 'apslAsesAvgAmt']),
+    minBidPrc: pickOnbid(itemXml, ['minBidPrc', 'lowstBidPrc', 'MIN_BID_PRC', 'LOWST_BID_PRC']),
+    apslAsesAvgAmt: pickOnbid(itemXml, ['apslAsesAvgAmt', 'apslEvlAmt', 'APSL_ASES_AVG_AMT', 'APSL_EVL_AMT']),
+    landArea,
+    bldArea,
+    area: [landArea && `land ${landArea}m2`, bldArea && `building ${bldArea}m2`].filter(Boolean).join(' / '),
     pbctBegnDtm,
     pbctClsDtm,
     bidStrtDtm: pbctBegnDtm,
     bidEndDtm: pbctClsDtm,
     statNm,
     bidStatNm: statNm,
-    dspsMthodNm: pickXml(itemXml, ['DSPS_MTHOD_NM', 'dspsMthodNm']),
-    pbctOrgNm: pickXml(itemXml, ['PBCT_ORG_NM', 'pbctOrgNm', 'RQST_ORG_NM', 'rqstOrgNm']),
+    dspsMthodNm: pickOnbid(itemXml, ['dspsMthodNm', 'DSPS_MTHOD_NM']),
+    prptDivNm: pickOnbid(itemXml, ['prptDivNm', 'PRPT_DIV_NM']),
+    pbctOrgNm: pickOnbid(itemXml, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', 'RQST_ORG_NM']),
+    potoUrlList: pickOnbid(itemXml, ['potoUrlList', 'POTO_URL_LIST']),
   };
 }
 
 async function fetchOnbid(endpoint, params, serviceKey) {
   const url = new URL(endpoint);
-  url.searchParams.set('ServiceKey', serviceKey);
+  url.searchParams.set('serviceKey', serviceKey);
   Object.entries(params || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
   });
@@ -542,11 +618,25 @@ async function fetchOnbid(endpoint, params, serviceKey) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    const res = await fetch(url.toString(), { signal: controller.signal });
+    const res = await fetch(url.toString(), {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    });
     const text = await res.text();
     if (!res.ok) throw new Error('온비드 API 응답 오류');
 
-    return text;
+    try {
+      const payload = JSON.parse(text);
+      const header = payload?.response?.header || payload?.header || {};
+      const resultCode = String(header.resultCode || '').trim();
+      if (resultCode && !['00', '0000', 'NORMAL_CODE'].includes(resultCode)) {
+        throw new Error(`Onbid API result code ${resultCode}`);
+      }
+      return payload;
+    } catch (parseError) {
+      if (String(parseError?.message || '').startsWith('Onbid API result code ')) throw parseError;
+      return { rawXml: text };
+    }
   } catch (e) {
     if (e.name === 'AbortError') throw new Error('온비드 API 응답 시간 초과');
     throw e;
@@ -573,20 +663,26 @@ app.get('/api/onbid/items', async (req, res) => {
     const bidEnd = sanitizeOnbidParam(req.query.bidPrdYmdEnd, 8);
     const pageNo = String(numberInRange(req.query.pageNo, 1, 1, 100));
     const numOfRows = String(numberInRange(req.query.numOfRows, 10, 1, 20));
+    const prptDivCd = sanitizeOnbidParam(req.query.prptDivCd, 80) || ONBID_DEFAULT_PRPT_DIV_CD;
+    const pvctTrgtYn = sanitizeOnbidParam(req.query.pvctTrgtYn, 1).toUpperCase() === 'Y' ? 'Y' : 'N';
 
-    const xml = await fetchOnbid(ONBID_LIST_ENDPOINT, {
+    const payload = await fetchOnbid(ONBID_LIST_ENDPOINT, {
       pageNo,
       numOfRows,
-      CLTR_NM: query,
-      SIDO: sido,
-      SIGNGU: signgu,
-      PBCT_BEGN_DTM: bidStart,
-      PBCT_CLS_DTM: bidEnd,
-      _type: 'xml',
+      resultType: 'json',
+      prptDivCd,
+      pvctTrgtYn,
+      lctnSdnm: sido,
+      lctnSggnm: signgu,
+      bidPrdYmdStart: bidStart,
+      bidPrdYmdEnd: bidEnd,
     }, key);
 
-    const items = xmlItemsByName(xml, 'item').map(normalizeOnbidListItem);
-    return res.json({ ok: true, count: items.length, totalCount: items.length, pageNo: Number(pageNo), numOfRows: Number(numOfRows), items, requestId: req.requestId });
+    const items = onbidItemsFromResponse(payload)
+      .map(normalizeOnbidListItem)
+      .filter((item) => onbidMatchesFilters(item, { query, sido, signgu, bidStart, bidEnd }));
+    const totalCount = query ? items.length : onbidTotalCount(payload, items.length);
+    return res.json({ ok: true, count: items.length, totalCount, pageNo: Number(pageNo), numOfRows: Number(numOfRows), items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/items', req, e);
     return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.'));
@@ -601,16 +697,17 @@ app.get('/api/onbid/detail', async (req, res) => {
     const cltrNo = sanitizeOnbidParam(req.query.cltrNo || req.query.cltrMngNo, 40);
     const plnmNo = sanitizeOnbidParam(req.query.plnmNo, 40);
     const pbctNo = sanitizeOnbidParam(req.query.pbctNo || req.query.pbctCdtnNo, 40);
-    if (!cltrNo && !plnmNo && !pbctNo) return res.status(400).json(errorBody(req, '온비드 상세 조회에 필요한 물건번호가 없습니다.'));
+    if (!cltrNo && !plnmNo) return res.status(400).json(errorBody(req, '온비드 상세 조회에 필요한 물건번호가 없습니다.'));
 
-    const xml = await fetchOnbid(ONBID_DETAIL_ENDPOINT, {
-      CLTR_NO: cltrNo,
-      PLNM_NO: plnmNo,
-      PBCT_NO: pbctNo,
-      _type: 'xml',
+    const payload = await fetchOnbid(ONBID_DETAIL_ENDPOINT, {
+      pageNo: '1',
+      numOfRows: '10',
+      resultType: 'json',
+      cltrMngNo: cltrNo || plnmNo,
+      pbctCdtnNo: pbctNo,
     }, key);
 
-    const items = xmlItemsByName(xml, 'item').map(normalizeOnbidDetailItem);
+    const items = onbidItemsFromResponse(payload).map(normalizeOnbidDetailItem);
     return res.json({ ok: true, count: items.length, item: items[0] || null, detail: items[0] || null, items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/detail', req, e);
