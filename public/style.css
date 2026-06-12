@@ -265,6 +265,19 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   margin-top: 40px;
 }
 .site-footer p { margin: 4px 0; }
+.footer-nav {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 12px;
+}
+.footer-nav a {
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 600;
+}
+.footer-nav a:hover { color: var(--accent); }
 
 @media (max-width: 640px) {
   .hero { padding: 60px 0 40px; }
