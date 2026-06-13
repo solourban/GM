@@ -22,6 +22,10 @@ requireIncludes(front, 'function renderMobileItems(items)', 'Onbid mobile result
 requireIncludes(front, 'id="v2OnbidMobileCards"', 'Onbid mobile result card list');
 requireIncludes(front, 'v2-onbid-table-wrap', 'Onbid desktop table wrapper');
 requireIncludes(front, 'root.innerHTML = renderResultsArea()', 'Onbid result root write');
+requireIncludes(front, 'function statusLabel(value)', 'Onbid status code label helper');
+requireIncludes(front, 'function formatArea(detail = {})', 'Onbid area formatting helper');
+requireIncludes(front, 'data-onbid-action="copy"', 'Onbid cltr number copy action');
+requireIncludes(front, 'v2-row-actions', 'Onbid desktop row action grouping');
 requireIncludes(layout, 'v2OnbidResultCard', 'tab layout guard must cover Onbid result card');
 
 const panelStart = front.indexOf('function renderPanel()');

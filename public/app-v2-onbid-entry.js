@@ -60,9 +60,44 @@
     return text;
   }
 
+  function displayValue(value, fallback = '-') {
+    const text = clean(value);
+    return text || fallback;
+  }
+
+  function statusLabel(value) {
+    const text = clean(value);
+    const map = {
+      '0001': '입찰준비중',
+      '0002': '입찰진행중',
+      '0003': '입찰마감',
+      '0006': '개찰중',
+      '0009': '수의계약가능',
+      '0010': '낙찰',
+      '0011': '유찰',
+      '0012': '취소',
+    };
+    return map[text] || text;
+  }
+
+  function formatArea(detail = {}) {
+    const land = itemValue(detail, ['landArea', 'landSqms', 'LAND_SQMS']);
+    const building = itemValue(detail, ['bldArea', 'bldSqms', 'BLD_SQMS']);
+    const parts = [];
+    if (land) parts.push(`토지 ${land}㎡`);
+    if (building) parts.push(`건물 ${building}㎡`);
+    return parts.join(' / ') || itemValue(detail, ['area', 'AREA', '면적']);
+  }
+
+  function copyText(value) {
+    const text = clean(value);
+    if (!text || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
   function normalizeItem(item) {
     const name = itemValue(item, ['cltrNm', 'onbidCltrNm', 'CLTR_NM', 'ONBID_CLTR_NM', '물건명']);
-    const address = itemValue(item, ['lctnFullAddr', 'lctnDtlAddr', 'addr', 'LCTN_FULL_ADDR', 'LCTN_DTL_ADDR', '소재지']);
+    const address = itemValue(item, ['lctnFullAddr', 'ldnmAdrs', 'nmrdAdrs', 'lctnDtlAddr', 'addr', 'LCTN_FULL_ADDR', 'LDNM_ADRS', 'NMRD_ADRS', 'LCTN_DTL_ADDR', '소재지']);
     const price = itemValue(item, ['minBidPrc', 'lowstBidPrc', 'LOWST_BID_PRC', 'MIN_BID_PRC', '최저입찰가']);
     const appraisal = itemValue(item, ['apslAsesAvgAmt', 'appraisalAmt', 'APSL_ASES_AVG_AMT', '감정평가액', '감정가']);
     const bidStart = itemValue(item, ['bidStrtDtm', 'bidPrdYmdStart', 'BID_STRT_DTM', '입찰시작일']);
@@ -72,6 +107,9 @@
     const pbctNo = itemValue(item, ['pbctNo', 'pbctCdtnNo', 'PBCT_NO', 'PBCT_CDTN_NO', '공고번호']);
     const method = itemValue(item, ['dspsMthodNm', 'dspsMthodCdNm', 'DSPS_MTHOD_NM', '처분방식']);
     const status = itemValue(item, ['bidStatNm', 'bidStatCdNm', 'BID_STAT_NM', '입찰상태']);
+    const prptDiv = itemValue(item, ['prptDivNm', 'ctgrFullNm', 'PRPT_DIV_NM', 'CTGR_FULL_NM']);
+    const onbidCltrno = itemValue(item, ['onbidCltrno', 'onbidCltrNo', 'ONBID_CLTRNO', 'ONBID_CLTR_NO']);
+    const onbidPbancNo = itemValue(item, ['onbidPbancNo', 'ONBID_PBANC_NO']);
     return {
       name,
       address,
@@ -84,26 +122,30 @@
       pbctNo,
       pbctCdtnNo: pbctNo,
       method,
-      status,
+      status: statusLabel(status),
+      prptDiv,
+      onbidCltrno,
+      onbidPbancNo,
     };
   }
 
   function normalizeDetail(detail = {}) {
     return {
       name: itemValue(detail, ['cltrNm', 'onbidCltrNm', 'CLTR_NM', 'ONBID_CLTR_NM', '물건명']),
-      address: itemValue(detail, ['lctnFullAddr', 'lctnDtlAddr', 'addr', 'LCTN_FULL_ADDR', 'LCTN_DTL_ADDR', '소재지']),
+      address: itemValue(detail, ['lctnFullAddr', 'ldnmAdrs', 'nmrdAdrs', 'lctnDtlAddr', 'addr', 'LCTN_FULL_ADDR', 'LDNM_ADRS', 'NMRD_ADRS', 'LCTN_DTL_ADDR', '소재지']),
       price: itemValue(detail, ['minBidPrc', 'lowstBidPrc', 'LOWST_BID_PRC', 'MIN_BID_PRC', '최저입찰가']),
       appraisal: itemValue(detail, ['apslAsesAvgAmt', 'appraisalAmt', 'APSL_ASES_AVG_AMT', '감정평가액', '감정가']),
       deposit: itemValue(detail, ['bidGrntAmt', 'bidDeposit', 'BID_GRNT_AMT', '입찰보증금']),
-      area: itemValue(detail, ['area', 'bldArea', 'landArea', 'AREA', '면적']),
+      area: formatArea(detail),
       use: itemValue(detail, ['prptDvsnNm', 'prptDivNm', 'usage', '용도', '물건구분']),
       method: itemValue(detail, ['dspsMthodNm', 'dspsMthodCdNm', 'DSPS_MTHOD_NM', '처분방식']),
-      status: itemValue(detail, ['bidStatNm', 'bidStatCdNm', 'BID_STAT_NM', '입찰상태']),
+      status: statusLabel(itemValue(detail, ['bidStatNm', 'bidStatCdNm', 'BID_STAT_NM', '입찰상태'])),
       org: itemValue(detail, ['pbctOrgNm', 'rqstOrgNm', 'PBCT_ORG_NM', 'RQST_ORG_NM', '공고기관']),
       cltrMngNo: itemValue(detail, ['cltrMngNo', 'cltrNo', 'CLTR_MNG_NO', 'CLTR_NO', '물건관리번호']),
       pbctNo: itemValue(detail, ['pbctNo', 'pbctCdtnNo', 'PBCT_NO', 'PBCT_CDTN_NO', '공고번호']),
       bidStart: itemValue(detail, ['bidStrtDtm', 'bidPrdYmdStart', 'BID_STRT_DTM', '입찰시작일']),
       bidEnd: itemValue(detail, ['bidEndDtm', 'bidPrdYmdEnd', 'BID_END_DTM', '입찰종료일']),
+      prptDiv: itemValue(detail, ['prptDivNm', 'ctgrFullNm', 'PRPT_DIV_NM', 'CTGR_FULL_NM']),
     };
   }
 
@@ -117,6 +159,9 @@
           const detailBtn = row.cltrMngNo
             ? `<button class="v2-small-btn" data-onbid-action="detail" data-cltr-mng-no="${esc(row.cltrMngNo)}" data-pbct-cdtn-no="${esc(row.pbctNo)}">상세조회</button>`
             : '<span class="v2-note">번호 없음</span>';
+          const copyBtn = row.cltrMngNo
+            ? `<button class="v2-small-btn" data-onbid-action="copy" data-copy-text="${esc(row.cltrMngNo)}">번호복사</button>`
+            : '';
           return `
             <article class="v2-mobile-item-card">
               <div class="v2-mobile-item-head">
@@ -135,7 +180,7 @@
                 <span><small>상태/방식</small><b>${esc(statusMethod || '-')}</b></span>
               </div>
               <p class="v2-note">${esc(row.address || '소재지 확인 필요')}</p>
-              <div class="v2-mobile-actions">${detailBtn}</div>
+              <div class="v2-mobile-actions">${detailBtn}${copyBtn}</div>
             </article>
           `;
         }).join('')}
@@ -270,7 +315,11 @@
               const detailBtn = row.cltrMngNo
                 ? `<button class="v2-small-btn" data-onbid-action="detail" data-cltr-mng-no="${esc(row.cltrMngNo)}" data-pbct-cdtn-no="${esc(row.pbctNo)}">상세조회</button>`
                 : '<span class="v2-note">번호 없음</span>';
-              return `<tr><td>${esc(row.name || '-')}</td><td>${esc(row.address || '-')}</td><td>${esc(formatMoney(row.price))}</td><td>${esc(formatMoney(row.appraisal))}</td><td>${esc(row.period || '-')}</td><td>${esc(statusMethod || '-')}</td><td>${esc(row.org || '-')}</td><td>${esc(numbers || '-')}</td><td>${detailBtn}</td></tr>`;
+              const copyBtn = row.cltrMngNo
+                ? `<button class="v2-small-btn" data-onbid-action="copy" data-copy-text="${esc(row.cltrMngNo)}">번호복사</button>`
+                : '';
+              const nameCell = [row.name, row.prptDiv].filter(Boolean).join(' · ');
+              return `<tr><td>${esc(displayValue(nameCell))}</td><td>${esc(displayValue(row.address, '소재지 확인 필요'))}</td><td>${esc(formatMoney(row.price))}</td><td>${esc(formatMoney(row.appraisal))}</td><td>${esc(row.period || '-')}</td><td>${esc(statusMethod || '-')}</td><td>${esc(row.org || '-')}</td><td>${esc(numbers || '-')}</td><td><div class="v2-row-actions">${detailBtn}${copyBtn}</div></td></tr>`;
             }).join('')}
           </tbody>
         </table>
@@ -295,14 +344,16 @@
       <section class="v2-result-card" id="v2OnbidDetailCard">
         <span class="v2-badge">온비드 상세</span>
         <h3>${esc(row.name || '공매 물건 상세')}</h3>
-        <p class="v2-note">공매 판단 카드는 다음 단계에서 연결합니다.${onbidState.detailRequestId ? ` 요청ID: ${esc(onbidState.detailRequestId)}` : ''}</p>
+        <p class="v2-note">상세 원문 응답을 검토용 카드로 정리했습니다.${onbidState.detailRequestId ? ` 요청ID: ${esc(onbidState.detailRequestId)}` : ''}</p>
         <div class="v2-grid compact">
-          <div class="v2-info wide"><div class="k">소재지</div><div class="v">${esc(row.address || '-')}</div></div>
+          <div class="v2-info wide"><div class="k">소재지</div><div class="v">${esc(displayValue(row.address, '소재지 확인 필요'))}</div></div>
           <div class="v2-info"><div class="k">최저입찰가</div><div class="v">${esc(formatMoney(row.price))}</div></div>
           <div class="v2-info"><div class="k">감정가</div><div class="v">${esc(formatMoney(row.appraisal))}</div></div>
           <div class="v2-info"><div class="k">입찰보증금</div><div class="v">${esc(formatMoney(row.deposit))}</div></div>
           <div class="v2-info"><div class="k">입찰기간</div><div class="v">${esc([formatDate(row.bidStart), formatDate(row.bidEnd)].filter(Boolean).join(' ~ ') || '-')}</div></div>
           <div class="v2-info"><div class="k">상태/방식</div><div class="v">${esc([row.status, row.method].filter(Boolean).join(' / ') || '-')}</div></div>
+          <div class="v2-info"><div class="k">물건구분</div><div class="v">${esc(displayValue(row.use || row.prptDiv))}</div></div>
+          <div class="v2-info"><div class="k">면적</div><div class="v">${esc(displayValue(row.area))}</div></div>
           <div class="v2-info"><div class="k">공고기관</div><div class="v">${esc(row.org || '-')}</div></div>
           <div class="v2-info"><div class="k">관리/공고번호</div><div class="v">${esc([row.cltrMngNo, row.pbctNo].filter(Boolean).join(' / ') || '-')}</div></div>
         </div>
@@ -412,6 +463,10 @@
       }
       if (onbidAction?.dataset.onbidAction === 'detail') {
         runDetail(onbidAction.dataset.cltrMngNo, onbidAction.dataset.pbctCdtnNo);
+        return;
+      }
+      if (onbidAction?.dataset.onbidAction === 'copy') {
+        copyText(onbidAction.dataset.copyText);
         return;
       }
       const tab = event.target.closest('.v2-tab');
