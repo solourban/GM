@@ -207,6 +207,8 @@
     const totalTax = incomeTax + localIncomeTax;
     const totalCost = totalBurden + sellBrokerageFee + totalTax;
     const afterTaxProfit = expectedSalePrice ? expectedSalePrice - totalCost : 0;
+    const breakEvenSalePrice = totalCost;
+    const holdingMonthlyCost = holdingMonths ? Math.round((holdingInterest + unpaidManagementFee + repairCost) / holdingMonths) : 0;
     const roi = requiredCash ? (afterTaxProfit / requiredCash) * 100 : 0;
     const minBidRate = base.minBid ? (plannedBid / base.minBid) * 100 : 0;
     const appraisedRate = base.appraisedValue ? (plannedBid / base.appraisedValue) * 100 : 0;
@@ -251,6 +253,8 @@
       totalTax,
       totalCost,
       afterTaxProfit,
+      breakEvenSalePrice,
+      holdingMonthlyCost,
       roi,
       minBidRate,
       appraisedRate,
@@ -298,8 +302,12 @@
     setText(card, 'totalAcquisitionCost', won(snapshot.totalAcquisitionCost));
     setText(card, 'requiredCash', won(snapshot.requiredCash));
     setText(card, 'taxableBase', won(snapshot.taxableBase));
+    setText(card, 'preTaxProfit', snapshot.expectedSalePrice ? won(snapshot.preTaxProfit) : '-');
+    setText(card, 'deductibleCost', won(snapshot.deductibleCost));
     setText(card, 'totalTax', won(snapshot.totalTax));
     setText(card, 'afterTaxProfit', snapshot.expectedSalePrice ? won(snapshot.afterTaxProfit) : '-');
+    setText(card, 'breakEvenSalePrice', snapshot.expectedSalePrice ? won(snapshot.breakEvenSalePrice) : '-');
+    setText(card, 'holdingMonthlyCost', won(snapshot.holdingMonthlyCost));
     setText(card, 'roi', snapshot.expectedSalePrice && snapshot.requiredCash ? percent(snapshot.roi) : '-');
     setText(card, 'message', snapshot.message);
 
@@ -369,6 +377,12 @@
         <div class="v2-info-box"><span>세금 참고액</span><strong data-bid-plan="totalTax">0원</strong></div>
         <div class="v2-info-box"><span>세후수익</span><strong data-bid-plan="afterTaxProfit">-</strong></div>
         <div class="v2-info-box"><span>수익률</span><strong data-bid-plan="roi">-</strong></div>
+      </div>
+      <div class="v2-grid four">
+        <div class="v2-info-box"><span>세전수익</span><strong data-bid-plan="preTaxProfit">-</strong></div>
+        <div class="v2-info-box"><span>비용처리금액</span><strong data-bid-plan="deductibleCost">0원</strong></div>
+        <div class="v2-info-box"><span>손익분기 매도가</span><strong data-bid-plan="breakEvenSalePrice">-</strong></div>
+        <div class="v2-info-box"><span>월평균 보유비용</span><strong data-bid-plan="holdingMonthlyCost">0원</strong></div>
       </div>
       <ul class="v2-list">
         <li data-bid-plan="message">입찰가와 예상 매도가를 입력하면 필요 현금과 세후수익을 계산합니다.</li>

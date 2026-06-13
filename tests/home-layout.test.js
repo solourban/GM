@@ -21,9 +21,9 @@ if (/max-width:900px[\s\S]*\.hero\{min-height:560px/.test(core)) {
   fail('tablet hero must not keep the old 560px empty first-screen height.');
 }
 
-requireIncludes('.hero { min-height:clamp(360px,45vh,480px); padding:48px 0 42px;', 'compact desktop hero sizing');
+requireIncludes('.hero { min-height:clamp(300px,36vh,420px); padding:34px 0 30px;', 'compact desktop hero sizing');
 requireIncludes('#v2HomePanels { min-height:0; }', 'home panel should not reserve extra empty height');
 requireIncludes('.results-section:empty { min-height:0; padding-top:0; padding-bottom:0; }', 'empty search results should collapse');
-requireIncludes('.hero{min-height:auto; padding:34px 0 38px;}', 'compact tablet hero sizing');
+requireIncludes('.hero{min-height:auto; padding:28px 0 30px;}', 'compact tablet hero sizing');
 
 console.log('Home layout guard passed.');

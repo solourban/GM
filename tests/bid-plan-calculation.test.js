@@ -79,6 +79,8 @@ assert.strictEqual(snapshot.requiredCash, 178520002, 'required cash should subtr
 assert.strictEqual(snapshot.taxableBase, 78479998, 'taxable base should subtract deductible costs from pre-tax profit');
 assert.strictEqual(snapshot.totalTax, 17265600, 'local income tax should be added to income tax');
 assert.strictEqual(snapshot.afterTaxProfit, 51214398, 'after-tax profit should subtract total costs and tax from sale price');
+assert.strictEqual(snapshot.breakEvenSalePrice, 598785602, 'break-even sale price should include total burden, selling fee, and taxes');
+assert.strictEqual(snapshot.holdingMonthlyCost, 5333334, 'monthly holding cost should average interest, management, and repair costs over holding months');
 assert(snapshot.roi > 28.6 && snapshot.roi < 28.7, 'ROI should be calculated from after-tax profit / required cash');
 
 const autoLoan = api.computePlan({

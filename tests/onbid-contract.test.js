@@ -33,6 +33,8 @@ requireIncludes(server, 'pvctTrgtYn', 'Onbid private-contract flag forwarding');
 requireIncludes(server, 'numberInRange(req.query.numOfRows, 10, 1, 20)', 'Onbid numOfRows cap');
 requireIncludes(server, 'cltrMngNo: cltrNo', 'list/detail cltr alias');
 requireIncludes(server, 'pbctCdtnNo: pbctNo', 'list/detail pbct alias');
+requireIncludes(server, 'onbidCltrno', 'Onbid original item number preservation');
+requireIncludes(server, 'onbidPbancNo', 'Onbid original notice number preservation');
 requireIncludes(server, 'detail: items[0] || null', 'detail response alias');
 requireIncludes(server, "return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.'))", 'safe list error response');
 requireIncludes(server, "return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.'))", 'safe detail error response');
