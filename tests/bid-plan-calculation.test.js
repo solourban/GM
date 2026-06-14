@@ -71,13 +71,20 @@ const snapshot = api.computePlan({
 
 assert.strictEqual(snapshot.bidDeposit, 52000000, 'bid deposit should follow report rate');
 assert.strictEqual(snapshot.acquisitionTax, 5720000, 'acquisition tax should use editable tax rate');
+assert.strictEqual(snapshot.appraisalLoanCap, 420000000, 'appraisal loan cap should use appraised value and appraisal loan rate');
+assert.strictEqual(snapshot.bidLoanCap, 416000000, 'bid loan cap should use planned bid and bid loan rate');
+assert.strictEqual(snapshot.suggestedLoan, 361000000, 'suggested loan should subtract room deduction from the lower loan cap');
 assert.strictEqual(snapshot.monthlyInterest, 1666667, 'monthly interest should include loan amount and annual rate');
 assert.strictEqual(snapshot.holdingInterest, 10000002, 'holding period interest should be reflected');
+assert.strictEqual(snapshot.prepaymentPenalty, 4000000, 'prepayment penalty should use loan amount and penalty rate');
 assert.strictEqual(snapshot.totalAcquisitionCost, 568520002, 'total acquisition cost should include bid, taxes, fees, repair, eviction, interest, and prepayment penalty');
 assert.strictEqual(snapshot.totalBurden, 578520002, 'total burden should include inherited amount separately');
 assert.strictEqual(snapshot.requiredCash, 178520002, 'required cash should subtract the loan from total burden');
 assert.strictEqual(snapshot.taxableBase, 78479998, 'taxable base should subtract deductible costs from pre-tax profit');
+assert.strictEqual(snapshot.incomeTax, 15696000, 'income tax should use taxable base and income tax rate');
+assert.strictEqual(snapshot.localIncomeTax, 1569600, 'local income tax should use income tax and local tax rate');
 assert.strictEqual(snapshot.totalTax, 17265600, 'local income tax should be added to income tax');
+assert.strictEqual(snapshot.totalCost, 598785602, 'total cost should include burden, selling fee, and tax');
 assert.strictEqual(snapshot.afterTaxProfit, 51214398, 'after-tax profit should subtract total costs and tax from sale price');
 assert.strictEqual(snapshot.breakEvenSalePrice, 598785602, 'break-even sale price should include total burden, selling fee, and taxes');
 assert.strictEqual(snapshot.holdingMonthlyCost, 5333334, 'monthly holding cost should average interest, management, and repair costs over holding months');
@@ -113,6 +120,23 @@ const requiredCopySummaryHooks = [
 ];
 for (const needle of requiredCopySummaryHooks) {
   assert(copySummarySource.includes(needle), `copy summary should include ${needle}`);
+}
+
+const requiredBidPlanDisplayHooks = [
+  '계산 상세',
+  '취득세+지방세',
+  '감정가 기준 대출',
+  '낙찰가 기준 대출',
+  '방공제 금액',
+  '중도상환수수료',
+  '양도세/소득세',
+  '양도세 지방세',
+  '총 비용(세금 포함)',
+  '권리관계와 명도 가능성',
+  'data-bid-plan="totalCost"',
+];
+for (const needle of requiredBidPlanDisplayHooks) {
+  assert(bidPlanSource.includes(needle), `bid plan display should include ${needle}`);
 }
 
 const requiredFinalJudgmentHooks = [

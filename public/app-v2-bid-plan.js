@@ -292,19 +292,34 @@
     card.__bidPlanSnapshot = snapshot;
 
     setText(card, 'deposit', won(snapshot.bidDeposit));
+    setText(card, 'acquisitionTax', won(snapshot.acquisitionTax));
+    setText(card, 'registryCost', won(snapshot.registryCost));
+    setText(card, 'legalFee', won(snapshot.legalFee));
+    setText(card, 'unpaidManagementFee', won(snapshot.unpaidManagementFee));
+    setText(card, 'repairCost', won(snapshot.repairCost));
+    setText(card, 'evictionCost', won(snapshot.evictionCost));
     setText(card, 'burden', won(snapshot.totalBurden));
     setText(card, 'minRate', snapshot.plannedBid ? percent(snapshot.minBidRate) : '-');
     setText(card, 'appraisedRate', snapshot.plannedBid ? percent(snapshot.appraisedRate) : '-');
+    setText(card, 'appraisalLoanCap', won(snapshot.appraisalLoanCap));
+    setText(card, 'bidLoanCap', won(snapshot.bidLoanCap));
+    setText(card, 'roomDeduction', won(snapshot.roomDeduction));
+    setText(card, 'suggestedLoan', won(snapshot.suggestedLoan));
     setText(card, 'loanAmount', won(snapshot.loanAmount));
     setText(card, 'loanSource', snapshot.hasManualLoan ? '직접 입력' : '한도 참고 자동 반영');
     setText(card, 'monthlyInterest', won(snapshot.monthlyInterest));
     setText(card, 'holdingInterest', won(snapshot.holdingInterest));
+    setText(card, 'prepaymentPenalty', won(snapshot.prepaymentPenalty));
     setText(card, 'totalAcquisitionCost', won(snapshot.totalAcquisitionCost));
     setText(card, 'requiredCash', won(snapshot.requiredCash));
     setText(card, 'taxableBase', won(snapshot.taxableBase));
     setText(card, 'preTaxProfit', snapshot.expectedSalePrice ? won(snapshot.preTaxProfit) : '-');
     setText(card, 'deductibleCost', won(snapshot.deductibleCost));
+    setText(card, 'sellBrokerageFee', won(snapshot.sellBrokerageFee));
+    setText(card, 'incomeTax', won(snapshot.incomeTax));
+    setText(card, 'localIncomeTax', won(snapshot.localIncomeTax));
     setText(card, 'totalTax', won(snapshot.totalTax));
+    setText(card, 'totalCost', won(snapshot.totalCost));
     setText(card, 'afterTaxProfit', snapshot.expectedSalePrice ? won(snapshot.afterTaxProfit) : '-');
     setText(card, 'breakEvenSalePrice', snapshot.expectedSalePrice ? won(snapshot.breakEvenSalePrice) : '-');
     setText(card, 'holdingMonthlyCost', won(snapshot.holdingMonthlyCost));
@@ -384,10 +399,39 @@
         <div class="v2-info-box"><span>손익분기 매도가</span><strong data-bid-plan="breakEvenSalePrice">-</strong></div>
         <div class="v2-info-box"><span>월평균 보유비용</span><strong data-bid-plan="holdingMonthlyCost">0원</strong></div>
       </div>
+      <div class="v2-form-block">
+        <h4>계산 상세</h4>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>취득세+지방세</span><strong data-bid-plan="acquisitionTax">0원</strong></div>
+          <div class="v2-info-box"><span>기타 등기비용</span><strong data-bid-plan="registryCost">0원</strong></div>
+          <div class="v2-info-box"><span>법무비</span><strong data-bid-plan="legalFee">0원</strong></div>
+          <div class="v2-info-box"><span>미납관리비</span><strong data-bid-plan="unpaidManagementFee">0원</strong></div>
+        </div>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>수리비</span><strong data-bid-plan="repairCost">0원</strong></div>
+          <div class="v2-info-box"><span>명도비</span><strong data-bid-plan="evictionCost">0원</strong></div>
+          <div class="v2-info-box"><span>중도상환수수료</span><strong data-bid-plan="prepaymentPenalty">0원</strong></div>
+          <div class="v2-info-box"><span>매도 중개수수료</span><strong data-bid-plan="sellBrokerageFee">0원</strong></div>
+        </div>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>감정가 기준 대출</span><strong data-bid-plan="appraisalLoanCap">0원</strong></div>
+          <div class="v2-info-box"><span>낙찰가 기준 대출</span><strong data-bid-plan="bidLoanCap">0원</strong></div>
+          <div class="v2-info-box"><span>방공제 금액</span><strong data-bid-plan="roomDeduction">0원</strong></div>
+          <div class="v2-info-box"><span>참고 대출한도</span><strong data-bid-plan="suggestedLoan">0원</strong></div>
+        </div>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>양도세/소득세</span><strong data-bid-plan="incomeTax">0원</strong></div>
+          <div class="v2-info-box"><span>양도세 지방세</span><strong data-bid-plan="localIncomeTax">0원</strong></div>
+          <div class="v2-info-box"><span>총 비용(세금 포함)</span><strong data-bid-plan="totalCost">0원</strong></div>
+          <div class="v2-info-box"><span>총 취득비용</span><strong data-bid-plan="totalAcquisitionCost">0원</strong></div>
+        </div>
+      </div>
       <ul class="v2-list">
         <li data-bid-plan="message">입찰가와 예상 매도가를 입력하면 필요 현금과 세후수익을 계산합니다.</li>
         <li>대출 가능 여부는 LTV, DSR, 지역 규제, 신용, 소득, 주택 수에 따라 달라집니다. 금융기관 확인이 필요합니다.</li>
         <li>세금 계산은 참고용입니다. 실제 양도세·소득세·지방세는 세무 전문가 확인이 필요합니다.</li>
+        <li>권리관계와 명도 가능성은 원본 서류와 현장 확인이 필요합니다.</li>
+        <li>총 비용은 입찰가, 인수금액, 취득·보유·매도비용, 세금 참고액을 합산한 값입니다.</li>
       </ul>
     `;
 
