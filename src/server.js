@@ -679,6 +679,7 @@ app.get('/api/onbid/items', async (req, res) => {
       resultType: 'json',
       prptDivCd,
       pvctTrgtYn,
+      onbidCltrNm: query,
       lctnSdnm: sido,
       lctnSggnm: signgu,
       bidPrdYmdStart: bidStart,
@@ -688,8 +689,8 @@ app.get('/api/onbid/items', async (req, res) => {
     const items = onbidItemsFromResponse(payload)
       .map(normalizeOnbidListItem)
       .filter((item) => onbidMatchesFilters(item, { query, sido, signgu, bidStart, bidEnd }));
-    const totalCount = query ? items.length : onbidTotalCount(payload, items.length);
-    return res.json({ ok: true, count: items.length, totalCount, pageNo: Number(pageNo), numOfRows: Number(numOfRows), items, requestId: req.requestId });
+    const totalCount = onbidTotalCount(payload, items.length);
+    return res.json({ ok: true, count: items.length, totalCount, pageNo: Number(pageNo), numOfRows: Number(numOfRows), keyword: query, items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/items', req, e);
     return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.'));

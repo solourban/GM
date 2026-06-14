@@ -23,6 +23,7 @@ function sectionBetween(source, startNeedle, endNeedle, label) {
 }
 
 requireIncludes(server, 'req.query.query || req.query.keyword', 'keyword alias support');
+requireIncludes(server, 'onbidCltrNm: query', 'Onbid keyword forwarding to item name parameter');
 requireIncludes(server, 'req.query.sido || req.query.lctnSdnm', 'sido alias support');
 requireIncludes(server, 'req.query.signgu || req.query.lctnSggnm', 'signgu alias support');
 requireIncludes(server, 'bidPrdYmdStart: bidStart', 'bid start forwarding');
