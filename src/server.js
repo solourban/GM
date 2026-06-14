@@ -275,6 +275,12 @@ app.get('/api/courts', (req, res) => {
   res.json({ ok: true, courts: listCourts(), requestId: req.requestId });
 });
 
+function publicDateRecommendationResult(result) {
+  if (!result || typeof result !== 'object') return result;
+  const { debug, ...publicResult } = result;
+  return publicResult;
+}
+
 app.get('/api/recommendations/by-date', async (req, res) => {
   try {
     const result = await findAuctionsByDate({
@@ -286,7 +292,7 @@ app.get('/api/recommendations/by-date', async (req, res) => {
       limit: req.query.limit || 20,
     });
     const status = result.ok ? 200 : 502;
-    return res.status(status).json({ ...result, requestId: req.requestId });
+    return res.status(status).json({ ...publicDateRecommendationResult(result), requestId: req.requestId });
   } catch (e) {
     logException('recommendations/by-date', req, e);
     return res.status(500).json(errorBody(req, '매각기일 추천 조회 중 오류가 발생했습니다.'));
@@ -412,7 +418,8 @@ app.get('/api/molit/trades', async (req, res) => {
       try {
         results.push(await fetchMolitType({ type, lawdCd, dealYmd, aptName }));
       } catch (e) {
-        results.push({ type, label: MOLIT_TYPES[type]?.label || type, error: e.message, rawCount: 0, filteredCount: 0, trades: [] });
+        logException('molit/trades:type', req, e, { tradeType: type });
+        results.push({ type, label: MOLIT_TYPES[type]?.label || type, error: '해당 유형 실거래가 조회 중 오류가 발생했습니다.', rawCount: 0, filteredCount: 0, trades: [] });
       }
     }
 
@@ -740,7 +747,7 @@ app.post('/api/fetch', async (req, res) => {
 app.post('/api/analyze', (req, res) => {
   try {
     const result = analyzeCase(req.body || {});
-    res.json({ ok: true, result, requestId: req.requestId });
+    res.json({ ok: true, result, report: result, requestId: req.requestId });
   } catch (e) {
     logException('analyze', req, e);
     res.status(500).json(errorBody(req, '분석 중 오류가 발생했습니다.'));
