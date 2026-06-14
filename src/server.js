@@ -281,7 +281,7 @@ function publicDateRecommendationResult(result) {
   return publicResult;
 }
 
-app.get('/api/recommendations/by-date', async (req, res) => {
+async function handleDateRecommendations(req, res, scope = 'recommendations/by-date') {
   try {
     const result = await findAuctionsByDate({
       court: req.query.court || '서울중앙',
@@ -294,10 +294,13 @@ app.get('/api/recommendations/by-date', async (req, res) => {
     const status = result.ok ? 200 : 502;
     return res.status(status).json({ ...publicDateRecommendationResult(result), requestId: req.requestId });
   } catch (e) {
-    logException('recommendations/by-date', req, e);
+    logException(scope, req, e);
     return res.status(500).json(errorBody(req, '매각기일 추천 조회 중 오류가 발생했습니다.'));
   }
-});
+}
+
+app.get('/api/recommendations/by-date', (req, res) => handleDateRecommendations(req, res, 'recommendations/by-date'));
+app.get('/api/date/recommendations', (req, res) => handleDateRecommendations(req, res, 'date/recommendations'));
 
 function xmlText(xml, tag) {
   const m = String(xml || '').match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
@@ -329,6 +332,7 @@ const MOLIT_TYPES = {
     nameTags: ['mhouseNm', '연립다세대', '주택명'],
   },
 };
+const MOLIT_FETCH_TIMEOUT_MS = 12_000;
 
 function normalizeTradeItem(itemXml, tradeType, label) {
   const name = pickXml(itemXml, MOLIT_TYPES[tradeType]?.nameTags || []);
@@ -382,23 +386,32 @@ async function fetchMolitType({ type, lawdCd, dealYmd, aptName }) {
   url.searchParams.set('numOfRows', '50');
   url.searchParams.set('pageNo', '1');
 
-  const res = await fetch(url.toString());
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${config.label} 실거래가 API 응답 오류`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MOLIT_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url.toString(), { signal: controller.signal });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${config.label} 실거래가 API 응답 오류`);
 
-  const items = xmlItems(text).map((xml) => normalizeTradeItem(xml, type, config.label));
-  const filter = String(aptName || '').trim().replace(/\s+/g, '');
-  const filtered = filter
-    ? items.filter((item) => String(item.aptName || '').replace(/\s+/g, '').includes(filter) || filter.includes(String(item.aptName || '').replace(/\s+/g, '')))
-    : items;
+    const items = xmlItems(text).map((xml) => normalizeTradeItem(xml, type, config.label));
+    const filter = String(aptName || '').trim().replace(/\s+/g, '');
+    const filtered = filter
+      ? items.filter((item) => String(item.aptName || '').replace(/\s+/g, '').includes(filter) || filter.includes(String(item.aptName || '').replace(/\s+/g, '')))
+      : items;
 
-  return {
-    type,
-    label: config.label,
-    rawCount: items.length,
-    filteredCount: filtered.length,
-    trades: filtered,
-  };
+    return {
+      type,
+      label: config.label,
+      rawCount: items.length,
+      filteredCount: filtered.length,
+      trades: filtered,
+    };
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error(`${config.label} 실거래가 API 응답 시간 초과`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 app.get('/api/molit/trades', async (req, res) => {

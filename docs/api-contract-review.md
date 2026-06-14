@@ -2,7 +2,7 @@
 
 기준일: 2026-06-14
 
-현재 서버 라우트 기준으로 점검했습니다. 지시서에 적힌 `/api/date/recommendations`와 `/api/molit/apt-trades`는 현재 서버에 그대로 존재하지 않으며, 실제 구현은 각각 `/api/recommendations/by-date`, `/api/molit/trades`입니다.
+현재 서버 라우트 기준으로 점검했습니다. 지시서에 적힌 `/api/date/recommendations`는 `/api/recommendations/by-date`와 같은 shared handler를 사용하는 호환 route로 제공하며, `/api/molit/apt-trades`는 현재 서버에 별도 route로 존재하지 않고 실제 구현은 `/api/molit/trades`입니다.
 
 ## 계약 표
 
@@ -12,13 +12,13 @@
 | `/api/health` | 없음 | `ok`, `service`, `version`, `startedAt`, `uptimeSeconds`, `timestamp`, `requestId` | service-status가 health/config 동시 조회 | 큰 불일치 없음 | 공통 404/500 외 없음 | 예 | 내부 stack 미노출 | `renewal-regression` |
 | `/api/fetch` | POST JSON `jiwonNm`, `saYear`, `saSer` | `ok`, `raw`, `elapsed`, `requestId` | core/bulk가 `data.raw`, `data.elapsed`, `data.error` 기대 | 해결됨 | `errorBody(req, '사건 조회 중 오류가 발생했습니다.')` | 예 | `rawApis`, `debug`, `_internalCsNo` 제거. catch에서 `e.message` 미노출 | `fetch-response-sanitization` |
 | `/api/analyze` | POST JSON. core는 `{ raw, manual, region }`로 호출하고 bridge가 raw-like payload로 변환 | `ok`, `result`, `report`, `requestId` | core는 `data.report` 기대. 서버가 직접 `report: result` alias 제공 | 해결됨 | `errorBody(req, '분석 중 오류가 발생했습니다.')` | 예 | `detail/e.message` 미노출 | `analyzer`, `api-contract-hardening` |
-| `/api/date/recommendations` | 지시서상 endpoint | 현재 route 없음 | 현재 프론트 사용 없음 | 문서명 불일치 | 404 공통 errorBody | 예 | 미해당 | 없음 |
-| `/api/recommendations/by-date` | GET query `court`, `start`, `end`, `usage`, `maxBidRate`, `limit` | `ok`, `verified`, `court`, `start`, `end`, `count`, `items`, `requestId` 또는 error | date 탭이 `data.items`, `data.court`, `data.start`, `data.end`, `data.error` 기대 | endpoint 이름만 지시서와 불일치 | 실패 시 public result + `requestId` 또는 generic 500 | 예 | `debug`는 public response에서 제거 | `date-recommendations-regression`, `api-contract-hardening` |
+| `/api/date/recommendations` | GET query `court`, `start`, `end`, `usage`, `maxBidRate`, `limit` | `ok`, `verified`, `court`, `start`, `end`, `count`, `items`, `requestId` 또는 error | 현재 프론트는 직접 사용하지 않지만 지시서/외부 문서 호환용 | 해결됨. `/api/recommendations/by-date`와 같은 shared handler 사용 | 실패 시 public result + `requestId` 또는 generic 500 | 예 | `debug`는 public response에서 제거 | `api-contract-hardening` |
+| `/api/recommendations/by-date` | GET query `court`, `start`, `end`, `usage`, `maxBidRate`, `limit` | `ok`, `verified`, `court`, `start`, `end`, `count`, `items`, `requestId` 또는 error | date 탭이 `data.items`, `data.court`, `data.start`, `data.end`, `data.error` 기대 | 해결됨. 현재 프론트 canonical endpoint | 실패 시 public result + `requestId` 또는 generic 500 | 예 | `debug`는 public response에서 제거 | `date-recommendations-regression`, `api-contract-hardening` |
 | `/api/onbid/items` | GET `keyword`/`query`, `lctnSdnm`/`sido`, `lctnSggnm`/`signgu`, `bidPrdYmdStart`, `bidPrdYmdEnd`, `pageNo`, `numOfRows` | `ok`, `count`, `totalCount`, `pageNo`, `numOfRows`, `keyword`, `items`, `requestId` | onbid 탭이 `items`, `totalCount`, `requestId` 기대 | 기존 의심 해결됨. `keyword`는 upstream `onbidCltrNm`으로 전달 | `errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.')` | 예 | `e.message/detail` 미노출. `numOfRows` 1-20 제한 | `onbid-contract`, `onbid-proxy` |
 | `/api/onbid/detail` | GET `cltrNo`/`cltrMngNo`, `plnmNo`, `pbctNo`/`pbctCdtnNo` | `ok`, `count`, `item`, `detail`, `items`, `requestId` | onbid 탭이 `data.detail || data.item` 기대 | 기존 의심 해결됨 | `errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.')` | 예 | `e.message/detail` 미노출 | `onbid-contract`, `onbid-result-layout` |
 | `/api/location/geocode` | GET `address` | `ok`, `query`, `count`, `documents`, `meta`, `requestId` | location이 `documents[0]`와 `meta` 기대 | 큰 불일치 없음 | generic 500. upstream 오류는 `upstream` diagnostic 포함 | 예 | key 미노출. upstream `message`는 180자로 제한 | `server-security`, `location-map-card` |
 | `/api/kakao/maps-sdk.js` | 없음 | JavaScript loader | location이 script src로 사용 | 큰 불일치 없음 | key 없으면 JS Error text | 아니오(JSON 아님) | JS key는 서버 upstream 요청에만 사용. loader JS 안에는 upstream URL이 포함됨 | `server-security`, `location-map-card` |
-| `/api/molit/trades` | GET `lawdCd`, `dealYmd`, `aptName`, `tradeType` | `ok`, `lawdCd`, `dealYmd`, `aptName`, `tradeTypes`, `rawCount`, `count`, `trades`, `requestId` | molit가 `trades`, `tradeTypes`, `count`, `rawCount` 기대 | 큰 불일치 없음 | generic 500 | 예 | 유형별 부분 실패도 사용자용 일반 문구만 노출 | `external-api-proxy`, `api-contract-hardening` |
+| `/api/molit/trades` | GET `lawdCd`, `dealYmd`, `aptName`, `tradeType` | `ok`, `lawdCd`, `dealYmd`, `aptName`, `tradeTypes`, `rawCount`, `count`, `trades`, `requestId` | molit가 `trades`, `tradeTypes`, `count`, `rawCount` 기대 | 큰 불일치 없음 | generic 500 | 예 | 유형별 부분 실패도 사용자용 일반 문구만 노출. upstream 호출은 12초 타임아웃 적용 | `external-api-proxy`, `api-contract-hardening` |
 | `/api/molit/apt-trades` | 지시서상 endpoint | 현재 route 없음 | 현재 프론트 사용 없음 | route 없음 | 404 공통 errorBody | 예 | 미해당 | 없음 |
 
 ## 의심 지점 상태
@@ -29,12 +29,13 @@
 | `/api/fetch` `rawApis/debug` 노출 가능성 | `sanitizeFetchCaseResult`가 `rawApis`, `debug`, `_internalCsNo` 제거 | 해결 | 테스트 유지 |
 | 온비드 items/detail 파라미터 불일치 | 서버가 `keyword/lctnSdnm/lctnSggnm/cltrMngNo/pbctCdtnNo` alias 수용 | 해결 | 테스트 유지 |
 | 온비드 에러 `detail/e.message` 노출 | catch는 generic errorBody만 반환 | 해결 | 테스트 유지 |
-| 매각기일 endpoint 명칭 | 실제 route는 `/api/recommendations/by-date` | 문서/명칭 불일치 | rename 또는 호환 route 추가 검토 |
+| 매각기일 endpoint 명칭 | `/api/recommendations/by-date`와 `/api/date/recommendations`가 같은 shared handler 사용 | 해결 | 프론트 canonical endpoint는 현행 유지 |
 | 매각기일 `debug` 노출 | 서버 route가 `publicDateRecommendationResult`로 `debug` 제거 | 해결 | 테스트 유지 |
 | MOLIT `e.message` 노출 | 유형별 부분 실패는 일반 문구로 반환하고 실제 오류는 서버 로그에 기록 | 해결 | 테스트 유지 |
+| MOLIT fetch timeout | upstream 유형별 호출에 `AbortController` 12초 타임아웃 적용 | 해결 | 프론트 월별 재시도 흐름 유지 |
 
 ## 우선순위
 
-1. `/api/date/recommendations` 호환 route가 필요한지 결정한다.
-2. 매각기일 endpoint 명칭을 문서/프론트에서 통일할지 검토한다.
-3. MOLIT fetch timeout과 월별 재시도 UX를 별도 점검한다.
+1. 입찰가 계산표 요구사항과 현재 UI의 표시 누락 항목을 구현 단계로 나눈다.
+2. 전수 리뷰표의 high-risk 파일별 escape/innerHTML 확인을 계속 좁힌다.
+3. `/api/molit/apt-trades` 호환 route가 외부 문서용으로 필요한지 결정한다.
