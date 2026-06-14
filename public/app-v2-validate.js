@@ -1,6 +1,16 @@
 (() => {
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[c]));
+  }
+
   function app() {
     return window.__auctionV2 || null;
   }
@@ -133,7 +143,7 @@
       else card.prepend(box);
     }
     box.className = `v2-form-message show ${type}`;
-    box.innerHTML = messages.map((msg) => `<div>• ${msg}</div>`).join('');
+    box.innerHTML = messages.map((msg) => `<div>• ${esc(msg)}</div>`).join('');
     box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
@@ -167,7 +177,7 @@
     if (!analysis) return;
 
     if (old) {
-      old.innerHTML = `<h3>입력값 경고</h3><p class="v2-note">분석은 실행했지만 아래 항목은 결과 신뢰도에 영향을 줄 수 있습니다.</p><ul class="v2-analysis-list">${warnings.map((msg) => `<li>${msg}</li>`).join('')}</ul>`;
+      old.innerHTML = `<h3>입력값 경고</h3><p class="v2-note">분석은 실행했지만 아래 항목은 결과 신뢰도에 영향을 줄 수 있습니다.</p><ul class="v2-analysis-list">${warnings.map((msg) => `<li>${esc(msg)}</li>`).join('')}</ul>`;
       return;
     }
 
@@ -175,7 +185,7 @@
     box.id = 'v2AnalyzeWarningKeepMessage';
     box.className = 'v2-result-card';
     box.style.borderLeft = '4px solid #d97706';
-    box.innerHTML = `<h3>입력값 경고</h3><p class="v2-note">분석은 실행했지만 아래 항목은 결과 신뢰도에 영향을 줄 수 있습니다.</p><ul class="v2-analysis-list">${warnings.map((msg) => `<li>${msg}</li>`).join('')}</ul>`;
+    box.innerHTML = `<h3>입력값 경고</h3><p class="v2-note">분석은 실행했지만 아래 항목은 결과 신뢰도에 영향을 줄 수 있습니다.</p><ul class="v2-analysis-list">${warnings.map((msg) => `<li>${esc(msg)}</li>`).join('')}</ul>`;
     analysis.parentNode.insertBefore(box, analysis);
   }
 
@@ -184,7 +194,7 @@
     const api = app();
     if (!s?.analyzeError || !s?.report || !api?.renderResults) return;
 
-    const message = s.analyzeError;
+    const message = clean(s.analyzeError);
     s.analyzeError = '';
     api.renderResults({ keepScroll: true });
 
@@ -194,7 +204,7 @@
       const box = document.createElement('section');
       box.id = 'v2AnalyzeFailureKeepMessage';
       box.className = 'v2-result-card v2-error';
-      box.innerHTML = `<h3>최근 권리분석 실패</h3><p>${message}</p><p class="v2-note">기존 권리분석 결과는 유지했습니다. 입력값을 확인한 뒤 다시 실행하세요.</p>`;
+      box.innerHTML = `<h3>최근 권리분석 실패</h3><p>${esc(message)}</p><p class="v2-note">기존 권리분석 결과는 유지했습니다. 입력값을 확인한 뒤 다시 실행하세요.</p>`;
       analysis.parentNode.insertBefore(box, analysis);
     }, 0);
   }

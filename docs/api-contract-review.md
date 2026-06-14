@@ -36,6 +36,6 @@
 
 ## 우선순위
 
-1. 입찰가 계산표 요구사항과 현재 UI의 표시 누락 항목을 구현 단계로 나눈다.
-2. 전수 리뷰표의 high-risk 파일별 escape/innerHTML 확인을 계속 좁힌다.
-3. `/api/molit/apt-trades` 호환 route가 외부 문서용으로 필요한지 결정한다.
+1. loaded v2 파일 중 core/date/saved/copy/final 계열의 escape/DOM helper guard를 계속 넓힌다.
+2. `/api/molit/apt-trades` 호환 route가 외부 문서용으로 필요한지 결정한다.
+3. 현재 `index.html`에서 로드하지 않는 legacy patch 파일을 광고 심사 전 정리 대상으로 분리한다.

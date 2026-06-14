@@ -486,12 +486,18 @@
     `;
   }
 
+  function renderAttemptText(attempt) {
+    const address = clean(attempt?.address);
+    const result = attempt?.ok ? `${Number(attempt?.count || 0).toLocaleString('ko-KR')}건` : '실패';
+    return `${address}: ${result}`;
+  }
+
   function renderAttempts(attempts = []) {
     if (!attempts.length) return '';
     return `
       <div class="v2-info wide">
         <div class="k">주소 재검색 시도</div>
-        <div class="v">${attempts.map((attempt) => `${clean(attempt.address)}: ${attempt.ok ? `${attempt.count || 0}건` : '실패'}`).join(' / ')}</div>
+        <div class="v">${attempts.map((attempt) => esc(renderAttemptText(attempt))).join(' / ')}</div>
       </div>
     `;
   }
