@@ -214,7 +214,7 @@
         <ul class="v2-list">
           <li>전체 후보 평균 최저가: ${formatWon(avgMinBid)}</li>
           <li>현재 표시 후보: ${items.length}건 / 전체 ${state.items.length}건</li>
-          <li>${selectedComparisonText(avgMinBid)}</li>
+          <li>${esc(selectedComparisonText(avgMinBid))}</li>
         </ul>
       </section>
     `;

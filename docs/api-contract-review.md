@@ -36,6 +36,6 @@
 
 ## 우선순위
 
-1. loaded v2 파일 중 core/date/saved/copy/final 계열의 escape/DOM helper guard를 계속 넓힌다.
+1. loaded v2 파일 중 date-source/candidate-stack/molit/confidence/case-sync 계열의 escape/DOM helper guard를 계속 넓힌다.
 2. `/api/molit/apt-trades` 호환 route가 외부 문서용으로 필요한지 결정한다.
 3. 현재 `index.html`에서 로드하지 않는 legacy patch 파일을 광고 심사 전 정리 대상으로 분리한다.

@@ -36,6 +36,42 @@ loadedScripts.forEach((file) => {
   forbid(source, /document\.write\s*\(/, `${file} document.write`);
 });
 
+const core = read('public/app-v2-core.js');
+[
+  'const esc = (v)',
+  'select.innerHTML = courts.map((name) => `<option>${esc(name)}</option>`).join',
+  'if (parts.length <= 1 && !building) return esc(s);',
+  'parts.slice(1).map((p) => `<span class="sub">${esc(p)}</span>`).join',
+  'root.innerHTML = `<div class="v2-result-card v2-error"><h3>조회 실패</h3><p>${esc(state.error)}</p></div>`',
+  '<p>${esc(state.error)}</p><p class="v2-note">아래에는 마지막 성공 결과를 유지했습니다.</p>',
+  '<p>${esc(state.analyzeError)}</p><p class="v2-note">Step 2 입력값은 유지됩니다.</p>',
+  'value="${esc(getManual(path))}" placeholder="${esc(placeholder)}" data-manual-path="${esc(path)}"',
+  'items.map((x) => `<li>${esc(x)}</li>`).join',
+  '<td>${esc(t.reason || \'-\')}</td>',
+  '<td>${esc(r.reason || \'-\')}</td>',
+].forEach((needle) => requireIncludes(core, needle, `core ${needle}`));
+
+const date = read('public/app-v2-date.js');
+[
+  'function esc(value)',
+  'value="${esc(value)}" ${active ? \'selected\' : \'\'}>${esc(label)}</option>',
+  '<li>${esc(selectedComparisonText(avgMinBid))}</li>',
+  'data-date-search-case="${esc(item.caseNo || \'\')}"',
+  '${esc(Array.isArray(item.reasons) ? item.reasons.join(\', \') : \'\')}',
+  '<div id="dateMessageV2" class="${messageClass}">${esc(state.message)}</div>',
+  'root.innerHTML = renderResultsArea()',
+].forEach((needle) => requireIncludes(date, needle, `date ${needle}`));
+
+const savedTab = read('public/app-v2-saved-tab.js');
+[
+  'const esc = (value)',
+  '${esc(propertyTypes()?.usageOf(item) || item.usage || \'-\')}',
+  '${esc(item.minBid || formatWon(item.minBid))}',
+  '${esc(decision(item, score))}',
+  'data-case-no="${esc(item.caseNo || \'\')}"',
+  'root.innerHTML = items.length ? renderSaved(items) : renderEmpty()',
+].forEach((needle) => requireIncludes(savedTab, needle, `saved tab ${needle}`));
+
 const validate = read('public/app-v2-validate.js');
 [
   'function esc(value)',
@@ -147,5 +183,37 @@ const serviceStatus = read('public/app-v2-service-status.js');
   "info('서비스 버전', esc(clean(health?.version || '-')))",
   "info('요청ID', esc(requestId || '-'))",
 ].forEach((needle) => requireIncludes(serviceStatus, needle, `service status ${needle}`));
+
+const copySummary = read('public/app-v2-copy-summary.js');
+[
+  'const area = document.createElement(\'textarea\')',
+  'area.value = text',
+  'await copyText(buildSummaryText(report))',
+  "status.textContent = '복사되었습니다.'",
+  "status.textContent = '복사에 실패했습니다. 브라우저 권한을 확인해주세요.'",
+].forEach((needle) => requireIncludes(copySummary, needle, `copy summary ${needle}`));
+
+const finalJudgment = read('public/app-v2-final-judgment.js');
+[
+  'function esc(value)',
+  '${esc(decision.label)}',
+  '${esc(decision.text)}',
+  '${esc(snapshot.nearbySummary)}',
+  '${esc(snapshot.tradeScopeNote)}',
+  'snapshot.reasons.map((item) => `<li>${esc(item)}</li>`).join',
+  'snapshot.nextChecks.map((item) => `<li>${esc(item)}</li>`).join',
+  'if (existing) existing.outerHTML = html',
+].forEach((needle) => requireIncludes(finalJudgment, needle, `final judgment ${needle}`));
+
+const finalCopy = read('public/app-v2-final-copy-bridge.js');
+[
+  'function esc(value)',
+  '${esc(copyState.status)}',
+  'data-summary-signature="${esc(summarySignature(summary))}"',
+  '<textarea id="${TEXTAREA_ID}" readonly',
+  '>${esc(summary)}</textarea>',
+  'existing.textContent = message',
+  'temp.value = summary',
+].forEach((needle) => requireIncludes(finalCopy, needle, `final copy ${needle}`));
 
 console.log(`InnerHTML escape guard passed. Checked ${loadedScripts.length} loaded v2 scripts.`);
