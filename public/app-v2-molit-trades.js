@@ -334,7 +334,7 @@
 
   function renderTypeSummary(types = []) {
     if (!types.length) return '-';
-    return types.map((t) => `${t.label || t.type}: ${Number(t.filteredCount || 0)}건`).join(' / ');
+    return types.map((t) => `${esc(t.label || t.type || '-')}: ${Number(t.filteredCount || 0)}건`).join(' / ');
   }
 
   function renderSuccess(result, location) {

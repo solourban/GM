@@ -72,6 +72,31 @@ const savedTab = read('public/app-v2-saved-tab.js');
   'root.innerHTML = items.length ? renderSaved(items) : renderEmpty()',
 ].forEach((needle) => requireIncludes(savedTab, needle, `saved tab ${needle}`));
 
+const dateSource = read('public/app-v2-date-source.js');
+[
+  'function esc(value)',
+  'issues.push(`매각기일이 다릅니다. 후보 ${esc(candidate.saleDate)} / 조회 ${esc(fetched.saleDate)}`)',
+  '<p class="v2-note">${esc(result.text)}</p>',
+  '<textarea id="v2DateCandidateMemo"',
+  '>${esc(memo)}</textarea>',
+  '<span class="v2-badge">${esc(label)}</span>',
+  '<h3>${esc(candidate.caseNo || \'사건번호 미확인\')}</h3>',
+  '${esc(candidate.reason || \'후보 사유 없음\')}',
+  'status.textContent = memo.value.trim() ?',
+].forEach((needle) => requireIncludes(dateSource, needle, `date source ${needle}`));
+
+const candidateStack = read('public/app-v2-candidate-stack.js');
+[
+  'function esc(value)',
+  '${esc(lowestMinBid?.item?.caseNo || \'-\')}',
+  'top.map(({ item, score, decision }) => `<li>${esc(item.caseNo || \'-\')} · 점수 ${score} · ${esc(decision)}</li>`).join',
+  '<td>${esc(item.caseNo || \'-\')}</td>',
+  '<td>${esc(memo || \'-\')}</td>',
+  'data-search-candidate="${esc(item.caseNo || \'\')}"',
+  'data-save-candidate="${esc(item.caseNo || \'\')}"',
+  'data-remove-candidate="${esc(item.caseNo || \'\')}"',
+].forEach((needle) => requireIncludes(candidateStack, needle, `candidate stack ${needle}`));
+
 const validate = read('public/app-v2-validate.js');
 [
   'function esc(value)',
@@ -183,6 +208,39 @@ const serviceStatus = read('public/app-v2-service-status.js');
   "info('서비스 버전', esc(clean(health?.version || '-')))",
   "info('요청ID', esc(requestId || '-'))",
 ].forEach((needle) => requireIncludes(serviceStatus, needle, `service status ${needle}`));
+
+const molit = read('public/app-v2-molit-trades.js');
+[
+  'function esc(value)',
+  'function info(k, v, extra = \'\')',
+  '${esc(reason)}',
+  '${esc(message)}',
+  '<td>${esc(trade.tradeTypeLabel || trade.tradeType || \'-\')}</td>',
+  '<td>${esc(trade.aptName || \'-\')}</td>',
+  'return types.map((t) => `${esc(t.label || t.type || \'-\')}: ${Number(t.filteredCount || 0)}건`).join',
+  "info('유형별 결과', renderTypeSummary(result.data?.tradeTypes), 'wide')",
+].forEach((needle) => requireIncludes(molit, needle, `molit ${needle}`));
+
+const confidence = read('public/app-v2-confidence.js');
+[
+  'function esc(value)',
+  'return `<div class="v2-info"><div class="k">${esc(item.label)}</div>',
+  '${esc(snapshot.label)} · ${esc(`${snapshot.ratio}%`)}',
+  '${esc(snapshot.message)}',
+  '${esc(snapshot.tradeScope)}',
+  '${esc(missingText)}',
+].forEach((needle) => requireIncludes(confidence, needle, `confidence ${needle}`));
+
+const caseSync = read('public/app-v2-case-sync-status.js');
+[
+  'function esc(value)',
+  'function info(label, value)',
+  '${esc(value)}',
+  '${esc(data.label)}',
+  '${esc(data.message)}',
+  "info('현재 사건 key', shortKey(data.key))",
+  "statusInfo('입지 임시값', data.hasLocation)",
+].forEach((needle) => requireIncludes(caseSync, needle, `case sync ${needle}`));
 
 const copySummary = read('public/app-v2-copy-summary.js');
 [
