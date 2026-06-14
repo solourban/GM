@@ -102,6 +102,10 @@ assert.strictEqual(stored.repairCost, '10000000', 'new storage should keep cost 
 const requiredCopySummaryHooks = [
   'function loadBidPlanSnapshot',
   'window.__auctionBidPlan.currentSnapshot',
+  'FINAL_JUDGMENT_STORAGE_KEY',
+  'function appendFinalJudgmentSummary',
+  '최종 검토 방향',
+  '다음 확인순서',
   '입찰가·자금 계산',
   '필요 현금',
   '세후수익',
@@ -114,6 +118,10 @@ for (const needle of requiredCopySummaryHooks) {
 const requiredFinalJudgmentHooks = [
   'function bidPlanSnapshot',
   'window.__auctionBidPlan?.currentSnapshot',
+  'function nextChecks',
+  '다음 확인순서',
+  '최저가 기준 실질부담',
+  '손익분기 매도가',
   '필요 현금',
   '세후수익',
   '수익률',

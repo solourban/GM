@@ -68,6 +68,10 @@
     }
   }
 
+  function reportMinBid(currentReport) {
+    return numberValue(currentReport?.basic?.['최저매각가격'] || currentReport?.basic?.['최저가']);
+  }
+
   function riskText(level) {
     if (level === 'danger') return '높음';
     if (level === 'warn') return '주의';
@@ -209,10 +213,28 @@
     return list.slice(0, 7);
   }
 
+  function nextChecks(currentReport, location, trades, bidPlan) {
+    const list = [];
+    const riskLevel = currentReport?.risk?.level || 'ok';
+    const inheritedTotal = numberValue(currentReport?.inherited?.total);
+    const scope = tradeScope(trades);
+
+    if (riskLevel === 'danger') list.push('권리 원본 재확인: 등기부, 매각물건명세서, 전입세대열람을 먼저 대조');
+    if (inheritedTotal > 0) list.push('인수금액 검증: 미배당 보증금·특수권리 금액을 실질 부담액에 포함');
+    if (!bidPlan) list.push('입찰가 산정 입력: 입찰 예정가, 대출, 보유비용, 예상 매도가 입력');
+    else if (bidPlan.afterTaxProfit < 0) list.push('수익성 재검토: 세후수익이 음수라 입찰가·비용·매도가 조정 필요');
+    if (!location?.x || !location?.y) list.push('입지 확인: 주소 좌표 변환 후 주변시설·현장성 확인');
+    if (scope.level !== 'specific') list.push('시세 검증: 동일 단지·전용면적·층 매칭 거래로 재확인');
+    list.push('최종 전 점검: 현장 점유자, 명도 가능성, 대출 가능액, 세금 전문가 확인');
+
+    return Array.from(new Set(list)).slice(0, 6);
+  }
+
   function buildSnapshot(currentReport, location, trades) {
     const decision = finalDecision(currentReport, location, trades);
     const comparison = trades?.comparison || {};
     const inheritedTotal = numberValue(currentReport?.inherited?.total);
+    const minBid = reportMinBid(currentReport);
     const count = tradeCount(trades);
     const scope = tradeScope(trades);
     const avgRatio = scope.priceComparable ? Number(comparison.avgRatio || 0) : 0;
@@ -222,8 +244,12 @@
       reasons: reasons(currentReport, location, trades),
       riskLevel: currentReport?.risk?.level || 'ok',
       riskText: riskText(currentReport?.risk?.level || 'ok'),
+      minBid,
+      minBidText: money(minBid),
       inheritedTotal,
       inheritedTotalText: money(inheritedTotal),
+      minBidBurden: minBid + inheritedTotal,
+      minBidBurdenText: money(minBid + inheritedTotal),
       tradeCount: count,
       tradeScope: scope.label,
       tradeScopeLevel: scope.level,
@@ -238,11 +264,16 @@
         plannedBid: bidPlan.plannedBid,
         expectedSalePrice: bidPlan.expectedSalePrice,
         loanAmount: bidPlan.loanAmount,
+        totalBurden: bidPlan.totalBurden,
+        totalCost: bidPlan.totalCost,
         requiredCash: bidPlan.requiredCash,
+        breakEvenSalePrice: bidPlan.breakEvenSalePrice,
+        holdingMonthlyCost: bidPlan.holdingMonthlyCost,
         afterTaxProfit: bidPlan.afterTaxProfit,
         roi: bidPlan.roi,
         message: clean(bidPlan.message || ''),
       } : null,
+      nextChecks: nextChecks(currentReport, location, trades, bidPlan),
     };
   }
 
@@ -265,9 +296,11 @@
     if (!plan) return '';
     return `
       <div class="v2-info"><div class="k">입찰 예정가</div><div class="v">${esc(money(plan.plannedBid))}</div></div>
+      <div class="v2-info"><div class="k">입찰가 기준 실질부담</div><div class="v">${esc(money(plan.totalBurden))}</div></div>
       <div class="v2-info"><div class="k">필요 현금</div><div class="v">${esc(money(plan.requiredCash))}</div></div>
       <div class="v2-info"><div class="k">세후수익</div><div class="v">${esc(money(plan.afterTaxProfit))}</div></div>
       <div class="v2-info"><div class="k">수익률</div><div class="v">${esc(plan.expectedSalePrice ? ratioText(plan.roi) : '-')}</div></div>
+      <div class="v2-info"><div class="k">손익분기 매도가</div><div class="v">${esc(money(plan.breakEvenSalePrice))}</div></div>
     `;
   }
 
@@ -283,7 +316,9 @@
         <div class="v2-grid compact">
           <div class="v2-info wide"><div class="k">최종 검토 방향</div><div class="v"><span class="v2-pill ${pillClass(decision.tone)}">${esc(decision.label)}</span></div><p class="v2-note">${esc(decision.text)}</p></div>
           <div class="v2-info"><div class="k">권리 위험도</div><div class="v">${esc(snapshot.riskText)}</div></div>
+          <div class="v2-info"><div class="k">최저가</div><div class="v">${esc(snapshot.minBidText)}</div></div>
           <div class="v2-info"><div class="k">인수 추정금액</div><div class="v">${esc(snapshot.inheritedTotalText)}</div></div>
+          <div class="v2-info"><div class="k">최저가 기준 실질부담</div><div class="v">${esc(snapshot.minBidBurdenText)}</div></div>
           <div class="v2-info"><div class="k">실거래가 표본 수</div><div class="v">${esc(`${snapshot.tradeCount}건`)}</div></div>
           <div class="v2-info"><div class="k">참고 범위</div><div class="v">${esc(snapshot.tradeScope)}</div></div>
           <div class="v2-info"><div class="k">최저가/평균가 참고비율</div><div class="v">${esc(snapshot.avgRatio ? `${snapshot.avgRatio.toFixed(1)}%` : '-')}</div></div>
@@ -295,6 +330,10 @@
         <ul class="v2-check-list">
           ${snapshot.reasons.map((item) => `<li>${esc(item)}</li>`).join('')}
         </ul>
+        <h4 class="v2-detail-title">다음 확인순서</h4>
+        <ol class="v2-check-list">
+          ${snapshot.nextChecks.map((item) => `<li>${esc(item)}</li>`).join('')}
+        </ol>
         <p class="v2-note">이 판단은 입력값 기반 참고용입니다. 실거래가는 수익 예측이나 적정가 확정값이 아니며, 실제 입찰 전 등기부, 매각물건명세서, 점유관계, 현장조사, 추가비용을 반드시 재확인해야 합니다.</p>
       </section>
     `;

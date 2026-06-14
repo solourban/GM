@@ -17,6 +17,27 @@
     return digits ? Math.max(0, Number(digits)) : 0;
   }
 
+  function esc(value) {
+    return clean(value).replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
+  function money(value) {
+    const n = numberValue(value);
+    return n ? `${n.toLocaleString('ko-KR')}원` : '0원';
+  }
+
+  function riskLabel(level) {
+    if (level === 'danger') return '높음';
+    if (level === 'warn') return '주의';
+    return '낮음';
+  }
+
   function unique(items) {
     return Array.from(new Set(items.map(clean).filter(Boolean)));
   }
@@ -80,23 +101,34 @@
   }
 
   function signature(report, reasons) {
+    const inheritedTotal = numberValue(report?.inherited?.total);
+    const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     return [
       report?.risk?.level || 'ok',
       actionLevel(report),
+      inheritedTotal,
+      minBid,
       ...reasons,
     ].map(clean).join('|');
   }
 
   function renderRiskBriefHtml(report, reasons) {
+    const level = report?.risk?.level || 'ok';
+    const inheritedTotal = numberValue(report?.inherited?.total);
+    const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
+    const practicalBurden = minBid + inheritedTotal;
     return `
       <span class="v2-badge">판단 근거</span>
       <h3>위험 판단 근거</h3>
       <p class="v2-note">권리분석 결과에서 입찰 전 확인해야 할 리스크만 추렸습니다.</p>
-      <div class="v2-grid one">
-        <div class="v2-info-box"><span>현재 권장 조치</span><strong>${actionLevel(report)}</strong></div>
+      <div class="v2-grid compact">
+        <div class="v2-info-box"><span>권리 위험도</span><strong>${esc(riskLabel(level))}</strong></div>
+        <div class="v2-info-box"><span>인수 추정금액</span><strong>${esc(money(inheritedTotal))}</strong></div>
+        <div class="v2-info-box"><span>최저가 기준 실질부담</span><strong>${esc(money(practicalBurden))}</strong></div>
+        <div class="v2-info-box"><span>현재 권장 조치</span><strong>${esc(actionLevel(report))}</strong></div>
       </div>
       <ul class="v2-list">
-        ${reasons.map((reason) => `<li>${reason}</li>`).join('')}
+        ${reasons.map((reason) => `<li>${esc(reason)}</li>`).join('')}
       </ul>
     `;
   }

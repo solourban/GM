@@ -6,6 +6,7 @@
   const DATE_CANDIDATE_MEMO_PREFIX = 'auction-note:v2:date-candidate-memo:';
   const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
   const TRADE_STORAGE_KEY = 'auction-note:v2:molit-trades';
+  const FINAL_JUDGMENT_STORAGE_KEY = 'auction-note:v2:final-judgment';
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
   function app() {
@@ -152,6 +153,15 @@
   function loadMolitTradeBasics() {
     try {
       const raw = sessionStorage.getItem(TRADE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function loadFinalJudgment() {
+    try {
+      const raw = sessionStorage.getItem(FINAL_JUDGMENT_STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (_) {
       return null;
@@ -425,6 +435,34 @@
     lines.push('- 주의: 실거래가는 참고용이며 동일 단지·동·층·면적, 계약해제 여부, 거래시점 차이를 별도 확인해야 합니다.');
   }
 
+  function appendFinalJudgmentSummary(lines) {
+    const final = loadFinalJudgment();
+    if (!final?.decision) return;
+
+    lines.push('');
+    lines.push('최종 검토 방향:');
+    lines.push(`- 판단: ${clean(final.decision.label || '미확인')}`);
+    if (final.decision.text) lines.push(`- 이유: ${clean(final.decision.text)}`);
+    if (final.minBidText) lines.push(`- 최저가: ${clean(final.minBidText)}`);
+    if (final.inheritedTotalText) lines.push(`- 인수 추정금액: ${clean(final.inheritedTotalText)}`);
+    if (final.minBidBurdenText) lines.push(`- 최저가 기준 실질부담: ${clean(final.minBidBurdenText)}`);
+    if (final.bidPlan?.totalBurden) lines.push(`- 입찰가 기준 실질부담: ${money(final.bidPlan.totalBurden)}`);
+    if (final.bidPlan?.requiredCash) lines.push(`- 필요 현금: ${money(final.bidPlan.requiredCash)}`);
+    if (final.bidPlan?.breakEvenSalePrice) lines.push(`- 손익분기 매도가: ${money(final.bidPlan.breakEvenSalePrice)}`);
+    if (Array.isArray(final.nextChecks) && final.nextChecks.length) {
+      lines.push('- 다음 확인순서:');
+      final.nextChecks.slice(0, 5).forEach((item, index) => {
+        lines.push(`  ${index + 1}. ${clean(item)}`);
+      });
+    }
+    if (Array.isArray(final.reasons) && final.reasons.length) {
+      lines.push('- 판단 근거:');
+      final.reasons.slice(0, 5).forEach((item) => {
+        lines.push(`  - ${clean(item)}`);
+      });
+    }
+  }
+
   function buildSummaryText(report) {
     const minBid = numberValue(report?.basic?.['최저매각가격'] || report?.basic?.['최저가']);
     const inheritedTotal = numberValue(report?.inherited?.total);
@@ -452,6 +490,7 @@
     lines.push(`인수 추정금액: ${money(inheritedTotal)}`);
     lines.push(`최저가 기준 실질 부담: ${money(practicalBurden)}`);
     if (upper) lines.push(`검토상한가 기준 실질 부담: ${money(upperTotal)}`);
+    appendFinalJudgmentSummary(lines);
     appendLocationSummary(lines);
     appendMolitTradeSummary(lines);
     appendDateCandidateSummary(lines);

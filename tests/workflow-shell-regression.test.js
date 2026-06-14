@@ -116,9 +116,11 @@ forbidIncludes(pkg, 'app-v2-date-seoul-only.js', 'Seoul-only date lock syntax ch
 
 [
   "const CARD_ID = 'v2RiskBriefCard'",
+  'function esc',
   'function signature',
   'function renderRiskBriefHtml',
   'function notifyResultChange',
+  '최저가 기준 실질부담',
   "card.className = 'v2-result-card v2-risk-brief-card'",
   "card.dataset.workflowStep = 'risk'",
   'card.dataset.signature !== nextSignature',
