@@ -1,6 +1,6 @@
 # Codex 전체 코드 리뷰표
 
-기준일: 2026-06-14
+기준일: 2026-06-15
 
 범위는 `public/index.html`에서 실제 로드되는 v2 스크립트와 서버 핵심 파일입니다. `public/*-patch.js`, legacy `public/app.js`, `public/app-v2.js`, `public/app-v2-analyze.js` 등 현재 `index.html`에서 로드하지 않는 파일은 별도 레거시 정리 대상으로 분리합니다.
 
@@ -8,7 +8,7 @@
 
 | 파일명 | 역할 | 생성하는 DOM id | 의존하는 DOM id | 사용하는 storage key | 사용하는 API endpoint | innerHTML 사용 여부 | escape 처리 여부 | 관련 테스트 | 위험도 | 비고 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `src/server.js` | Express 서버, 정적 파일, API 라우트 | 해당 없음 | 해당 없음 | 해당 없음 | 전체 `/api/*` | 아니오 | 서버 응답 sanitize 일부 | `server-security`, `fetch-response-sanitization`, `onbid-contract`, `external-api-proxy` | 높음 | API 계약 변경 시 프론트 전체 영향 |
+| `src/server.js` | Express 서버, 정적 파일, API 라우트 | 해당 없음 | 해당 없음 | 해당 없음 | 전체 `/api/*` | 아니오 | 서버 응답 sanitize 일부 | `server-security`, `fetch-response-sanitization`, `onbid-contract`, `external-api-proxy`, `api-contract-hardening`, `renewal-regression` | 높음 | API 계약 변경 시 프론트 전체 영향 |
 | `src/crawler.js` | 법원 사건 기본정보 수집 | 해당 없음 | 해당 없음 | 해당 없음 | 외부 법원 API | 아니오 | 서버 route에서 내부 필드 제거 | `fetch-response-sanitization`, `analyzer` | 높음 | `rawApis/debug/_internalCsNo` 제거는 server에서 보장 |
 | `src/analyzer.js` | 권리분석 계산 | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 | 아니오 | 해당 없음 | `analyzer` | 높음 | `/api/analyze` result 계약의 원천 |
 | `src/dateRecommendations.js` | 매각기일 추천 후보 수집/검증 | 해당 없음 | 해당 없음 | 해당 없음 | 외부 법원 API | 아니오 | clean 함수 사용 | `date-recommendations-regression`, `api-contract-hardening` | 중 | module 내부 debug는 유지하되 public route 응답에서는 제거 |
@@ -36,7 +36,7 @@
 | `public/app-v2-saved-tab.js` | 저장 후보 TOP 5 탭 | `v2SavedTabControlsCard`, `v2SavedTabRuntimeCard`, `v2SavedMobileCards` | `v2TabResultsSection` | `auction-note:v2:saved-candidates`, memo key | 없음 | 예 | `esc` 사용 | `tab-results-layout`, `innerhtml-escape-guard` | 중 | 저장 후보 목록/검색 handoff |
 | `public/app-v2-bulk-tab.js` | 여러 사건 일괄조회 | `v2Bulk*` | `v2TabResultsSection`, search input | `auction-note:v2:bulk-lookup-state`, candidate/saved keys | `/api/courts`, `/api/fetch` | 예 | `esc` 사용 | `tab-results-layout` | 높음 | 여러 `/api/fetch` 호출과 후보 저장 |
 | `public/app-v2-location.js` | 위치/카카오 지도/좌표 | `v2LocationCard` | `resultsSection` | `auction-note:v2:location-geocode` | `/api/location/geocode`, `/api/config`, `/api/kakao/maps-sdk.js` | 예 | `esc` 사용, 주소 재검색 시도 escape 적용 | `location-map-card`, `server-security`, `innerhtml-escape-guard` | 높음 | Kakao JS key는 서버 프록시 경유 |
-| `public/app-v2-molit-trades.js` | 국토부 실거래가 카드 | `v2MolitTradeCard` | `v2LocationCard` | `auction-note:v2:location-geocode`, `auction-note:v2:molit-trades` | `/api/molit/trades` | 예 | render helper escape 사용 | `external-api-proxy`, `api-contract-hardening`, `innerhtml-escape-guard` | 중 | 서버 MOLIT fetch timeout 적용 |
+| `public/app-v2-molit-trades.js` | 국토부 실거래가 카드 | `v2MolitTradeCard` | `v2LocationCard` | `auction-note:v2:location-geocode`, `auction-note:v2:molit-trades` | `/api/molit/trades` | 예 | render helper escape 사용 | `external-api-proxy`, `api-contract-hardening`, `innerhtml-escape-guard` | 중 | 서버 MOLIT fetch timeout 적용. `/api/molit/apt-trades`는 외부 문서용 아파트 전용 호환 route |
 | `public/app-v2-final-judgment.js` | 최종 판단 카드 | `v2FinalJudgmentCard` | 위치/실거래/입찰가/checklist cards | `auction-note:v2:final-judgment`, 위치/실거래 keys | 없음 | 예 | `esc` 사용 | `bid-plan-calculation`, `innerhtml-escape-guard` | 중 | bid-plan snapshot 반영 |
 | `public/app-v2-external-checklist.js` | 외부 확인 체크리스트 | `v2ExternalVerification*` | `resultsSection`, risk/location/trade/final cards | `auction-note:v2:external-verification:` | 없음 | 예 | `esc`, `textContent` 혼합 | `external-checklist-regression`, `innerhtml-escape-guard` | 중 | 사건별 localStorage 메모 |
 | `public/app-v2-confidence.js` | 판단 신뢰도 카드 | `v2DecisionConfidenceCard` | final/location/trade cards | final/location/trade keys | 없음 | 예 | `esc` 사용 | `result-order-regression`, `innerhtml-escape-guard` | 중 | final 카드와 순서 의존 |
@@ -71,6 +71,7 @@
 ## 남은 리뷰 포인트
 
 - `/api/analyze`, 매각기일 `debug`, MOLIT 부분 실패 메시지, MOLIT timeout은 `api-contract-hardening` 계열 테스트로 해결 상태를 고정했다.
+- `/api/molit/apt-trades`는 `/api/molit/trades` shared handler를 사용하고 `tradeType: apt`로 고정하는 호환 route로 제공한다.
 - `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
 - 남은 loaded v2 파일 중 result-polish/display-fix/courts/workflow shell처럼 정적 템플릿 중심 파일은 레거시 patch 정리와 함께 낮은 우선순위로 유지한다.
 - 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. 1차 UI 패치에서 hero 높이와 empty results 영역을 축소했다.

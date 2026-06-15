@@ -37,6 +37,7 @@ const requiredServerRoutes = [
   ["app.get('/api/courts'", 'court list route'],
   ["app.get('/api/location/geocode'", 'Kakao geocode proxy route'],
   ["app.get('/api/molit/trades'", 'MOLIT trades proxy route'],
+  ["app.get('/api/molit/apt-trades'", 'MOLIT apartment compatibility route'],
   ["app.get('/api/onbid/items'", 'Onbid list proxy route'],
   ["app.get('/api/onbid/detail'", 'Onbid detail proxy route'],
 ];

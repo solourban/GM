@@ -27,6 +27,9 @@ requireIncludes("app.get('/api/date/recommendations'", 'date recommendations com
 requireIncludes("handleDateRecommendations(req, res, 'date/recommendations')", 'compatibility route uses shared handler');
 requireIncludes('const { debug, ...publicResult } = result', 'date recommendation debug stripping');
 requireIncludes('res.json({ ok: true, result, report: result, requestId: req.requestId })', 'analyze report alias');
+requireIncludes('async function handleMolitTrades', 'shared MOLIT trades handler');
+requireIncludes("app.get('/api/molit/apt-trades'", 'MOLIT apartment compatibility route');
+requireIncludes("handleMolitTrades(req, res, { scope: 'molit/apt-trades', fixedTradeType: 'apt' })", 'MOLIT apartment route fixes trade type');
 requireIncludes("'해당 유형 실거래가 조회 중 오류가 발생했습니다.'", 'safe MOLIT partial failure message');
 requireIncludes('const MOLIT_FETCH_TIMEOUT_MS', 'MOLIT fetch timeout constant');
 
@@ -37,7 +40,7 @@ const molitFetch = sectionBetween('async function fetchMolitType', "app.get('/ap
 if (!/controller\.abort\(\)/.test(molitFetch)) fail('MOLIT fetch helper must abort slow upstream requests.');
 if (!/AbortError/.test(molitFetch)) fail('MOLIT fetch helper must translate AbortError safely.');
 
-const molitRoute = sectionBetween("app.get('/api/molit/trades'", "const ONBID_LIST_BASE_URL", '/api/molit/trades route');
-if (/error:\s*e\.message/.test(molitRoute)) fail('MOLIT partial failures must not expose e.message.');
+const molitHandler = sectionBetween('async function handleMolitTrades', "const ONBID_LIST_BASE_URL", 'MOLIT shared route handler');
+if (/error:\s*e\.message/.test(molitHandler)) fail('MOLIT partial failures must not expose e.message.');
 
 console.log('API contract hardening guard passed.');

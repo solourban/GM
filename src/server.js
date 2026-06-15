@@ -414,12 +414,14 @@ async function fetchMolitType({ type, lawdCd, dealYmd, aptName }) {
   }
 }
 
-app.get('/api/molit/trades', async (req, res) => {
+async function handleMolitTrades(req, res, options = {}) {
+  const scope = options.scope || 'molit/trades';
+  const fixedTradeType = options.fixedTradeType || '';
   try {
     const lawdCd = String(req.query.lawdCd || '').trim();
     const dealYmd = String(req.query.dealYmd || '').trim();
     const aptName = String(req.query.aptName || '').trim();
-    const tradeType = String(req.query.tradeType || 'auto').trim();
+    const tradeType = fixedTradeType || String(req.query.tradeType || 'auto').trim();
 
     if (!validLawdCd(lawdCd)) return res.status(400).json(errorBody(req, '법정동코드 5자리가 필요합니다.'));
     if (!validDealYmd(dealYmd)) return res.status(400).json(errorBody(req, '계약월은 YYYYMM 형식이어야 합니다.'));
@@ -431,7 +433,7 @@ app.get('/api/molit/trades', async (req, res) => {
       try {
         results.push(await fetchMolitType({ type, lawdCd, dealYmd, aptName }));
       } catch (e) {
-        logException('molit/trades:type', req, e, { tradeType: type });
+        logException(`${scope}:type`, req, e, { tradeType: type });
         results.push({ type, label: MOLIT_TYPES[type]?.label || type, error: '해당 유형 실거래가 조회 중 오류가 발생했습니다.', rawCount: 0, filteredCount: 0, trades: [] });
       }
     }
@@ -449,10 +451,13 @@ app.get('/api/molit/trades', async (req, res) => {
       requestId: req.requestId,
     });
   } catch (e) {
-    logException('molit/trades', req, e);
+    logException(scope, req, e);
     return res.status(500).json(errorBody(req, '국토부 실거래가 조회 중 오류가 발생했습니다.'));
   }
-});
+}
+
+app.get('/api/molit/trades', (req, res) => handleMolitTrades(req, res, { scope: 'molit/trades' }));
+app.get('/api/molit/apt-trades', (req, res) => handleMolitTrades(req, res, { scope: 'molit/apt-trades', fixedTradeType: 'apt' }));
 
 const ONBID_LIST_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstListSrvc2';
 const ONBID_DETAIL_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstDtlSrvc2';

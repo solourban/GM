@@ -23,6 +23,7 @@ requireIncludes(server, 'safeKakaoDiagnostic', 'Kakao diagnostic helper');
 requireIncludes(server, 'addressName: address.address_name ||', 'Kakao jibun address mapping');
 requireIncludes(server, 'roadAddress: road.address_name ||', 'Kakao road address mapping');
 requireIncludes(server, "app.get('/api/molit/trades'", 'MOLIT unified trades route');
+requireIncludes(server, "app.get('/api/molit/apt-trades'", 'MOLIT apartment compatibility route');
 requireIncludes(server, 'RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev', 'MOLIT apartment call in server');
 requireIncludes(server, 'RTMSDataSvcOffiTrade/getRTMSDataSvcOffiTrade', 'MOLIT officetel call in server');
 requireIncludes(server, 'RTMSDataSvcRHTrade/getRTMSDataSvcRHTrade', 'MOLIT row house call in server');

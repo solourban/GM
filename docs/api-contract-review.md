@@ -1,8 +1,8 @@
 # API 계약 점검표
 
-기준일: 2026-06-14
+기준일: 2026-06-15
 
-현재 서버 라우트 기준으로 점검했습니다. 지시서에 적힌 `/api/date/recommendations`는 `/api/recommendations/by-date`와 같은 shared handler를 사용하는 호환 route로 제공하며, `/api/molit/apt-trades`는 현재 서버에 별도 route로 존재하지 않고 실제 구현은 `/api/molit/trades`입니다.
+현재 서버 라우트 기준으로 점검했습니다. 지시서에 적힌 `/api/date/recommendations`는 `/api/recommendations/by-date`와 같은 shared handler를 사용하는 호환 route로 제공하며, `/api/molit/apt-trades`도 `/api/molit/trades`와 같은 shared handler를 사용하는 아파트 전용 호환 route로 제공합니다.
 
 ## 계약 표
 
@@ -19,7 +19,7 @@
 | `/api/location/geocode` | GET `address` | `ok`, `query`, `count`, `documents`, `meta`, `requestId` | location이 `documents[0]`와 `meta` 기대 | 큰 불일치 없음 | generic 500. upstream 오류는 `upstream` diagnostic 포함 | 예 | key 미노출. upstream `message`는 180자로 제한 | `server-security`, `location-map-card` |
 | `/api/kakao/maps-sdk.js` | 없음 | JavaScript loader | location이 script src로 사용 | 큰 불일치 없음 | key 없으면 JS Error text | 아니오(JSON 아님) | JS key는 서버 upstream 요청에만 사용. loader JS 안에는 upstream URL이 포함됨 | `server-security`, `location-map-card` |
 | `/api/molit/trades` | GET `lawdCd`, `dealYmd`, `aptName`, `tradeType` | `ok`, `lawdCd`, `dealYmd`, `aptName`, `tradeTypes`, `rawCount`, `count`, `trades`, `requestId` | molit가 `trades`, `tradeTypes`, `count`, `rawCount` 기대 | 큰 불일치 없음 | generic 500 | 예 | 유형별 부분 실패도 사용자용 일반 문구만 노출. upstream 호출은 12초 타임아웃 적용 | `external-api-proxy`, `api-contract-hardening` |
-| `/api/molit/apt-trades` | 지시서상 endpoint | 현재 route 없음 | 현재 프론트 사용 없음 | route 없음 | 404 공통 errorBody | 예 | 미해당 | 없음 |
+| `/api/molit/apt-trades` | GET `lawdCd`, `dealYmd`, `aptName` | `ok`, `lawdCd`, `dealYmd`, `aptName`, `tradeTypes`, `rawCount`, `count`, `trades`, `requestId` | 현재 프론트 사용 없음. 지시서/외부 문서 호환용 | 해결됨. `/api/molit/trades` shared handler를 사용하되 `tradeType: apt`로 고정 | generic 500 | 예 | 유형별 부분 실패도 사용자용 일반 문구만 노출. upstream 호출은 12초 타임아웃 적용 | `external-api-proxy`, `api-contract-hardening`, `renewal-regression` |
 
 ## 의심 지점 상태
 
@@ -33,9 +33,9 @@
 | 매각기일 `debug` 노출 | 서버 route가 `publicDateRecommendationResult`로 `debug` 제거 | 해결 | 테스트 유지 |
 | MOLIT `e.message` 노출 | 유형별 부분 실패는 일반 문구로 반환하고 실제 오류는 서버 로그에 기록 | 해결 | 테스트 유지 |
 | MOLIT fetch timeout | upstream 유형별 호출에 `AbortController` 12초 타임아웃 적용 | 해결 | 프론트 월별 재시도 흐름 유지 |
+| MOLIT `/api/molit/apt-trades` 호환 route | `/api/molit/trades`와 같은 shared handler를 사용하고 `tradeType: apt`로 고정 | 해결 | 외부 문서/호환 링크용으로 유지 |
 
 ## 우선순위
 
-1. `/api/molit/apt-trades` 호환 route가 외부 문서용으로 필요한지 결정한다.
-2. 현재 `index.html`에서 로드하지 않는 legacy patch 파일을 광고 심사 전 정리 대상으로 분리한다.
-3. loaded v2 파일 중 정적 템플릿 중심 파일은 UI 회귀 테스트와 함께 낮은 우선순위로 유지한다.
+1. 현재 `index.html`에서 로드하지 않는 legacy patch 파일을 광고 심사 전 정리 대상으로 분리한다.
+2. loaded v2 파일 중 정적 템플릿 중심 파일은 UI 회귀 테스트와 함께 낮은 우선순위로 유지한다.
