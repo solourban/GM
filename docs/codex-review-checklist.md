@@ -1,6 +1,6 @@
 # Codex 전체 코드 리뷰표
 
-기준일: 2026-06-16
+기준일: 2026-06-17
 
 범위는 `public/index.html`에서 실제 로드되는 v2 스크립트와 서버 핵심 파일입니다. `public/*-patch.js`, legacy `public/app.js`, `public/app-v2.js`, `public/app-v2-analyze.js` 등 현재 `index.html`에서 로드하지 않는 파일은 `legacy/public-js/`로 이동해 정적 운영 노출 대상에서 분리했습니다.
 
@@ -22,7 +22,7 @@
 | `public/app-v2-service-status.js` | 연동 상태 카드 | `v2ServiceStatusCard` | `v2HomePanels` | 없음 | `/api/health`, `/api/config` | 예 | `esc` 사용 | `server-security`, `external-api-proxy` | 중 | API 키 값은 노출하지 않고 설정 여부만 표시 |
 | `public/app-v2-validate.js` | Step2/분석 경고 유지 | `v2Step2GuardMessage`, `v2Analyze*Message` | `step2InputCard`, `analysisCard` | 없음 | 없음 | 예 | `esc` 사용 | `case-reset-safety`, `innerhtml-escape-guard` | 중 | 분석 실패/경고 메시지 HTML escape 적용 |
 | `public/app-v2-allocation.js` | 배당/인수 설명 보강 | `allocationExplainCard` | `analysisCard` | 없음 | 없음 | 예 | `esc` 확인 완료 | `innerhtml-escape-guard` | 중 | 분석 카드 후속 보강 |
-| `public/app-v2-display-fix.js` | 결과 카드 표시 보정 | `v2MissingAmountNotice` 등 | `analysisCard`, bid/funding cards | 없음 | 없음 | 예 | 정적 템플릿 위주 | `result-order-regression` | 중 | 표시 순서와 충돌 가능 |
+| `public/app-v2-display-fix.js` | 결과 카드 표시 보정 | `v2MissingAmountNotice` 등 | `analysisCard`, bid/funding cards | 없음 | 없음 | 예 | `esc` 사용 | `result-order-regression`, `innerhtml-escape-guard` | 중 | 표시 순서와 충돌 가능 |
 | `public/app-v2-risk-brief.js` | 위험 요약 카드 | `v2RiskBriefCard` | `v2BiddingSummaryCard` | 없음 | 없음 | 예 | `esc` 확인 완료 | `external-checklist-regression`, `innerhtml-escape-guard` | 중 | 최종 판단 카드들과 순서 의존 |
 | `public/app-v2-copy-summary.js` | 최종 복사용 요약 | `v2CopySummaryCard`, `v2CopySummaryBtn` | bid/funding/checklist cards | `auction-note:v2.2:bid-plan:`, 후보/위치/실거래 storage | 없음 | 예 | textarea/copy API와 `textContent` 중심 | `bid-plan-calculation`, `innerhtml-escape-guard` | 중 | 저장 후보/입찰가 snapshot 연결 |
 | `public/app-v2-bid-plan.js` | 입찰가·자금 계산 카드 | `v2BidPlanCard`, `v2PlannedBidInput`, `v2BidPlan_*` | `v2PreBidChecklistCard`, `v2FundingReviewCard`, `v2BidRangeCard` | `auction-note:v2.2:bid-plan:` | 없음 | 예 | `esc`, `textContent` 사용 | `bid-plan-calculation`, `innerhtml-escape-guard` | 높음 | 계산 상세 UI와 계산식 테스트 적용 |
@@ -73,7 +73,7 @@
 
 - `/api/analyze`, 매각기일 `debug`, MOLIT 부분 실패 메시지, MOLIT timeout은 `api-contract-hardening` 계열 테스트로 해결 상태를 고정했다.
 - `/api/molit/apt-trades`는 `/api/molit/trades` shared handler를 사용하고 `tradeType: apt`로 고정하는 호환 route로 제공한다.
-- `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
+- `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/display-fix/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
 - `public`에는 `index.html`이 실제 로드하는 JS만 남기고, 과거 patch/legacy JS 46개는 `legacy/public-js/`로 이동했다. `legacy-public-cleanup` 테스트로 재유입을 방지한다.
-- 남은 loaded v2 파일 중 result-polish/display-fix/courts/workflow shell처럼 정적 템플릿 중심 파일은 낮은 우선순위로 유지한다.
+- 남은 loaded v2 파일 중 result-polish/courts/workflow shell처럼 정적 템플릿 중심 파일은 낮은 우선순위로 유지한다.
 - 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. 1차 UI 패치에서 hero 높이와 empty results 영역을 축소했다.

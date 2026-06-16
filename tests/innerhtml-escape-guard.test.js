@@ -116,6 +116,21 @@ const allocation = read('public/app-v2-allocation.js');
   '${esc(report?.malso?.date || \'-\')}',
 ].forEach((needle) => requireIncludes(allocation, needle, `allocation ${needle}`));
 
+const displayFix = read('public/app-v2-display-fix.js');
+[
+  'const esc = (value)',
+  '${esc(riskLabel(level))}',
+  '${esc(money(minBid))}',
+  '${esc(money(practicalBurden))}',
+  '${esc(`입력 임차인 ${tenants}명, 인수 가능 항목 ${inheritedItems}건 기준입니다.`)}',
+  '${esc(decisionMessage(report, inheritedTotal, minBid))}',
+  '${esc(percent(upperRate))}',
+  '${esc(bidRangeMessage(report, lower, upper, base, inheritedTotal))}',
+  '${esc(`입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.`)}',
+  '${esc(fundingMessage(report, minTotal, upperTotal))}',
+  'items.map((item) => `<li>□ ${esc(item)}</li>`).join',
+].forEach((needle) => requireIncludes(displayFix, needle, `display fix ${needle}`));
+
 const riskBrief = read('public/app-v2-risk-brief.js');
 [
   'function esc(value)',

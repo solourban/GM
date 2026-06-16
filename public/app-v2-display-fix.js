@@ -1,5 +1,8 @@
 (() => {
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 
   function app() {
     return window.__auctionV2 || null;
@@ -211,14 +214,14 @@
       <h3>입찰 전 핵심 요약</h3>
       <p class="v2-note">권리분석 결과를 입찰 판단 기준으로 다시 정리한 요약입니다. 원본 서류 확인을 대체하지 않습니다.</p>
       <div class="v2-grid four">
-        <div class="v2-info-box"><span>위험도</span><strong>${riskLabel(level)}</strong></div>
-        <div class="v2-info-box"><span>최저가</span><strong>${money(minBid)}</strong></div>
-        <div class="v2-info-box"><span>인수 추정금액</span><strong>${money(inheritedTotal)}</strong></div>
-        <div class="v2-info-box"><span>실질 부담 추정</span><strong>${money(practicalBurden)}</strong></div>
+        <div class="v2-info-box"><span>위험도</span><strong>${esc(riskLabel(level))}</strong></div>
+        <div class="v2-info-box"><span>최저가</span><strong>${esc(money(minBid))}</strong></div>
+        <div class="v2-info-box"><span>인수 추정금액</span><strong>${esc(money(inheritedTotal))}</strong></div>
+        <div class="v2-info-box"><span>실질 부담 추정</span><strong>${esc(money(practicalBurden))}</strong></div>
       </div>
       <ul class="v2-list">
-        <li>입력 임차인 ${tenants}명, 인수 가능 항목 ${inheritedItems}건 기준입니다.</li>
-        <li>${decisionMessage(report, inheritedTotal, minBid)}</li>
+        <li>${esc(`입력 임차인 ${tenants}명, 인수 가능 항목 ${inheritedItems}건 기준입니다.`)}</li>
+        <li>${esc(decisionMessage(report, inheritedTotal, minBid))}</li>
       </ul>
     `);
   }
@@ -262,13 +265,13 @@
       <h3>입찰가 검토 기준</h3>
       <p class="v2-note">자동 산식으로 만든 참고 범위입니다. 실제 입찰가는 실거래가, 현장 상태, 명도비, 경쟁률을 별도로 반영해야 합니다.</p>
       <div class="v2-grid four">
-        <div class="v2-info-box"><span>입찰 하한 기준</span><strong>${money(lower)}</strong></div>
-        <div class="v2-info-box"><span>검토 상한 기준</span><strong>${money(upper)}</strong></div>
-        <div class="v2-info-box"><span>감정가 대비 상한</span><strong>${percent(upperRate)}</strong></div>
-        <div class="v2-info-box"><span>인수 반영 후 여유</span><strong>${money(upperAfterInherited)}</strong></div>
+        <div class="v2-info-box"><span>입찰 하한 기준</span><strong>${esc(money(lower))}</strong></div>
+        <div class="v2-info-box"><span>검토 상한 기준</span><strong>${esc(money(upper))}</strong></div>
+        <div class="v2-info-box"><span>감정가 대비 상한</span><strong>${esc(percent(upperRate))}</strong></div>
+        <div class="v2-info-box"><span>인수 반영 후 여유</span><strong>${esc(money(upperAfterInherited))}</strong></div>
       </div>
       <ul class="v2-list">
-        <li>${bidRangeMessage(report, lower, upper, base, inheritedTotal)}</li>
+        <li>${esc(bidRangeMessage(report, lower, upper, base, inheritedTotal))}</li>
         <li>입찰가를 정할 때는 낙찰가가 아니라 낙찰가 + 인수금액 + 취득비용 + 수리·명도비용 기준으로 다시 계산하세요.</li>
       </ul>
     `);
@@ -320,14 +323,14 @@
       <h3>입찰 전 자금 검토</h3>
       <p class="v2-note">현재 입력값 기준의 단순 추정입니다. 대출 가능액, 잔금기한, 세금, 수리·명도비는 별도로 확인해야 합니다.</p>
       <div class="v2-grid four">
-        <div class="v2-info-box"><span>최저가 보증금</span><strong>${money(minBidDeposit)}</strong></div>
-        <div class="v2-info-box"><span>최저가+인수</span><strong>${money(minTotal)}</strong></div>
-        <div class="v2-info-box"><span>상한가 보증금</span><strong>${money(upperBidDeposit)}</strong></div>
-        <div class="v2-info-box"><span>상한가+인수</span><strong>${money(upperTotal)}</strong></div>
+        <div class="v2-info-box"><span>최저가 보증금</span><strong>${esc(money(minBidDeposit))}</strong></div>
+        <div class="v2-info-box"><span>최저가+인수</span><strong>${esc(money(minTotal))}</strong></div>
+        <div class="v2-info-box"><span>상한가 보증금</span><strong>${esc(money(upperBidDeposit))}</strong></div>
+        <div class="v2-info-box"><span>상한가+인수</span><strong>${esc(money(upperTotal))}</strong></div>
       </div>
       <ul class="v2-list">
-        <li>입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.</li>
-        <li>${fundingMessage(report, minTotal, upperTotal)}</li>
+        <li>${esc(`입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.`)}</li>
+        <li>${esc(fundingMessage(report, minTotal, upperTotal))}</li>
       </ul>
     `);
   }
@@ -362,7 +365,7 @@
       <h3>입찰 전 확인 체크리스트</h3>
       <p class="v2-note">분석 결과에서 파생된 확인 항목입니다. 입찰 전 원본 서류와 현장 확인 기준으로 하나씩 점검하세요.</p>
       <ul class="v2-list">
-        ${items.map((item) => `<li>□ ${item}</li>`).join('')}
+        ${items.map((item) => `<li>□ ${esc(item)}</li>`).join('')}
       </ul>
     `);
   }
