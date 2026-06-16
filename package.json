@@ -11,6 +11,7 @@
     "test:final-judgment": "node --check public/app-v2-final-judgment.js && node --check public/app-v2-confidence.js && node --check public/app-v2-case-sync-status.js && node --check public/app-v2-final-copy-bridge.js",
     "test:public-secrets": "node tests/public-secrets.test.js",
     "test:public-scripts": "node tests/public-scripts.test.js",
+    "test:legacy-public-cleanup": "node tests/legacy-public-cleanup.test.js",
     "test:property-type-filters": "node tests/property-type-filters.test.js",
     "test:tab-results-layout": "node tests/tab-results-layout.test.js",
     "test:fetch-response-sanitization": "node tests/fetch-response-sanitization.test.js",
@@ -37,7 +38,7 @@
     "test:static-pages": "node tests/static-pages.test.js",
     "test:home-layout": "node tests/home-layout.test.js",
     "test:analyzer": "node tests/analyzer.test.js",
-    "test": "npm run test:syntax && npm run test:public && npm run test:final-judgment && npm run test:public-secrets && npm run test:public-scripts && npm run test:property-type-filters && npm run test:tab-results-layout && npm run test:date-recommendations-regression && npm run test:fetch-response-sanitization && npm run test:onbid-contract && npm run test:onbid-result-layout && npm run test:bid-plan-calculation && npm run test:spec-extraction-design && npm run test:spec-extractor-parser && npm run test:spec-extractor-regression && npm run test:server-security && npm run test:api-contract-hardening && npm run test:location-map-card && npm run test:case-reset-safety && npm run test:case-scope-regression && npm run test:tab-scope-guard && npm run test:external-checklist-regression && npm run test:result-order-regression && npm run test:workflow-shell && npm run test:innerhtml-escape && npm run test:dependency-guard && npm run test:external-api-proxy && npm run test:onbid-proxy && npm run test:renewal-regression && npm run test:static-pages && npm run test:home-layout && npm run test:analyzer",
+    "test": "npm run test:syntax && npm run test:public && npm run test:final-judgment && npm run test:public-secrets && npm run test:public-scripts && npm run test:legacy-public-cleanup && npm run test:property-type-filters && npm run test:tab-results-layout && npm run test:date-recommendations-regression && npm run test:fetch-response-sanitization && npm run test:onbid-contract && npm run test:onbid-result-layout && npm run test:bid-plan-calculation && npm run test:spec-extraction-design && npm run test:spec-extractor-parser && npm run test:spec-extractor-regression && npm run test:server-security && npm run test:api-contract-hardening && npm run test:location-map-card && npm run test:case-reset-safety && npm run test:case-scope-regression && npm run test:tab-scope-guard && npm run test:external-checklist-regression && npm run test:result-order-regression && npm run test:workflow-shell && npm run test:innerhtml-escape && npm run test:dependency-guard && npm run test:external-api-proxy && npm run test:onbid-proxy && npm run test:renewal-regression && npm run test:static-pages && npm run test:home-layout && npm run test:analyzer",
     "test:date-recommendations-regression": "node tests/date-recommendations-regression.test.js"
   },
   "dependencies": {

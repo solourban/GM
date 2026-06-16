@@ -1,6 +1,6 @@
 # API 계약 점검표
 
-기준일: 2026-06-15
+기준일: 2026-06-16
 
 현재 서버 라우트 기준으로 점검했습니다. 지시서에 적힌 `/api/date/recommendations`는 `/api/recommendations/by-date`와 같은 shared handler를 사용하는 호환 route로 제공하며, `/api/molit/apt-trades`도 `/api/molit/trades`와 같은 shared handler를 사용하는 아파트 전용 호환 route로 제공합니다.
 
@@ -37,5 +37,5 @@
 
 ## 우선순위
 
-1. 현재 `index.html`에서 로드하지 않는 legacy patch 파일을 광고 심사 전 정리 대상으로 분리한다.
-2. loaded v2 파일 중 정적 템플릿 중심 파일은 UI 회귀 테스트와 함께 낮은 우선순위로 유지한다.
+1. loaded v2 파일 중 정적 템플릿 중심 파일은 UI 회귀 테스트와 함께 낮은 우선순위로 유지한다.
+2. 운영 전 AdSense 광고 코드 삽입 전까지 현재처럼 정적 페이지에는 광고 코드를 두지 않는다.

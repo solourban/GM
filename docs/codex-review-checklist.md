@@ -1,8 +1,8 @@
 # Codex 전체 코드 리뷰표
 
-기준일: 2026-06-15
+기준일: 2026-06-16
 
-범위는 `public/index.html`에서 실제 로드되는 v2 스크립트와 서버 핵심 파일입니다. `public/*-patch.js`, legacy `public/app.js`, `public/app-v2.js`, `public/app-v2-analyze.js` 등 현재 `index.html`에서 로드하지 않는 파일은 별도 레거시 정리 대상으로 분리합니다.
+범위는 `public/index.html`에서 실제 로드되는 v2 스크립트와 서버 핵심 파일입니다. `public/*-patch.js`, legacy `public/app.js`, `public/app-v2.js`, `public/app-v2-analyze.js` 등 현재 `index.html`에서 로드하지 않는 파일은 `legacy/public-js/`로 이동해 정적 운영 노출 대상에서 분리했습니다.
 
 ## 핵심 파일 점검표
 
@@ -13,6 +13,7 @@
 | `src/analyzer.js` | 권리분석 계산 | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 | 아니오 | 해당 없음 | `analyzer` | 높음 | `/api/analyze` result 계약의 원천 |
 | `src/dateRecommendations.js` | 매각기일 추천 후보 수집/검증 | 해당 없음 | 해당 없음 | 해당 없음 | 외부 법원 API | 아니오 | clean 함수 사용 | `date-recommendations-regression`, `api-contract-hardening` | 중 | module 내부 debug는 유지하되 public route 응답에서는 제거 |
 | `public/index.html` | 앱 진입 HTML, script load order | `resultsSection` | 해당 없음 | 해당 없음 | 해당 없음 | 아니오 | 해당 없음 | `public-scripts`, `static-pages` | 중 | script 순서 변경 주의 |
+| `legacy/public-js/*` | 운영에서 로드하지 않는 과거 public JS archive | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 | 아니오 | 해당 없음 | `legacy-public-cleanup` | 낮음 | 운영 정적 경로에서는 제외. 복구 시 index script/test 동시 갱신 필요 |
 | `public/app-v2-request-id-bridge.js` | fetch requestId 헤더 보강 | 없음 | `window.fetch` | 없음 | 전체 fetch | 아니오 | 해당 없음 | `public-scripts` | 중 | 모든 API 요청에 간접 영향 |
 | `public/app-v2-spec-extractor-parser.js` | 명세서 텍스트 파서 | 없음 | 없음 | 없음 | 없음 | 아니오 | DOM 접근 없음 | `spec-extractor-parser` | 중 | parser는 브라우저 API 사용 금지 테스트 있음 |
 | `public/app-v2-core.js` | 홈 탭, 검색, Step1/Step2/권리분석 기본 렌더 | `v2HomePanels`, `v2TabResultsSection`, `step2InputCard`, `analysisCard` | `resultsSection`, `.hero-inner`, `.header-inner` | 없음 | `/api/courts`, `/api/fetch`, `/api/analyze` | 예 | `esc`, `textContent` 혼합 | `public-scripts`, `tab-results-layout`, `case-scope-regression`, `innerhtml-escape-guard` | 높음 | 화면 구조의 중심. 홈 화면 여백/hero도 여기서 제어 |
@@ -73,5 +74,6 @@
 - `/api/analyze`, 매각기일 `debug`, MOLIT 부분 실패 메시지, MOLIT timeout은 `api-contract-hardening` 계열 테스트로 해결 상태를 고정했다.
 - `/api/molit/apt-trades`는 `/api/molit/trades` shared handler를 사용하고 `tradeType: apt`로 고정하는 호환 route로 제공한다.
 - `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
-- 남은 loaded v2 파일 중 result-polish/display-fix/courts/workflow shell처럼 정적 템플릿 중심 파일은 레거시 patch 정리와 함께 낮은 우선순위로 유지한다.
+- `public`에는 `index.html`이 실제 로드하는 JS만 남기고, 과거 patch/legacy JS 46개는 `legacy/public-js/`로 이동했다. `legacy-public-cleanup` 테스트로 재유입을 방지한다.
+- 남은 loaded v2 파일 중 result-polish/display-fix/courts/workflow shell처럼 정적 템플릿 중심 파일은 낮은 우선순위로 유지한다.
 - 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. 1차 UI 패치에서 hero 높이와 empty results 영역을 축소했다.
