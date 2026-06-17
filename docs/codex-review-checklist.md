@@ -26,7 +26,7 @@
 | `public/app-v2-risk-brief.js` | 위험 요약 카드 | `v2RiskBriefCard` | `v2BiddingSummaryCard` | 없음 | 없음 | 예 | `esc` 확인 완료 | `external-checklist-regression`, `innerhtml-escape-guard` | 중 | 최종 판단 카드들과 순서 의존 |
 | `public/app-v2-copy-summary.js` | 최종 복사용 요약 | `v2CopySummaryCard`, `v2CopySummaryBtn` | bid/funding/checklist cards | `auction-note:v2.2:bid-plan:`, 후보/위치/실거래 storage | 없음 | 예 | textarea/copy API와 `textContent` 중심 | `bid-plan-calculation`, `innerhtml-escape-guard` | 중 | 저장 후보/입찰가 snapshot 연결 |
 | `public/app-v2-bid-plan.js` | 입찰가·자금 계산 카드 | `v2BidPlanCard`, `v2PlannedBidInput`, `v2BidPlan_*` | `v2PreBidChecklistCard`, `v2FundingReviewCard`, `v2BidRangeCard` | `auction-note:v2.2:bid-plan:` | 없음 | 예 | `esc`, `textContent` 사용 | `bid-plan-calculation`, `innerhtml-escape-guard` | 높음 | 계산 상세 UI와 계산식 테스트 적용 |
-| `public/app-v2-result-polish.js` | 결과 표시 polish | 없음 | 결과 카드들 | 없음 | 없음 | 예 | 확인 필요 | `result-order-regression` | 낮음 | 시각 보정 |
+| `public/app-v2-result-polish.js` | 결과 표시 polish | 없음 | 결과 카드들 | 없음 | 없음 | 예 | `esc` 사용 | `result-order-regression`, `innerhtml-escape-guard` | 낮음 | 시각 보정 |
 | `public/app-v2-persist.js` | 사건별 입력/분석 저장 | `v2PersistStatus`, `v2PersistResetBtn` | `step2InputCard` | `auction-note:v2.2:case:` | 없음 | 아니오 | `textContent` 사용 | `case-reset-safety`, `case-scope-regression` | 높음 | 공용 PC 잔존 안내 필요 |
 | `public/app-v2-case-reset.js` | 사건 전환/초기화 안전장치 | `v2CaseScopeNotice` | 검색 input, Step2 | `auction-note:v2.2:case:`, `auction-note:v2.2:bid-plan:`, transient session keys | 없음 | 예 | 정적 템플릿 위주 | `case-reset-safety`, `case-scope-regression` | 높음 | 사건 스코프 오염 방지 핵심 |
 | `public/app-v2-spec-extractor.js` | 매각물건명세서 텍스트 추출 UI | `v2SpecExtractor*` | `v2SpecExtractorMount`, `resultsSection` | `auction-note:v2:spec-extraction:` | 없음 | 예 | parser 결과 escape 확인 필요 | `spec-extractor-regression`, `spec-extraction-design` | 높음 | 원문은 sessionStorage 한정 원칙 |
@@ -43,8 +43,8 @@
 | `public/app-v2-confidence.js` | 판단 신뢰도 카드 | `v2DecisionConfidenceCard` | final/location/trade cards | final/location/trade keys | 없음 | 예 | `esc` 사용 | `result-order-regression`, `innerhtml-escape-guard` | 중 | final 카드와 순서 의존 |
 | `public/app-v2-case-sync-status.js` | 사건 동기화 상태 | `v2CaseSyncStatusCard` | final/molit/confidence cards | case/final/location/trade/active keys | 없음 | 예 | `esc` 사용 | `case-scope-regression`, `innerhtml-escape-guard` | 중 | 사건 변경 시 stale data 감지 |
 | `public/app-v2-final-copy-bridge.js` | 최종 복사 bridge | final copy card ids | copy/final/molit cards | final/location/trade keys | 없음 | 예 | textarea escape, `textContent` 사용 | `result-order-regression`, `innerhtml-escape-guard` | 낮음 | 복사용 텍스트 생성 |
-| `public/app-v2-date-courts.js` | 매각기일 법원 목록 helper | 없음 | `dateCourtV2`, `dateMessageV2` | 없음 | 없음 | 예 | 정적 option 템플릿 | `date-recommendations-regression` | 낮음 | date panel 보조 |
-| `public/app-v2-workflow-shell.js` | 검색 결과 workflow wrapper | `v2WorkflowShell*` | `resultsSection`, `step2InputCard`, `analysisCard` | 없음 | 없음 | 예 | 정적 템플릿 위주 | `workflow-shell-regression` | 중 | 결과 카드 wrapping 영향 |
+| `public/app-v2-date-courts.js` | 매각기일 법원 목록 helper | 없음 | `dateCourtV2`, `dateMessageV2` | 없음 | 없음 | 예 | `esc` 사용 | `date-recommendations-regression`, `innerhtml-escape-guard` | 낮음 | date panel 보조 |
+| `public/app-v2-workflow-shell.js` | 검색 결과 workflow wrapper | `v2WorkflowShell*` | `resultsSection`, `step2InputCard`, `analysisCard` | 없음 | 없음 | 예 | `esc` 사용 | `workflow-shell-regression`, `innerhtml-escape-guard` | 중 | 결과 카드 wrapping 영향 |
 | `public/app-v2-essential-documents.js` | 필수 서류 체크 카드 | `v2EssentialDocumentsCard` | `resultsSection`, `analysisCard`, `step2InputCard` | 없음 | 없음 | 예 | `esc`, `textContent` 혼합 | `external-checklist-regression` | 중 | 외부검증 anchor |
 | `public/app-v2-tab-scope-guard.js` | 탭별 결과 오염 방지 | 없음 | `v2TabResultsSection`, `resultsSection`, tab/cards | 없음 | 없음 | 예 | 정적 메시지 | `tab-scope-guard` | 높음 | search 결과와 다른 탭 결과 분리 |
 | `public/app-v2-positioning-copy.js` | 탭별 안내 문구 | `v2PositioningNote` | `v2HomePanels` | 없음 | 없음 | 아니오 | `textContent` 사용 | 없음 | 낮음 | copy only |
@@ -73,7 +73,7 @@
 
 - `/api/analyze`, 매각기일 `debug`, MOLIT 부분 실패 메시지, MOLIT timeout은 `api-contract-hardening` 계열 테스트로 해결 상태를 고정했다.
 - `/api/molit/apt-trades`는 `/api/molit/trades` shared handler를 사용하고 `tradeType: apt`로 고정하는 호환 route로 제공한다.
-- `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/display-fix/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
+- `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-courts/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/display-fix/result-polish/workflow-shell/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
 - `public`에는 `index.html`이 실제 로드하는 JS만 남기고, 과거 patch/legacy JS 46개는 `legacy/public-js/`로 이동했다. `legacy-public-cleanup` 테스트로 재유입을 방지한다.
-- 남은 loaded v2 파일 중 result-polish/courts/workflow shell처럼 정적 템플릿 중심 파일은 낮은 우선순위로 유지한다.
+- 남은 loaded v2 파일 중 positioning-copy/map-provider-guard/result-order처럼 DOM textContent 또는 순서 제어 중심 파일은 낮은 우선순위로 유지한다.
 - 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. 1차 UI 패치에서 hero 높이와 empty results 영역을 축소했다.

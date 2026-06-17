@@ -62,6 +62,14 @@ const date = read('public/app-v2-date.js');
   'root.innerHTML = renderResultsArea()',
 ].forEach((needle) => requireIncludes(date, needle, `date ${needle}`));
 
+const dateCourts = read('public/app-v2-date-courts.js');
+[
+  'function esc(value)',
+  'return `<option value="${esc(value)}" ${active ? \'selected\' : \'\'}>${esc(label)}</option>`',
+  'if (shouldRefreshOptions(current)) current.innerHTML = optionHtml(selected)',
+  'select.innerHTML = optionHtml(selected)',
+].forEach((needle) => requireIncludes(dateCourts, needle, `date courts ${needle}`));
+
 const savedTab = read('public/app-v2-saved-tab.js');
 [
   'const esc = (value)',
@@ -223,6 +231,26 @@ const serviceStatus = read('public/app-v2-service-status.js');
   "info('서비스 버전', esc(clean(health?.version || '-')))",
   "info('요청ID', esc(requestId || '-'))",
 ].forEach((needle) => requireIncludes(serviceStatus, needle, `service status ${needle}`));
+
+const resultPolish = read('public/app-v2-result-polish.js');
+[
+  'const esc = (value)',
+  '<div class="v2-info ${extra}"><div class="k">${esc(label)}</div><div class="v">${esc(clean(value) || \'-\')}</div></div>',
+  "${info('기본정보 매각기일', saleDate)}",
+  "${info('최저매각가격', basic['최저매각가격'])}",
+  "${info('조회 상태', raw.status === 'ok' ? '정상 수집' : clean(raw.status || '-'))}",
+].forEach((needle) => requireIncludes(resultPolish, needle, `result polish ${needle}`));
+
+const workflowShell = read('public/app-v2-workflow-shell.js');
+[
+  'function esc(value)',
+  '<h3>${esc(copy.title)}</h3>',
+  '<p class="v2-note">${esc(copy.note)}</p>',
+  'const classAttr = item.className ? ` class="${esc(item.className)}"` : \'\'',
+  '<div${classAttr} title="${esc(value)}"><span>${esc(item.label)}</span><strong>${esc(value)}</strong></div>',
+  'data-workflow-step="${esc(step.id)}"',
+  '>${esc(step.label)}</button>',
+].forEach((needle) => requireIncludes(workflowShell, needle, `workflow shell ${needle}`));
 
 const molit = read('public/app-v2-molit-trades.js');
 [

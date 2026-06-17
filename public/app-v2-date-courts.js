@@ -16,6 +16,12 @@
     return String(value || '').replace(/\s+/g, ' ').trim();
   }
 
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
   function normalize(value) {
     const v = clean(value);
     if (!v) return '서울중앙';
@@ -29,7 +35,7 @@
     const normalizedSelected = normalize(selected);
     return COURTS.map(([value, label]) => {
       const active = normalize(value) === normalizedSelected || normalize(label) === normalizedSelected;
-      return `<option value="${value}" ${active ? 'selected' : ''}>${label}</option>`;
+      return `<option value="${esc(value)}" ${active ? 'selected' : ''}>${esc(label)}</option>`;
     }).join('');
   }
 
