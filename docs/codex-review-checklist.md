@@ -16,7 +16,7 @@
 | `legacy/public-js/*` | 운영에서 로드하지 않는 과거 public JS archive | 해당 없음 | 해당 없음 | 해당 없음 | 해당 없음 | 아니오 | 해당 없음 | `legacy-public-cleanup` | 낮음 | 운영 정적 경로에서는 제외. 복구 시 index script/test 동시 갱신 필요 |
 | `public/app-v2-request-id-bridge.js` | fetch requestId 헤더 보강 | 없음 | `window.fetch` | 없음 | 전체 fetch | 아니오 | 해당 없음 | `public-scripts` | 중 | 모든 API 요청에 간접 영향 |
 | `public/app-v2-spec-extractor-parser.js` | 명세서 텍스트 파서 | 없음 | 없음 | 없음 | 없음 | 아니오 | DOM 접근 없음 | `spec-extractor-parser` | 중 | parser는 브라우저 API 사용 금지 테스트 있음 |
-| `public/app-v2-core.js` | 홈 탭, 검색, Step1/Step2/권리분석 기본 렌더 | `v2HomePanels`, `v2TabResultsSection`, `step2InputCard`, `analysisCard` | `resultsSection`, `.hero-inner`, `.header-inner` | 없음 | `/api/courts`, `/api/fetch`, `/api/analyze` | 예 | `esc`, `textContent` 혼합 | `public-scripts`, `tab-results-layout`, `case-scope-regression`, `innerhtml-escape-guard` | 높음 | 화면 구조의 중심. 홈 화면 여백/hero도 여기서 제어 |
+| `public/app-v2-core.js` | 홈 탭, 검색, Step1/Step2/권리분석 기본 렌더 | `v2HomePanels`, `v2TabResultsSection`, `step2InputCard`, `analysisCard` | `resultsSection`, `.hero-inner`, `.header-inner` | 없음 | `/api/courts`, `/api/fetch`, `/api/analyze` | 예 | `esc`, `textContent` 혼합 | `public-scripts`, `tab-results-layout`, `case-scope-regression`, `innerhtml-escape-guard`, `home-layout` | 높음 | 화면 구조의 중심. 홈 화면 여백/hero와 모바일 줄바꿈도 여기서 제어 |
 | `public/app-v2-analyze-bridge.js` | `/api/analyze` 요청/응답 bridge | 없음 | `window.fetch` | 없음 | `/api/analyze` | 아니오 | 해당 없음 | `analyzer`, `public-scripts`, `api-contract-hardening` | 높음 | 서버도 `report` alias를 내려주며 bridge는 하위호환 보정으로 유지 |
 | `public/app-v2-onbid-entry.js` | 온비드 공매 탭/목록/상세 | `v2OnbidEntryPanel`, `v2OnbidResultCard`, `v2OnbidResultArea`, `v2OnbidDetailCard` | `v2HomePanels`, `v2TabResultsSection` | 없음 | `/api/config`, `/api/onbid/items`, `/api/onbid/detail` | 예 | `esc` 사용 | `onbid-contract`, `onbid-result-layout`, `onbid-proxy` | 높음 | 결과는 green input card 밖 `v2TabResultsSection`에 표시 |
 | `public/app-v2-service-status.js` | 연동 상태 카드 | `v2ServiceStatusCard` | `v2HomePanels` | 없음 | `/api/health`, `/api/config` | 예 | `esc` 사용 | `server-security`, `external-api-proxy` | 중 | API 키 값은 노출하지 않고 설정 여부만 표시 |
@@ -75,5 +75,6 @@
 - `/api/molit/apt-trades`는 `/api/molit/trades` shared handler를 사용하고 `tradeType: apt`로 고정하는 호환 route로 제공한다.
 - `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-courts/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/display-fix/result-polish/workflow-shell/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
 - `public`에는 `index.html`이 실제 로드하는 JS만 남기고, 과거 patch/legacy JS 46개는 `legacy/public-js/`로 이동했다. `legacy-public-cleanup` 테스트로 재유입을 방지한다.
+- 홈/결과 카드의 모바일 탭 2컬럼 배치, 버튼 줄바꿈, 긴 값 줄바꿈, body 가로 overflow 방지는 `home-layout` 테스트로 1차 고정했다.
 - 남은 loaded v2 파일 중 positioning-copy/map-provider-guard/result-order처럼 DOM textContent 또는 순서 제어 중심 파일은 낮은 우선순위로 유지한다.
-- 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. 1차 UI 패치에서 hero 높이와 empty results 영역을 축소했다.
+- 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. UI 패치에서 hero 높이, empty results 영역, 모바일 줄바꿈을 축소/보강했다.
