@@ -31,9 +31,15 @@ requireIncludes('.v2-card, .v2-result-card { width:100%; min-width:0; max-width:
 requireIncludes('.v2-form { width:100%; min-width:0; display:grid;', 'forms should not force wider than the card');
 requireIncludes('.v2-field input, .v2-field select { width:100%; min-width:0; max-width:100%;', 'inputs should shrink within mobile cards');
 requireIncludes('.v2-btn, .v2-secondary-btn, .v2-small-btn, .v2-danger-btn { min-width:0; max-width:100%; min-height:42px; border-radius:11px; padding:0 16px; font-weight:900; cursor:pointer; border:1px solid var(--line); white-space:normal; line-height:1.25; text-align:center; }', 'buttons should allow responsive wrapping');
-requireIncludes('.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch}', 'mobile tabs should use two stable columns');
-requireIncludes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:hidden}', 'mobile header should not create horizontal overflow');
-requireIncludes('.v2-tab{width:100%;min-width:0;min-height:40px;padding:8px 5px;font-size:12px;line-height:1.25;text-align:center;white-space:normal;overflow-wrap:anywhere;display:flex;align-items:center;justify-content:center}', 'mobile tabs should wrap long labels');
+requireIncludes('.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch;overflow:visible}', 'mobile tabs should use two stable columns without clipping');
+if (core.includes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:hidden}')) {
+  fail('mobile header must not hide overflowing tabs by clipping them.');
+}
+
+requireIncludes('.site-header { position: sticky; top: 0; z-index: 100; background: rgba(246,245,241,.96); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); max-width:100%; overflow:visible; }', 'site header should not clip responsive tab rows');
+requireIncludes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}', 'mobile header should let tab rows fit instead of clipping');
+requireIncludes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:40px;padding:8px 5px;font-size:12px;line-height:1.25;text-align:center;white-space:normal;overflow-wrap:anywhere;display:flex;align-items:center;justify-content:center}', 'mobile tabs should wrap long labels');
+requireIncludes('@media (max-width:360px){ .v2-tabs{grid-template-columns:1fr}.v2-tab{min-height:38px} }', 'very narrow headers should stack tabs in one column');
 
 if (!style.includes('html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }')) {
   fail('page should prevent body-level horizontal overflow.');

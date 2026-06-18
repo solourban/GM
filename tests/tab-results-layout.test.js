@@ -44,10 +44,11 @@ assert(
   'mobile date result layout must hide the wide table and show card rows'
 );
 assert(
-  core.includes('.site-header{padding:6px 0}')
-    && core.includes('.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch}')
-    && core.includes('.v2-tab{width:100%;min-width:0;min-height:40px;'),
-  'mobile sticky header must stay compact with stable two-column tab rows'
+  core.includes('.site-header{padding:6px 0;overflow:visible}')
+    && core.includes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}')
+    && core.includes('.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch;overflow:visible}')
+    && core.includes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:40px;'),
+  'mobile sticky header must stay compact without clipping tab rows'
 );
 assert(
   dateSource.includes('function resultRoot()') && dateSource.includes("root.insertAdjacentHTML('afterbegin', renderCard(candidate))"),
