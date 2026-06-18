@@ -20,6 +20,7 @@ const requiredLinks = [
   '/disclaimer.html',
   '/contact.html',
 ];
+const stylesheetHref = '/style.css?v=20260618-mobile-polish';
 
 function fail(message) {
   console.error(`Static page guard failed: ${message}`);
@@ -52,17 +53,23 @@ function assertNoAdCode(fileName, html) {
   assert(!/adsbygoogle|googlesyndication/i.test(html), `${fileName} contains AdSense ad code.`);
 }
 
+function assertStylesheet(fileName, html) {
+  assert(html.includes(`href="${stylesheetHref}"`), `${fileName} must load the cache-busted stylesheet.`);
+}
+
 for (const fileName of staticPages) {
   const filePath = path.join(PUBLIC_DIR, fileName);
   assert(fs.existsSync(filePath), `${fileName} does not exist.`);
 
   const html = readPublic(fileName);
   assertHtmlEnvelope(fileName, html);
+  assertStylesheet(fileName, html);
   requiredLinks.forEach((href) => assertContainsLink(fileName, html, href));
   assertNoAdCode(fileName, html);
 }
 
 const indexHtml = readPublic('index.html');
+assertStylesheet('index.html', indexHtml);
 ['/about.html', '/guide.html', '/privacy.html', '/disclaimer.html', '/contact.html']
   .forEach((href) => assertContainsLink('index.html', indexHtml, href));
 assertNoAdCode('index.html', indexHtml);
