@@ -299,6 +299,48 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 }
 .footer-nav a:hover { color: var(--accent); }
 
+.v2-onbid-head {
+  display: grid;
+  gap: 6px;
+}
+.v2-onbid-head h3,
+.v2-onbid-head p {
+  margin: 0;
+}
+.v2-onbid-head .v2-badge {
+  justify-self: start;
+}
+.v2-onbid-status {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.v2-onbid-status span {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.v2-onbid-status b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--ink-3);
+  font-size: 11px;
+}
+.v2-onbid-status .v2-pill {
+  padding: 3px 7px;
+  font-size: 11px;
+}
+.v2-onbid-search {
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
 @media (max-width: 640px) {
   .brand-logo img {
     height: 38px;
@@ -421,6 +463,35 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   body .v2-cta-row {
     gap: 8px;
     margin-top: 10px;
+  }
+  body .v2-onbid-head {
+    gap: 5px;
+  }
+  body .v2-onbid-status {
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+  body .v2-onbid-status span {
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+  body .v2-onbid-status b {
+    font-size: 10.5px;
+  }
+  body .v2-onbid-status .v2-pill {
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
+  body .v2-onbid-search {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+  body .v2-onbid-search .v2-input-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  body .v2-onbid-search .v2-field:nth-child(3) {
+    grid-column: 1 / -1;
   }
   body #v2PositioningNote {
     margin-top: 8px !important;

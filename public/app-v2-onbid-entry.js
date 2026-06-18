@@ -436,21 +436,18 @@
     return `
       <section class="v2-panel ${state()?.activeTab === TAB ? 'active' : ''}" data-panel="${TAB}" id="${PANEL_ID}">
         <div class="v2-card">
-          <span class="v2-badge">공매 모드</span>
-          <h3>온비드 공매</h3>
-          <p>법원경매와 분리된 공매 전용 흐름입니다. 사건번호가 아니라 지역·키워드·입찰조건으로 물건을 찾습니다.</p>
-          <div class="v2-grid compact">
-            <div class="v2-info wide">
-              <div class="k">현재 단계</div>
-              <div class="v">v2.1.8.x 공매 상세 조회 연결</div>
-              <p class="v2-note">검색 결과에서 선택한 물건의 상세 정보를 같은 온비드 탭 안에 표시합니다. 공매 판단은 다음 단계에서 붙입니다.</p>
-            </div>
-            <div class="v2-info"><div class="k">온비드 API</div><div class="v">${statusPill(ready)}</div></div>
-            <div class="v2-info"><div class="k">기존 경매 데이터</div><div class="v">분리 유지</div></div>
-            <div class="v2-info"><div class="k">요청ID</div><div class="v">${esc(requestId || '-')}</div></div>
+          <div class="v2-onbid-head">
+            <span class="v2-badge">공매 모드</span>
+            <h3>온비드 공매</h3>
+            <p>지역·키워드·입찰기간으로 공매 물건을 찾습니다.</p>
           </div>
-          <div class="v2-step-section">
-            <h4>공매 물건 검색</h4>
+          <div class="v2-onbid-status" aria-label="온비드 연동 상태">
+            <span><b>API</b>${statusPill(ready)}</span>
+            <span><b>데이터</b>경매와 분리</span>
+            <span><b>요청ID</b>${esc(requestId || '-')}</span>
+          </div>
+          <div class="v2-step-section v2-onbid-search">
+            <h4>검색 조건</h4>
             <div class="v2-input-grid">
               <label class="v2-field"><span>시·도</span><input data-onbid-field="lctnSdnm" value="${esc(onbidState.filters.lctnSdnm)}" placeholder="예: 충청남도"></label>
               <label class="v2-field"><span>시·군·구</span><input data-onbid-field="lctnSggnm" value="${esc(onbidState.filters.lctnSggnm)}" placeholder="예: 천안시"></label>
