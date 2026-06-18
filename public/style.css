@@ -308,6 +308,149 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   .search-row { flex-direction: column; }
 }
 
+@media (max-width: 720px) {
+  body .site-header {
+    background: #fff;
+    padding: 4px 0;
+  }
+  body .header-inner {
+    gap: 6px;
+    padding: 0 12px;
+  }
+  body .brand-logo img {
+    height: 36px;
+    max-width: 160px;
+  }
+  body .v2-tabs {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 6px;
+  }
+  body .v2-tab {
+    min-height: 34px;
+    padding: 6px;
+    font-size: 11.5px;
+    font-weight: 850;
+  }
+  body .hero {
+    padding: 18px 0 22px;
+    align-items: flex-start;
+  }
+  body .hero-inner {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  body .v2-card,
+  body .v2-result-card {
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.06);
+  }
+  body .v2-card h3,
+  body .v2-result-card h3 {
+    margin-bottom: 6px;
+    font-size: 18px;
+    letter-spacing: 0;
+  }
+  body .v2-card p,
+  body .v2-note {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  body .v2-form {
+    gap: 8px;
+    margin-top: 10px;
+  }
+  body .v2-field {
+    gap: 4px;
+  }
+  body .v2-field span {
+    font-size: 11.5px;
+  }
+  body .v2-field input,
+  body .v2-field select {
+    min-height: 40px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  body .v2-btn,
+  body .v2-secondary-btn,
+  body .v2-small-btn,
+  body .v2-danger-btn {
+    min-height: 38px;
+    border-radius: 10px;
+    padding: 0 12px;
+  }
+  body .v2-form-message {
+    margin-top: 8px;
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+  body .v2-grid {
+    gap: 8px;
+    margin-top: 10px;
+  }
+  body .v2-grid.compact {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  body .v2-info {
+    border-radius: 10px;
+    padding: 9px;
+  }
+  body .v2-info .k {
+    margin-bottom: 2px;
+    font-size: 11px;
+  }
+  body .v2-info .v {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  body .v2-step-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+  body .v2-step-section h4,
+  body .v2-detail-title {
+    margin-bottom: 8px;
+    font-size: 14px;
+    letter-spacing: 0;
+  }
+  body .v2-input-grid {
+    gap: 8px;
+  }
+  body .v2-cta-row {
+    gap: 8px;
+    margin-top: 10px;
+  }
+  body #v2PositioningNote {
+    margin-top: 8px !important;
+    padding: 0 14px;
+    font-size: 12px;
+  }
+  body #v2ServiceStatusToggle {
+    margin-top: 8px !important;
+    min-height: 36px;
+    padding: 0 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  body .brand-logo img {
+    height: 34px;
+    max-width: 150px;
+  }
+  body .header-inner {
+    gap: 5px;
+  }
+  body .v2-tabs {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  body .v2-tab {
+    min-height: 34px;
+    font-size: 11px;
+  }
+}
+
 .tag.warn-tag { background: var(--warn-bg); color: var(--warn); }
 
 /* === v3: 사용자 입력 폼 === */

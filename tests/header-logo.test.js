@@ -38,5 +38,7 @@ assert(style.includes('.brand-logo img {'), 'style.css must include brand-logo i
 assert(style.includes('object-fit: contain;'), 'logo image must preserve its ratio.');
 assert(/\.brand-logo img\s*\{[\s\S]*height:\s*44px;[\s\S]*max-width:\s*220px;/.test(style), 'desktop logo size contract is missing.');
 assert(/@media \(max-width: 640px\)[\s\S]*\.brand-logo img\s*\{[\s\S]*height:\s*38px;[\s\S]*max-width:\s*180px;/.test(style), 'mobile logo size contract is missing.');
+assert(/@media \(max-width: 720px\)[\s\S]*body \.brand-logo img\s*\{[\s\S]*height:\s*36px;[\s\S]*max-width:\s*160px;/.test(style), 'compact mobile logo override is missing.');
+assert(/@media \(max-width: 360px\)[\s\S]*body \.brand-logo img\s*\{[\s\S]*height:\s*34px;[\s\S]*max-width:\s*150px;/.test(style), 'narrow mobile logo override is missing.');
 
 console.log('Header logo guard passed.');

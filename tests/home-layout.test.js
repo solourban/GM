@@ -39,7 +39,37 @@ if (core.includes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100
 requireIncludes('.site-header { position: sticky; top: 0; z-index: 100; background: rgba(246,245,241,.96); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); max-width:100%; overflow:visible; }', 'site header should not clip responsive tab rows');
 requireIncludes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}', 'mobile header should let tab rows fit instead of clipping');
 requireIncludes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:40px;padding:8px 5px;font-size:12px;line-height:1.25;text-align:center;white-space:normal;overflow-wrap:anywhere;display:flex;align-items:center;justify-content:center}', 'mobile tabs should wrap long labels');
-requireIncludes('@media (max-width:360px){ .v2-tabs{grid-template-columns:1fr}.v2-tab{min-height:38px} }', 'very narrow headers should stack tabs in one column');
+if (!style.includes('body .v2-tabs {\n    grid-template-columns: repeat(2,minmax(0,1fr));')) {
+  fail('mobile visual override should keep header tabs in two columns.');
+}
+
+if (!style.includes('body .v2-tab {\n    min-height: 34px;')) {
+  fail('mobile visual override should reduce tab height.');
+}
+
+if (!style.includes('body .hero {\n    padding: 18px 0 22px;\n    align-items: flex-start;')) {
+  fail('mobile visual override should reduce the green input area weight.');
+}
+
+if (!style.includes('body .v2-card,\n  body .v2-result-card {\n    border-radius: 16px;\n    padding: 14px;')) {
+  fail('mobile visual override should compact input/result cards.');
+}
+
+if (!style.includes('body .v2-grid.compact {\n    grid-template-columns: repeat(2,minmax(0,1fr));')) {
+  fail('mobile visual override should compact information grids.');
+}
+
+if (!style.includes('body .v2-info {\n    border-radius: 10px;\n    padding: 9px;')) {
+  fail('mobile visual override should reduce information card padding.');
+}
+
+if (!style.includes('body .v2-step-section {\n    margin-top: 12px;\n    padding-top: 12px;')) {
+  fail('mobile visual override should reduce secondary step spacing.');
+}
+
+if (!style.includes('body #v2ServiceStatusToggle {\n    margin-top: 8px !important;')) {
+  fail('mobile visual override should pull the service status button closer.');
+}
 
 if (!style.includes('html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }')) {
   fail('page should prevent body-level horizontal overflow.');
