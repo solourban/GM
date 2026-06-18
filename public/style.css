@@ -39,6 +39,19 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   padding: 14px 0;
 }
 .brand { display: flex; align-items: center; gap: 12px; }
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  min-width: 0;
+}
+.brand-logo img {
+  display: block;
+  width: auto;
+  height: 44px;
+  max-width: 220px;
+  object-fit: contain;
+}
 .brand-mark {
   width: 38px; height: 38px;
   display: grid; place-items: center;
@@ -287,6 +300,10 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 .footer-nav a:hover { color: var(--accent); }
 
 @media (max-width: 640px) {
+  .brand-logo img {
+    height: 38px;
+    max-width: 180px;
+  }
   .hero { padding: 60px 0 40px; }
   .search-row { flex-direction: column; }
 }
