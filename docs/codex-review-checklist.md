@@ -76,5 +76,6 @@
 - `innerHTML` 사용이 많은 구조라 `innerhtml-escape-guard`로 core/date/date-courts/date-source/candidate-stack/saved/copy/final/molit/confidence/case-sync/validate/allocation/display-fix/result-polish/workflow-shell/risk/onbid/bid-plan/location/spec/external/bulk/essential/service의 핵심 escape 계약을 고정했다.
 - `public`에는 `index.html`이 실제 로드하는 JS만 남기고, 과거 patch/legacy JS 46개는 `legacy/public-js/`로 이동했다. `legacy-public-cleanup` 테스트로 재유입을 방지한다.
 - 홈/결과 카드의 모바일 탭 2컬럼 배치, 버튼 줄바꿈, 긴 값 줄바꿈, body 가로 overflow 방지는 `home-layout` 테스트로 1차 고정했다.
+- 애드센스는 승인 전 광고 스크립트와 가짜 `public/ads.txt`를 넣지 않고, `ADSENSE_PUBLISHER_ID` 환경변수 설정 시 `/ads.txt`가 동적으로 노출되는 구조로 준비했다. `adsense-readiness` 테스트로 고정한다.
 - 남은 loaded v2 파일 중 positioning-copy/map-provider-guard/result-order처럼 DOM textContent 또는 순서 제어 중심 파일은 낮은 우선순위로 유지한다.
 - 홈 화면의 큰 green hero 높이와 빈 영역은 `app-v2-core.js`의 과거 `.hero { min-height:660px; }`와 hero copy hidden 구조가 원인이었다. UI 패치에서 hero 높이, empty results 영역, 모바일 줄바꿈을 축소/보강했다.

@@ -9,6 +9,8 @@
     items: [],
     totalCount: 0,
     requestId: '',
+    diagnostic: null,
+    upstream: null,
     filters: { lctnSdnm: '', lctnSggnm: '', keyword: '', bidPrdYmdStart: '', bidPrdYmdEnd: '' },
     detailStatus: 'idle',
     detailError: '',
@@ -63,6 +65,24 @@
   function displayValue(value, fallback = '-') {
     const text = clean(value);
     return text || fallback;
+  }
+
+  function renderDiagnosticNote(diagnostic) {
+    if (!diagnostic) return '';
+    const filters = Array.isArray(diagnostic.appliedFilters) && diagnostic.appliedFilters.length
+      ? `조건: ${diagnostic.appliedFilters.join(' / ')}`
+      : '조건: 전체';
+    return `<p class="v2-note">${esc(filters)} · ${esc(diagnostic.hint || '')}</p>`;
+  }
+
+  function renderUpstreamDiagnostic(upstream) {
+    if (!upstream) return '';
+    const parts = [
+      upstream.status ? `HTTP ${upstream.status}` : '',
+      upstream.resultCode ? `코드 ${upstream.resultCode}` : '',
+      upstream.resultMsg ? `메시지 ${upstream.resultMsg}` : '',
+    ].filter(Boolean).join(' / ');
+    return `<p class="v2-note">${parts ? `온비드 응답: ${esc(parts)}. ` : ''}${esc(upstream.hint || '조회 조건을 줄여 다시 시도하세요.')}</p>`;
   }
 
   function statusLabel(value) {
@@ -244,6 +264,8 @@
     onbidState.status = 'loading';
     onbidState.error = '';
     onbidState.items = [];
+    onbidState.diagnostic = null;
+    onbidState.upstream = null;
     onbidState.detailStatus = 'idle';
     onbidState.detailError = '';
     onbidState.detail = null;
@@ -252,16 +274,48 @@
     try {
       const res = await fetch(`/api/onbid/items?${params.toString()}`, { headers: { Accept: 'application/json' } });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.ok === false) throw new Error(data.error || '온비드 공매 물건 조회에 실패했습니다.');
+      if (!res.ok || data.ok === false) {
+        const apiError = new Error(data.error || '온비드 공매 물건 조회에 실패했습니다.');
+        apiError.upstream = data.upstream || null;
+        throw apiError;
+      }
       onbidState.status = 'success';
       onbidState.items = Array.isArray(data.items) ? data.items : [];
       onbidState.totalCount = Number(data.totalCount || onbidState.items.length || 0);
       onbidState.requestId = clean(data.requestId || '');
+      onbidState.diagnostic = data.diagnostic || null;
     } catch (error) {
       onbidState.status = 'error';
       onbidState.error = clean(error.message || String(error));
+      onbidState.upstream = error.upstream || null;
     }
     renderIntoDom();
+  }
+
+  function resetSearchState(nextFilters = {}) {
+    onbidState.filters = {
+      lctnSdnm: clean(nextFilters.lctnSdnm),
+      lctnSggnm: clean(nextFilters.lctnSggnm),
+      keyword: clean(nextFilters.keyword),
+      bidPrdYmdStart: clean(nextFilters.bidPrdYmdStart),
+      bidPrdYmdEnd: clean(nextFilters.bidPrdYmdEnd),
+    };
+    onbidState.status = 'idle';
+    onbidState.error = '';
+    onbidState.items = [];
+    onbidState.totalCount = 0;
+    onbidState.requestId = '';
+    onbidState.diagnostic = null;
+    onbidState.upstream = null;
+    onbidState.detailStatus = 'idle';
+    onbidState.detailError = '';
+    onbidState.detail = null;
+    renderIntoDom();
+  }
+
+  function runSampleSearch() {
+    resetSearchState({ lctnSdnm: '서울', keyword: '아파트' });
+    runSearch();
   }
 
   async function runDetail(cltrMngNo, pbctCdtnNo) {
@@ -291,17 +345,18 @@
       return `<div class="v2-info wide"><div class="k">조회 중</div><div class="v">온비드 공매 물건을 조회하고 있습니다.</div></div>`;
     }
     if (onbidState.status === 'error') {
-      return `<div class="v2-info wide"><div class="k">조회 실패</div><div class="v">${esc(onbidState.error || '조회 실패')}</div><p class="v2-note">조건을 줄이거나 ONBID_API_KEY 설정 상태를 확인하세요.</p></div>`;
+      return `<div class="v2-info wide"><div class="k">조회 실패</div><div class="v">${esc(onbidState.error || '조회 실패')}</div>${renderUpstreamDiagnostic(onbidState.upstream)}<p class="v2-note">조건을 줄이거나 ONBID_API_KEY 설정 상태를 확인하세요.</p></div>`;
     }
     if (onbidState.status !== 'success') return '';
     if (!onbidState.items.length) {
-      return `<div class="v2-info wide"><div class="k">조회 결과</div><div class="v">검색된 공매 물건이 없습니다.</div><p class="v2-note">지역을 넓히거나 키워드·입찰기간 조건을 비워 다시 조회하세요.</p></div>`;
+      return `<div class="v2-info wide"><div class="k">조회 결과</div><div class="v">검색된 공매 물건이 없습니다.</div>${renderDiagnosticNote(onbidState.diagnostic)}<p class="v2-note">지역을 넓히거나 키워드·입찰기간 조건을 비워 다시 조회하세요.</p></div>`;
     }
     return `
       <div class="v2-info wide">
         <div class="k">조회 결과</div>
         <div class="v">${esc(String(onbidState.items.length))}건 표시 / 전체 ${esc(String(onbidState.totalCount || onbidState.items.length))}건</div>
         <p class="v2-note">상세 조회는 같은 온비드 탭 안에 표시합니다.${onbidState.requestId ? ` 요청ID: ${esc(onbidState.requestId)}` : ''}</p>
+        ${renderDiagnosticNote(onbidState.diagnostic)}
       </div>
       ${renderMobileItems(onbidState.items)}
       <div class="v2-table-wrap v2-onbid-table-wrap" style="grid-column:1/-1">
@@ -405,6 +460,8 @@
             </div>
             <div class="v2-cta-row">
               <button class="v2-btn" data-onbid-action="search" ${ready ? '' : 'disabled'}>${onbidState.status === 'loading' ? '조회 중...' : '온비드 물건 조회'}</button>
+              <button class="v2-secondary-btn" data-onbid-action="sample-search" ${ready ? '' : 'disabled'}>서울 아파트 샘플</button>
+              <button class="v2-secondary-btn" data-onbid-action="clear-filters">조건 초기화</button>
               ${ready ? '<span class="v2-note">기본 10건만 우선 조회합니다.</span>' : '<span class="v2-note">ONBID_API_KEY 설정 후 조회할 수 있습니다.</span>'}
             </div>
           </div>
@@ -459,6 +516,14 @@
       const onbidAction = event.target.closest('[data-onbid-action]');
       if (onbidAction?.dataset.onbidAction === 'search') {
         runSearch();
+        return;
+      }
+      if (onbidAction?.dataset.onbidAction === 'sample-search') {
+        runSampleSearch();
+        return;
+      }
+      if (onbidAction?.dataset.onbidAction === 'clear-filters') {
+        resetSearchState();
         return;
       }
       if (onbidAction?.dataset.onbidAction === 'detail') {

@@ -77,6 +77,21 @@ app.get('/', (req, res, next) => {
   });
 });
 
+function normalizeAdsensePublisherId(value) {
+  const id = String(value || '').trim();
+  return /^pub-\d{12,20}$/.test(id) ? id : '';
+}
+
+app.get('/ads.txt', (req, res) => {
+  const publisherId = normalizeAdsensePublisherId(process.env.ADSENSE_PUBLISHER_ID);
+  res.type('text/plain; charset=utf-8');
+  if (!publisherId) {
+    return res.status(404).send('# ADSENSE_PUBLISHER_ID is not configured.\n');
+  }
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  return res.send(`google.com, ${publisherId}, DIRECT, f08c47fec0942fa0\n`);
+});
+
 app.use(express.static(PUBLIC_DIR));
 
 const { analyzeCase } = require('./analyzer');
@@ -464,6 +479,7 @@ const ONBID_DETAIL_BASE_URL = 'https://apis.data.go.kr/B010003/OnbidRlstDtlSrvc2
 const ONBID_LIST_ENDPOINT = `${ONBID_LIST_BASE_URL}/getRlstCltrList2`;
 const ONBID_DETAIL_ENDPOINT = `${ONBID_DETAIL_BASE_URL}/getRlstDtlInf2`;
 const ONBID_DEFAULT_PRPT_DIV_CD = '0007,0010,0005,0004,0002,0003,0006,0008,0011';
+const ONBID_SUCCESS_CODES = new Set(['00', '0000', 'NORMAL_CODE', 'INFO-00']);
 
 function sanitizeOnbidParam(value, max = 80) {
   return String(value || '')
@@ -640,6 +656,54 @@ function normalizeOnbidDetailItem(itemXml) {
   };
 }
 
+function createOnbidUpstreamError(message, upstream = {}) {
+  const error = new Error(message);
+  error.isOnbidUpstream = true;
+  error.upstream = {
+    status: Number(upstream.status || 0),
+    resultCode: String(upstream.resultCode || '').trim().slice(0, 80),
+    resultMsg: String(upstream.resultMsg || '').replace(/\s+/g, ' ').trim().slice(0, 180),
+  };
+  return error;
+}
+
+function safeOnbidDiagnostic(error) {
+  const upstream = error?.upstream || {};
+  const status = Number(upstream.status || 0);
+  const resultCode = String(upstream.resultCode || '').trim().slice(0, 80);
+  const resultMsg = String(upstream.resultMsg || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+  const message = String(error?.message || '');
+  let hint = '온비드 OpenAPI 응답 상태와 조회 조건을 확인하세요.';
+  if (status === 401 || status === 403 || /SERVICE|KEY|AUTH/i.test(`${resultCode} ${resultMsg}`)) {
+    hint = 'ONBID_API_KEY 값 또는 공공데이터포털 활용 신청 상태를 확인하세요.';
+  } else if (status === 429 || /LIMIT|TRAFFIC|QUOTA/i.test(`${resultCode} ${resultMsg}`)) {
+    hint = '온비드 API 호출 한도 또는 일시 제한 가능성이 있습니다. 잠시 후 다시 조회하세요.';
+  } else if (message.includes('시간 초과')) {
+    hint = '온비드 API 응답이 늦습니다. 조건을 줄이거나 잠시 후 다시 조회하세요.';
+  } else if (status >= 500) {
+    hint = '온비드 또는 공공데이터포털 쪽 일시 오류일 수 있습니다.';
+  }
+  return { status, resultCode, resultMsg, hint };
+}
+
+function onbidQueryDiagnostic(filters, items, totalCount) {
+  const appliedFilters = [
+    filters.sido && `지역:${filters.sido}`,
+    filters.signgu && `시군구:${filters.signgu}`,
+    filters.query && `키워드:${filters.query}`,
+    filters.bidStart && `시작:${filters.bidStart}`,
+    filters.bidEnd && `종료:${filters.bidEnd}`,
+  ].filter(Boolean);
+  const hint = items.length
+    ? '온비드 API 조회와 화면 표시가 정상입니다. 세부 조회 버튼으로 원문 상세를 확인하세요.'
+    : '결과가 없으면 지역/시군구/키워드/입찰기간 조건을 하나씩 줄여 다시 조회하세요.';
+  return {
+    appliedFilters,
+    totalCount: Number(totalCount || 0),
+    hint,
+  };
+}
+
 async function fetchOnbid(endpoint, params, serviceKey) {
   const url = new URL(endpoint);
   url.searchParams.set('serviceKey', serviceKey);
@@ -655,22 +719,42 @@ async function fetchOnbid(endpoint, params, serviceKey) {
       headers: { Accept: 'application/json' },
     });
     const text = await res.text();
-    if (!res.ok) throw new Error('온비드 API 응답 오류');
+    if (!res.ok) {
+      throw createOnbidUpstreamError('온비드 API 응답 오류', {
+        status: res.status,
+        resultCode: `HTTP_${res.status}`,
+        resultMsg: text,
+      });
+    }
 
     try {
       const payload = JSON.parse(text);
       const header = payload?.response?.header || payload?.header || {};
       const resultCode = String(header.resultCode || '').trim();
-      if (resultCode && !['00', '0000', 'NORMAL_CODE'].includes(resultCode)) {
-        throw new Error(`Onbid API result code ${resultCode}`);
+      const resultMsg = String(header.resultMsg || header.resultMessage || '').trim();
+      if (resultCode && !ONBID_SUCCESS_CODES.has(resultCode)) {
+        throw createOnbidUpstreamError('온비드 API 결과 코드 오류', {
+          status: res.status,
+          resultCode,
+          resultMsg,
+        });
       }
       return payload;
     } catch (parseError) {
-      if (String(parseError?.message || '').startsWith('Onbid API result code ')) throw parseError;
+      if (parseError?.isOnbidUpstream) throw parseError;
+      const xmlResultCode = xmlText(text, 'resultCode') || xmlText(text, 'returnReasonCode');
+      const xmlResultMsg = xmlText(text, 'resultMsg') || xmlText(text, 'returnAuthMsg') || xmlText(text, 'errMsg');
+      if (xmlResultCode && !ONBID_SUCCESS_CODES.has(xmlResultCode)) {
+        throw createOnbidUpstreamError('온비드 API XML 결과 코드 오류', {
+          status: res.status,
+          resultCode: xmlResultCode,
+          resultMsg: xmlResultMsg,
+        });
+      }
       return { rawXml: text };
     }
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('온비드 API 응답 시간 초과');
+    if (e.name === 'AbortError') throw createOnbidUpstreamError('온비드 API 응답 시간 초과');
     throw e;
   } finally {
     clearTimeout(timer);
@@ -711,14 +795,26 @@ app.get('/api/onbid/items', async (req, res) => {
       bidPrdYmdEnd: bidEnd,
     }, key);
 
+    const filters = { query, sido, signgu, bidStart, bidEnd, prptDivCd, pvctTrgtYn };
     const items = onbidItemsFromResponse(payload)
       .map(normalizeOnbidListItem)
       .filter((item) => onbidMatchesFilters(item, { query, sido, signgu, bidStart, bidEnd }));
     const totalCount = onbidTotalCount(payload, items.length);
-    return res.json({ ok: true, count: items.length, totalCount, pageNo: Number(pageNo), numOfRows: Number(numOfRows), keyword: query, items, requestId: req.requestId });
+    return res.json({
+      ok: true,
+      count: items.length,
+      totalCount,
+      pageNo: Number(pageNo),
+      numOfRows: Number(numOfRows),
+      keyword: query,
+      filters,
+      diagnostic: onbidQueryDiagnostic(filters, items, totalCount),
+      items,
+      requestId: req.requestId,
+    });
   } catch (e) {
     logException('onbid/items', req, e);
-    return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.'));
+    return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.', { upstream: safeOnbidDiagnostic(e) }));
   }
 });
 
@@ -744,7 +840,7 @@ app.get('/api/onbid/detail', async (req, res) => {
     return res.json({ ok: true, count: items.length, item: items[0] || null, detail: items[0] || null, items, requestId: req.requestId });
   } catch (e) {
     logException('onbid/detail', req, e);
-    return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.'));
+    return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.', { upstream: safeOnbidDiagnostic(e) }));
   }
 });
 

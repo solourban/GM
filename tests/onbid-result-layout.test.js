@@ -26,6 +26,10 @@ requireIncludes(front, 'function statusLabel(value)', 'Onbid status code label h
 requireIncludes(front, 'function formatArea(detail = {})', 'Onbid area formatting helper');
 requireIncludes(front, 'data-onbid-action="copy"', 'Onbid cltr number copy action');
 requireIncludes(front, 'v2-row-actions', 'Onbid desktop row action grouping');
+requireIncludes(front, 'data-onbid-action="sample-search"', 'Onbid sample search button');
+requireIncludes(front, 'data-onbid-action="clear-filters"', 'Onbid clear filters button');
+requireIncludes(front, 'renderUpstreamDiagnostic(onbidState.upstream)', 'Onbid error diagnostic display');
+requireIncludes(front, 'renderDiagnosticNote(onbidState.diagnostic)', 'Onbid success/empty diagnostic display');
 requireIncludes(layout, 'v2OnbidResultCard', 'tab layout guard must cover Onbid result card');
 
 const panelStart = front.indexOf('function renderPanel()');

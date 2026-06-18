@@ -43,7 +43,7 @@ if (!style.includes('.container { width: 100%; max-width: 1040px; margin: 0 auto
   fail('global containers should have an explicit responsive width.');
 }
 
-if (!style.includes('max-width: 100%;\n  overflow-x: hidden;')) {
+if (!/max-width:\s*100%;\s*overflow-x:\s*hidden;/.test(style)) {
   fail('footer should not create horizontal overflow.');
 }
 

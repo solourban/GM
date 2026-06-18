@@ -37,8 +37,11 @@ requireIncludes(server, 'pbctCdtnNo: pbctNo', 'list/detail pbct alias');
 requireIncludes(server, 'onbidCltrno', 'Onbid original item number preservation');
 requireIncludes(server, 'onbidPbancNo', 'Onbid original notice number preservation');
 requireIncludes(server, 'detail: items[0] || null', 'detail response alias');
-requireIncludes(server, "return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.'))", 'safe list error response');
-requireIncludes(server, "return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.'))", 'safe detail error response');
+requireIncludes(server, 'safeOnbidDiagnostic', 'safe Onbid upstream diagnostic helper');
+requireIncludes(server, 'createOnbidUpstreamError', 'Onbid upstream error wrapper');
+requireIncludes(server, 'diagnostic: onbidQueryDiagnostic(filters, items, totalCount)', 'safe Onbid success diagnostic');
+requireIncludes(server, "return res.status(502).json(errorBody(req, '온비드 목록 조회 중 오류가 발생했습니다.', { upstream: safeOnbidDiagnostic(e) }))", 'safe list error response with diagnostic');
+requireIncludes(server, "return res.status(502).json(errorBody(req, '온비드 상세 조회 중 오류가 발생했습니다.', { upstream: safeOnbidDiagnostic(e) }))", 'safe detail error response with diagnostic');
 
 const onbidRoutes = sectionBetween(server, "app.get('/api/onbid/items'", "app.post('/api/fetch'", 'Onbid routes');
 if (/detail\s*:\s*e\.message/.test(onbidRoutes)) fail('Onbid routes must not expose e.message as detail.');
@@ -47,5 +50,9 @@ requireIncludes(front, "params.set('cltrNo'", 'frontend detail cltr param');
 requireIncludes(front, "params.set('pbctNo'", 'frontend detail pbct param');
 requireIncludes(front, 'data.detail || data.item || {}', 'frontend detail/item response fallback');
 requireIncludes(front, "['cltrMngNo', 'cltrNo'", 'frontend cltr field alias');
+requireIncludes(front, 'renderUpstreamDiagnostic', 'frontend Onbid upstream diagnostic rendering');
+requireIncludes(front, 'renderDiagnosticNote', 'frontend Onbid success diagnostic rendering');
+requireIncludes(front, 'data-onbid-action="sample-search"', 'frontend Onbid sample search action');
+requireIncludes(front, 'resetSearchState', 'frontend Onbid clear filters action');
 
 console.log('Onbid contract guard passed.');

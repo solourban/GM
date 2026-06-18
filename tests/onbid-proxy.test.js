@@ -27,5 +27,7 @@ requireIncludes(server, 'cltrMngNo', 'Onbid detail required cltrMngNo parameter'
 requireIncludes(server, 'pbctCdtnNo', 'Onbid detail pbctCdtnNo parameter');
 requireIncludes(server, 'process.env.ONBID_API_KEY', 'Onbid server-side environment variable usage');
 requireIncludes(server, 'hasOnbid', 'Onbid config status flag');
+requireIncludes(server, 'safeOnbidDiagnostic', 'Onbid upstream diagnostic should be sanitized server-side');
+requireIncludes(server, 'ONBID_SUCCESS_CODES', 'Onbid result code allowlist');
 
 console.log('Onbid proxy guard passed.');
