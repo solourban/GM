@@ -14,6 +14,10 @@ function requireIncludes(needle, label) {
   if (!core.includes(needle)) fail(`${label} is missing.`);
 }
 
+function requireStyleIncludes(needle, label) {
+  if (!style.includes(needle)) fail(`${label} is missing.`);
+}
+
 if (/\.hero\s*\{\s*min-height:660px/.test(core)) {
   fail('desktop hero must not keep the old 660px empty first-screen height.');
 }
@@ -82,6 +86,26 @@ if (!style.includes('#v2ServiceStatusCard {\n  max-width: var(--v2-card-width, 9
 if (!style.includes('body #v2ServiceStatusCard {\n    margin-top: 10px;')) {
   fail('mobile service status card should keep a visible gap from the search card.');
 }
+
+requireIncludes('function renderFlowItem(label, status, note, tone = \'\')', 'next-step flow item renderer');
+requireIncludes('function hasManualInput() {', 'manual input evidence helper');
+requireIncludes("return hasManualInput();", 'analysis gate should ignore default select-only values');
+requireIncludes('v2-next-step-card', 'next-step workflow card');
+requireIncludes('v2-next-flow', 'next-step workflow list');
+requireIncludes('data-action="scroll-bid-plan"', 'bid-plan scroll action');
+requireIncludes('data-action="scroll-essential-docs"', 'essential-documents scroll action');
+requireIncludes('v2-analysis-next', 'post-analysis next-step panel');
+requireIncludes("const target = $('v2BidPlanCard') || $('v2BiddingSummaryCard') || $('analysisCard');", 'bid-plan scroll should target cards, not workflow tabs');
+requireIncludes("const target = $('v2EssentialDocumentsCard') || $('analysisCard');", 'essential-documents scroll should target cards, not workflow tabs');
+if (core.includes('document.querySelector(\'[data-workflow-step="bid"]\')') || core.includes('document.querySelector(\'[data-workflow-step="risk"]\')')) {
+  fail('post-analysis scroll buttons should not target workflow tab buttons.');
+}
+
+requireStyleIncludes('.v2-next-step-card {\n  border-left: 4px solid var(--accent);', 'next-step card visual anchor');
+requireStyleIncludes('.v2-next-flow {\n  list-style: none;\n  display: grid;\n  grid-template-columns: repeat(4,minmax(0,1fr));', 'desktop next-step flow grid');
+requireStyleIncludes('.v2-analysis-next {\n  margin-top: 14px;', 'post-analysis next panel styling');
+requireStyleIncludes('body .v2-next-flow {\n    grid-template-columns: repeat(2,minmax(0,1fr));', 'mobile next-step flow grid');
+requireStyleIncludes('body .v2-analysis-next {\n    margin-top: 10px;', 'mobile post-analysis panel spacing');
 
 if (!style.includes('html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }')) {
   fail('page should prevent body-level horizontal overflow.');

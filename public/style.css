@@ -378,6 +378,71 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   max-width: var(--v2-card-width, 920px);
   margin: 16px auto 0;
 }
+.v2-next-step-card {
+  border-left: 4px solid var(--accent);
+}
+.v2-next-flow {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 8px;
+  margin: 14px 0;
+  padding: 0;
+}
+.v2-next-flow li {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  padding: 10px;
+}
+.v2-next-flow b,
+.v2-next-flow span,
+.v2-next-flow small {
+  display: block;
+}
+.v2-next-flow b {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.v2-next-flow span {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+.v2-next-flow small {
+  margin-top: 5px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.v2-next-flow li.is-done {
+  border-color: rgba(26,127,77,0.35);
+  background: var(--ok-bg);
+}
+.v2-next-flow li.is-ready {
+  border-color: rgba(183,122,10,0.35);
+  background: var(--warn-bg);
+}
+.v2-analysis-next {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  padding: 12px;
+}
+.v2-analysis-next h4 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.v2-analysis-next ol {
+  margin: 0 0 0 18px;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.65;
+}
 
 @media (max-width: 640px) {
   .brand-logo img {
@@ -554,6 +619,36 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   }
   body #v2ServiceStatusCard {
     margin-top: 10px;
+  }
+  body .v2-next-step-card {
+    border-left-width: 3px;
+  }
+  body .v2-next-flow {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 8px;
+    margin: 10px 0;
+  }
+  body .v2-next-flow li {
+    border-radius: 10px;
+    padding: 9px;
+  }
+  body .v2-next-flow span {
+    font-size: 14px;
+  }
+  body .v2-next-flow small {
+    font-size: 11.5px;
+  }
+  body .v2-analysis-next {
+    margin-top: 10px;
+    border-radius: 10px;
+    padding: 10px;
+  }
+  body .v2-analysis-next h4 {
+    font-size: 14px;
+  }
+  body .v2-analysis-next ol {
+    font-size: 12px;
+    line-height: 1.55;
   }
 }
 

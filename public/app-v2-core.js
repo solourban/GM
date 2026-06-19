@@ -386,9 +386,21 @@
     return `<section class="v2-result-card"><div class="v2-table-head"><h3>이해관계인</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="v2-badge">${rows.length}명</span>${rows.length > limit ? `<button class="v2-small-btn" data-action="toggle-interested">${state.interestedExpanded ? '상세 목록 접기' : '상세 목록 펼치기'}</button>` : ''}</div></div><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>구분</th><th>이름</th><th>순번</th></tr></thead><tbody>${visible.map((r) => `<tr><td>${esc(r.type || '')}</td><td>${esc(r.name || '')}</td><td>${esc(r.seq || '')}</td></tr>`).join('')}</tbody></table></div>${rows.length > limit && !state.interestedExpanded ? `<p class="v2-note">전체 ${rows.length}명 중 ${limit}명만 우선 표시합니다.</p>` : ''}</section>`;
   }
 
+  function renderFlowItem(label, status, note, tone = '') {
+    return `<li class="${tone ? `is-${esc(tone)}` : ''}"><b>${esc(label)}</b><span>${esc(status)}</span><small>${esc(note)}</small></li>`;
+  }
+
   function renderNextStep() {
     const hasMalso = hasValue(state.manual.malso, ['date','holder','amount']);
-    return `<section class="v2-result-card"><h3>다음 단계</h3><p class="v2-note">매각물건명세서와 등기부 기준으로 최선순위·임차인·특수권리를 입력하면 권리분석 준비가 됩니다.</p><div class="v2-grid compact">${info('최선순위', hasMalso ? '입력 중' : '미입력')}${info('임차인 입력', `${state.manual.tenants.length}명`)}${info('특수권리 입력', `${state.manual.specials.length}건`)}</div><div class="v2-cta-row"><button class="v2-btn" data-action="open-step2">${state.step2Visible ? 'Step 2 입력 계속하기' : 'Step 2 명세서 입력 시작'}</button>${state.step2Visible ? '<button class="v2-secondary-btn" data-action="close-step2">Step 2 접기</button>' : ''}</div></section>`;
+    const readyToAnalyze = hasManualInput();
+    const analyzed = Boolean(state.report);
+    const flow = [
+      renderFlowItem('1. 기본정보 확인', '완료', '사건번호, 법원, 매각기일, 최저가를 우선 확인했습니다.', 'done'),
+      renderFlowItem('2. 원문서 입력', readyToAnalyze ? '진행 중' : '필요', '매각물건명세서·등기부 기준으로 말소기준권리와 점유관계를 입력합니다.', readyToAnalyze ? 'ready' : 'todo'),
+      renderFlowItem('3. 권리분석', analyzed ? '완료' : (readyToAnalyze ? '실행 가능' : '대기'), '입력값 기준으로 대항력, 인수금액, 특수권리를 1차 판단합니다.', analyzed ? 'done' : (readyToAnalyze ? 'ready' : 'todo')),
+      renderFlowItem('4. 입찰가·자금', analyzed ? '다음' : '분석 후', '권리 리스크를 반영한 뒤 필요 현금과 입찰가 범위를 검토합니다.', analyzed ? 'ready' : 'todo'),
+    ].join('');
+    return `<section class="v2-result-card v2-next-step-card"><h3>다음 단계</h3><p class="v2-note">조회 결과는 시작점입니다. 원문 서류 입력 → 권리분석 → 입찰가·자금 검토 순서로 이어가세요.</p><ol class="v2-next-flow">${flow}</ol><div class="v2-grid compact">${info('최선순위', hasMalso ? '입력 중' : '미입력')}${info('임차인 입력', `${state.manual.tenants.length}명`)}${info('특수권리 입력', `${state.manual.specials.length}건`)}</div><div class="v2-cta-row"><button class="v2-btn" data-action="open-step2">${state.step2Visible ? 'Step 2 입력 계속하기' : 'Step 2 명세서 입력 시작'}</button>${state.step2Visible ? '<button class="v2-secondary-btn" data-action="close-step2">Step 2 접기</button>' : ''}${analyzed ? '<button class="v2-secondary-btn" data-action="scroll-bid-plan">입찰가·자금 계산 보기</button>' : ''}</div><p class="v2-note">자동 수집값이 비어 있거나 애매하면 법원경매정보 원문 문서를 우선 기준으로 보세요.</p></section>`;
   }
 
   function getManual(path) {
@@ -415,8 +427,12 @@
     return `<div class="v2-repeat-card"><div class="v2-repeat-head"><b>특수권리 ${index + 1}</b><button class="v2-danger-btn" data-action="remove-special" data-index="${index}">삭제</button></div><div class="v2-input-grid">${select(`specials.${index}.type`, '권리 유형', ['유치권','법정지상권','분묘기지권','예고등기','가처분','가압류','기타'])}${input(`specials.${index}.holder`, '권리자', '예: 김OO')}${input(`specials.${index}.date`, '신고/접수일', '예: 2024.01.01')}${input(`specials.${index}.amount`, '금액/비고', '예: 10,000,000')}</div></div>`;
   }
 
+  function hasManualInput() {
+    return hasValue(state.manual.malso, ['date','holder','amount']) || state.manual.tenants.some((t) => hasValue(t, ['name','moveIn','fixed','deposit'])) || state.manual.specials.some((s) => hasValue(s, ['holder','date','amount']));
+  }
+
   function canAnalyze() {
-    return hasValue(state.manual.malso, ['date','type','holder','amount']) || state.manual.tenants.some((t) => hasValue(t, ['name','moveIn','fixed','deposit'])) || state.manual.specials.some((s) => hasValue(s, ['type','holder','date','amount']));
+    return hasManualInput();
   }
 
   function renderStep2() {
@@ -498,7 +514,7 @@
     const rights = Array.isArray(r.rights) ? r.rights : [];
     const inherited = Number(r.inherited?.total || 0);
     const items = [`입력 임차인 ${tenants.length}명 기준으로 대항력 여부를 1차 판단했습니다.`, inherited > 0 ? `인수 가능 금액이 ${inherited.toLocaleString('ko-KR')}원으로 계산되었습니다.` : '현재 입력 기준으로 인수금액은 0원으로 계산되었습니다.'];
-    return `<section class="v2-result-card analysis" id="analysisCard"><span class="v2-risk-badge ${cls}">위험도 ${label}</span><h3>권리분석 결과</h3><p class="v2-note">${esc(state.reportAt)} 기준 실행 결과입니다.</p><div class="v2-grid compact">${info('위험 등급', label)}${info('인수금액', won(inherited))}${info('임차인', `${tenants.length}명`)}${info('권리', `${rights.length}건`)}</div><ul class="v2-analysis-list">${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${renderTenantDetails(tenants)}${renderRightDetails(rights)}<p class="v2-note">이 결과는 입력값 기반 1차 판단입니다. 실제 입찰 전 등기부, 매각물건명세서, 전입세대열람, 현장조사를 다시 확인해야 합니다.</p></section>`;
+    return `<section class="v2-result-card analysis" id="analysisCard"><span class="v2-risk-badge ${cls}">위험도 ${label}</span><h3>권리분석 결과</h3><p class="v2-note">${esc(state.reportAt)} 기준 실행 결과입니다.</p><div class="v2-grid compact">${info('위험 등급', label)}${info('인수금액', won(inherited))}${info('임차인', `${tenants.length}명`)}${info('권리', `${rights.length}건`)}</div><ul class="v2-analysis-list">${items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${renderTenantDetails(tenants)}${renderRightDetails(rights)}<div class="v2-analysis-next"><h4>분석 후 확인 순서</h4><ol><li>매각물건명세서·등기부 원문과 입력값이 일치하는지 재확인</li><li>인수금액과 명도·수리·체납 비용을 입찰가 계산에 반영</li><li>입찰가·필요 현금 계산 카드에서 보수적으로 수익성을 점검</li></ol><div class="v2-cta-row"><button class="v2-secondary-btn" data-action="scroll-bid-plan">입찰가·자금 계산 보기</button><button class="v2-secondary-btn" data-action="scroll-essential-docs">필수 문서 확인 보기</button></div></div><p class="v2-note">이 결과는 입력값 기반 1차 판단입니다. 실제 입찰 전 등기부, 매각물건명세서, 전입세대열람, 현장조사를 다시 확인해야 합니다.</p></section>`;
   }
 
   function renderTenantDetails(tenants) {
@@ -537,6 +553,16 @@
       if (action === 'remove-special') state.manual.specials.splice(Number(btn.dataset.index), 1);
       if (action === 'analyze') { runAnalyze(); return; }
       if (action === 'scroll-analysis') { $('analysisCard')?.scrollIntoView({ behavior:'smooth', block:'start' }); return; }
+      if (action === 'scroll-bid-plan') {
+        const target = $('v2BidPlanCard') || $('v2BiddingSummaryCard') || $('analysisCard');
+        target?.scrollIntoView({ behavior:'smooth', block:'start' });
+        return;
+      }
+      if (action === 'scroll-essential-docs') {
+        const target = $('v2EssentialDocumentsCard') || $('analysisCard');
+        target?.scrollIntoView({ behavior:'smooth', block:'start' });
+        return;
+      }
       renderResults({ keepScroll:true });
       if (['open-step2','add-tenant','add-special'].includes(action)) setTimeout(() => $('step2InputCard')?.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
     });
