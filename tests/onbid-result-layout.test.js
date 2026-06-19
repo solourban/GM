@@ -32,6 +32,7 @@ requireIncludes(front, 'data-onbid-action="clear-filters"', 'Onbid clear filters
 requireIncludes(front, 'class="v2-onbid-head"', 'Onbid compact header block');
 requireIncludes(front, 'class="v2-onbid-status"', 'Onbid compact status strip');
 requireIncludes(front, 'class="v2-step-section v2-onbid-search"', 'Onbid compact search section');
+requireIncludes(front, "event.target.closest('.brand')", 'Onbid tab must resync after the logo resets core tabs');
 requireIncludes(front, 'renderUpstreamDiagnostic(onbidState.upstream)', 'Onbid error diagnostic display');
 requireIncludes(front, 'renderDiagnosticNote(onbidState.diagnostic)', 'Onbid success/empty diagnostic display');
 requireIncludes(layout, 'v2OnbidResultCard', 'tab layout guard must cover Onbid result card');

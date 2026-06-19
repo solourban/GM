@@ -30,6 +30,12 @@ for (const page of pages) {
   assert(html.includes('class="brand brand-logo"'), `${page} must use the logo brand anchor.`);
   assert(html.includes('src="/assets/nakchalnote-logo.png"'), `${page} must reference the shared logo asset.`);
   assert(html.includes('alt="낙찰노트 로고"'), `${page} must keep accessible logo alt text.`);
+  if (page === 'index.html') {
+    assert(html.includes('href="#top"'), 'homepage logo should scroll/reset in-place instead of reloading the app shell.');
+    assert(html.includes('<header class="site-header" id="top">'), 'homepage logo target should exist at the top of the page.');
+  } else {
+    assert(html.includes('href="/"'), `${page} logo should still navigate back to the homepage.`);
+  }
 }
 
 const style = fs.readFileSync(path.join(PUBLIC_DIR, 'style.css'), 'utf8');

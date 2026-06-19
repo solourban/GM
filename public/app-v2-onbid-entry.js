@@ -531,6 +531,10 @@
         copyText(onbidAction.dataset.copyText);
         return;
       }
+      if (event.target.closest('.brand')) {
+        scheduleSync();
+        return;
+      }
       const tab = event.target.closest('.v2-tab');
       if (!tab?.dataset?.tab) return;
       if (tab.dataset.tab === TAB && state()) state().activeTab = TAB;

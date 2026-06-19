@@ -340,6 +340,10 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   margin-top: 14px;
   padding-top: 14px;
 }
+#v2ServiceStatusCard {
+  max-width: var(--v2-card-width, 920px);
+  margin: 16px auto 0;
+}
 
 @media (max-width: 640px) {
   .brand-logo img {
@@ -502,6 +506,9 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
     margin-top: 8px !important;
     min-height: 36px;
     padding: 0 14px;
+  }
+  body #v2ServiceStatusCard {
+    margin-top: 10px;
   }
 }
 

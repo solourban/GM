@@ -20,7 +20,7 @@ const requiredLinks = [
   '/disclaimer.html',
   '/contact.html',
 ];
-const stylesheetHref = '/style.css?v=20260618-onbid-polish';
+const stylesheetHref = '/style.css?v=20260619-logo-tab-fix';
 
 function fail(message) {
   console.error(`Static page guard failed: ${message}`);

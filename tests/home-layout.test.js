@@ -71,6 +71,14 @@ if (!style.includes('body #v2ServiceStatusToggle {\n    margin-top: 8px !importa
   fail('mobile visual override should pull the service status button closer.');
 }
 
+if (!style.includes('#v2ServiceStatusCard {\n  max-width: var(--v2-card-width, 920px);\n  margin: 16px auto 0;')) {
+  fail('service status card should align with the main search card instead of looking overlapped.');
+}
+
+if (!style.includes('body #v2ServiceStatusCard {\n    margin-top: 10px;')) {
+  fail('mobile service status card should keep a visible gap from the search card.');
+}
+
 if (!style.includes('html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }')) {
   fail('page should prevent body-level horizontal overflow.');
 }
