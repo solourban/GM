@@ -64,6 +64,7 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 .brand-text p { margin: 3px 0 0; font-size: 11px; color: var(--ink-3); }
 
 .hero { background: var(--accent); color: #F6F5F1; padding: 80px 0 60px; }
+.hero-copy { display: none; }
 .hero-title {
   font-family: var(--font-serif);
   font-size: clamp(32px, 5vw, 52px);

@@ -51,6 +51,10 @@ if (!style.includes('body .hero {\n    padding: 18px 0 22px;\n    align-items: f
   fail('mobile visual override should reduce the green input area weight.');
 }
 
+if (!style.includes('.hero-copy { display: none; }')) {
+  fail('static CSS should hide the pre-boot marketing hero copy.');
+}
+
 if (!style.includes('body .v2-card,\n  body .v2-result-card {\n    border-radius: 16px;\n    padding: 14px;')) {
   fail('mobile visual override should compact input/result cards.');
 }

@@ -20,7 +20,7 @@ const requiredLinks = [
   '/disclaimer.html',
   '/contact.html',
 ];
-const stylesheetHref = '/style.css?v=20260619-logo-tab-fix';
+const stylesheetHref = '/style.css?v=20260619-static-hero-hide';
 
 function fail(message) {
   console.error(`Static page guard failed: ${message}`);
