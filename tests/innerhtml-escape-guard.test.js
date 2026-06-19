@@ -23,6 +23,7 @@ function scriptRefsFromIndex() {
   return [...read('public/index.html').matchAll(/<script\s+src="([^"]+)"/g)]
     .map((match) => match[1])
     .filter((src) => src.startsWith('/app-v2-'))
+    .map((src) => src.split('?')[0])
     .map((src) => `public${src}`);
 }
 

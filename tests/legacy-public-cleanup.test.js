@@ -13,7 +13,7 @@ function fail(message) {
 
 function scriptSources(html) {
   return [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["'][^>]*><\/script>/gi)]
-    .map((match) => path.basename(match[1]))
+    .map((match) => path.basename(match[1].split('?')[0]))
     .filter(Boolean);
 }
 

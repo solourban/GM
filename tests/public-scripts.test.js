@@ -17,7 +17,7 @@ function fail(message) {
 
 function scriptSources(html) {
   return [...html.matchAll(/<script\s+[^>]*src=["']([^"']+)["'][^>]*><\/script>/gi)]
-    .map((match) => match[1])
+    .map((match) => match[1].split('?')[0])
     .filter((src) => src.startsWith('/'));
 }
 

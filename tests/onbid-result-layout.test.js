@@ -35,10 +35,21 @@ requireIncludes(front, 'class="v2-step-section v2-onbid-search"', 'Onbid compact
 requireIncludes(front, "event.target.closest('.brand')", 'Onbid tab must resync after the logo resets core tabs');
 requireIncludes(front, 'renderUpstreamDiagnostic(onbidState.upstream)', 'Onbid error diagnostic display');
 requireIncludes(front, 'renderDiagnosticNote(onbidState.diagnostic)', 'Onbid success/empty diagnostic display');
+requireIncludes(front, 'function filterSummary(filters = onbidState.filters)', 'Onbid filter summary helper');
+requireIncludes(front, 'function renderResultState(kind, title, message, options = {})', 'Onbid dedicated result state renderer');
+requireIncludes(front, "'empty',", 'Onbid empty result state branch');
+requireIncludes(front, 'v2-onbid-result-summary', 'Onbid success result summary class');
+requireIncludes(front, 'v2-onbid-next-check', 'Onbid detail next-check card');
+requireIncludes(front, '공고문·물건명세·입찰보증금을 원문에서 재확인하세요.', 'Onbid detail next-check copy');
+requireIncludes(front, 'details class="v2-onbid-raw"', 'Onbid raw detail fields should be collapsed behind a details disclosure');
 requireIncludes(layout, 'v2OnbidResultCard', 'tab layout guard must cover Onbid result card');
 requireIncludes(style, '.v2-onbid-status {', 'Onbid status strip styles');
 requireIncludes(style, 'body .v2-onbid-status {', 'Onbid mobile status strip styles');
 requireIncludes(style, '.v2-onbid-head .v2-badge {', 'Onbid badge should not stretch across the card');
+requireIncludes(style, '.v2-onbid-state {', 'Onbid state card styles');
+requireIncludes(style, '.v2-onbid-state-empty {', 'Onbid empty result state styles');
+requireIncludes(style, '.v2-onbid-next-check {', 'Onbid next-check card styles');
+requireIncludes(style, '.v2-onbid-raw summary {', 'Onbid raw detail disclosure styles');
 requireIncludes(style, 'body .v2-onbid-search .v2-input-grid {', 'Onbid mobile search grid should be compact');
 requireIncludes(style, 'body .v2-onbid-search .v2-field:nth-child(3) {', 'Onbid keyword field should keep a full-width row');
 

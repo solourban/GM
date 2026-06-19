@@ -85,6 +85,31 @@
     return `<p class="v2-note">${parts ? `온비드 응답: ${esc(parts)}. ` : ''}${esc(upstream.hint || '조회 조건을 줄여 다시 시도하세요.')}</p>`;
   }
 
+  function filterSummary(filters = onbidState.filters) {
+    const parts = [
+      filters.lctnSdnm ? `시·도 ${filters.lctnSdnm}` : '',
+      filters.lctnSggnm ? `시·군·구 ${filters.lctnSggnm}` : '',
+      filters.keyword ? `키워드 ${filters.keyword}` : '',
+      filters.bidPrdYmdStart || filters.bidPrdYmdEnd
+        ? `기간 ${filters.bidPrdYmdStart || '시작 미지정'}~${filters.bidPrdYmdEnd || '종료 미지정'}`
+        : '',
+    ].filter(Boolean);
+    return parts.join(' / ') || '전체 조건';
+  }
+
+  function renderResultState(kind, title, message, options = {}) {
+    const actions = options.actions || '';
+    return `
+      <div class="v2-info wide v2-onbid-state ${kind ? `v2-onbid-state-${esc(kind)}` : ''}">
+        <div class="k">${esc(options.label || '조회 상태')}</div>
+        <div class="v">${esc(title)}</div>
+        <p class="v2-note">${esc(message)}</p>
+        ${options.extra || ''}
+        ${actions ? `<div class="v2-cta-row">${actions}</div>` : ''}
+      </div>
+    `;
+  }
+
   function statusLabel(value) {
     const text = clean(value);
     const map = {
@@ -342,19 +367,43 @@
 
   function renderResults() {
     if (onbidState.status === 'loading') {
-      return `<div class="v2-info wide"><div class="k">조회 중</div><div class="v">온비드 공매 물건을 조회하고 있습니다.</div></div>`;
+      return renderResultState(
+        'loading',
+        '온비드 공매 물건을 조회하고 있습니다.',
+        `${filterSummary()} 기준으로 기본 10건을 먼저 불러옵니다.`,
+        { label: '조회 중', extra: '<div class="v2-loading"><span class="v2-spinner"></span><span class="v2-note">응답이 도착하면 이 영역에 목록이 표시됩니다.</span></div>' }
+      );
     }
     if (onbidState.status === 'error') {
-      return `<div class="v2-info wide"><div class="k">조회 실패</div><div class="v">${esc(onbidState.error || '조회 실패')}</div>${renderUpstreamDiagnostic(onbidState.upstream)}<p class="v2-note">조건을 줄이거나 ONBID_API_KEY 설정 상태를 확인하세요.</p></div>`;
+      return renderResultState(
+        'error',
+        onbidState.error || '온비드 조회에 실패했습니다.',
+        '조건을 줄이거나 ONBID_API_KEY 설정 상태를 확인하세요.',
+        {
+          label: '조회 실패',
+          extra: `${renderUpstreamDiagnostic(onbidState.upstream)}<p class="v2-note">현재 조건: ${esc(filterSummary())}</p>`,
+          actions: '<button class="v2-secondary-btn" data-onbid-action="search">다시 조회</button><button class="v2-secondary-btn" data-onbid-action="clear-filters">조건 초기화</button>',
+        }
+      );
     }
     if (onbidState.status !== 'success') return '';
     if (!onbidState.items.length) {
-      return `<div class="v2-info wide"><div class="k">조회 결과</div><div class="v">검색된 공매 물건이 없습니다.</div>${renderDiagnosticNote(onbidState.diagnostic)}<p class="v2-note">지역을 넓히거나 키워드·입찰기간 조건을 비워 다시 조회하세요.</p></div>`;
+      return renderResultState(
+        'empty',
+        '검색된 공매 물건이 없습니다.',
+        '지역을 넓히거나 키워드·입찰기간 조건을 비워 다시 조회하세요.',
+        {
+          label: '조회 결과',
+          extra: `${renderDiagnosticNote(onbidState.diagnostic)}<p class="v2-note">현재 조건: ${esc(filterSummary())}</p>`,
+          actions: '<button class="v2-secondary-btn" data-onbid-action="clear-filters">조건 비우기</button><button class="v2-secondary-btn" data-onbid-action="sample-search">서울 아파트 샘플</button>',
+        }
+      );
     }
     return `
-      <div class="v2-info wide">
+      <div class="v2-info wide v2-onbid-result-summary">
         <div class="k">조회 결과</div>
         <div class="v">${esc(String(onbidState.items.length))}건 표시 / 전체 ${esc(String(onbidState.totalCount || onbidState.items.length))}건</div>
+        <p class="v2-note">현재 조건: ${esc(filterSummary())}</p>
         <p class="v2-note">상세 조회는 같은 온비드 탭 안에 표시합니다.${onbidState.requestId ? ` 요청ID: ${esc(onbidState.requestId)}` : ''}</p>
         ${renderDiagnosticNote(onbidState.diagnostic)}
       </div>
@@ -411,8 +460,17 @@
           <div class="v2-info"><div class="k">면적</div><div class="v">${esc(displayValue(row.area))}</div></div>
           <div class="v2-info"><div class="k">공고기관</div><div class="v">${esc(row.org || '-')}</div></div>
           <div class="v2-info"><div class="k">관리/공고번호</div><div class="v">${esc([row.cltrMngNo, row.pbctNo].filter(Boolean).join(' / ') || '-')}</div></div>
+          <div class="v2-info wide v2-onbid-next-check">
+            <div class="k">다음 확인 포인트</div>
+            <div class="v">공고문·물건명세·입찰보증금을 원문에서 재확인하세요.</div>
+            <ul class="v2-onbid-checklist">
+              <li>공고기관, 입찰기간, 보증금 납부 조건이 현재 화면과 일치하는지 확인</li>
+              <li>권리·점유·인도 조건은 법원경매와 별도로 원문 공고에서 재검토</li>
+              <li>입찰 전 온비드 원문과 첨부 서류 기준으로 최종 판단</li>
+            </ul>
+          </div>
         </div>
-        ${rawEntries.length ? `<div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>원본 필드</th><th>값</th></tr></thead><tbody>${rawEntries.map(([key, value]) => `<tr><td>${esc(key)}</td><td>${esc(value)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="v2-note">표시할 상세 원본 필드가 없습니다.</p>'}
+        ${rawEntries.length ? `<details class="v2-onbid-raw"><summary>원본 필드 ${esc(String(rawEntries.length))}개 보기</summary><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>원본 필드</th><th>값</th></tr></thead><tbody>${rawEntries.map(([key, value]) => `<tr><td>${esc(key)}</td><td>${esc(value)}</td></tr>`).join('')}</tbody></table></div></details>` : '<p class="v2-note">표시할 상세 원본 필드가 없습니다.</p>'}
       </section>
     `;
   }
