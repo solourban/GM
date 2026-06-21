@@ -34,6 +34,14 @@ requireIncludes('.v2-panel { display:none; width:100%; min-width:0; max-width:va
 requireIncludes('.v2-card, .v2-result-card { width:100%; min-width:0; max-width:100%; background:#fff; color:var(--ink); border:1px solid rgba(229,228,222,.96); border-radius:18px; padding:20px; box-shadow:0 16px 38px rgba(11,15,20,.09); overflow-wrap:anywhere; }', 'cards should wrap long values instead of overflowing');
 requireIncludes('.v2-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }', 'home cards should have a designed title row');
 requireIncludes('.v2-eyebrow { display:inline-flex;', 'home cards should expose compact step labels');
+requireIncludes('function firstValue(source, keys, fallback = \'\')', 'case overview should normalize alternate source labels');
+requireIncludes('function caseMetric(label, value)', 'case overview should render key metrics');
+requireIncludes('function caseChip(value)', 'case overview should render compact chips');
+requireIncludes('<section class="v2-result-card v2-case-overview-card">', 'case overview result card');
+requireIncludes('<div class="v2-case-hero">', 'case overview hero band');
+requireIncludes('class="v2-grid v2-case-detail-grid"', 'case overview detail grid should preserve full basic fields');
+requireIncludes('${caseMetric(\'최저매각가격\', minPrice)}', 'case overview should highlight minimum bid');
+requireIncludes('${caseMetric(\'매각기일\', saleDate)}', 'case overview should highlight sale date');
 requireIncludes('.v2-form { width:100%; min-width:0; display:grid;', 'forms should not force wider than the card');
 requireIncludes('.v2-field input, .v2-field select { width:100%; min-width:0; max-width:100%;', 'inputs should shrink within mobile cards');
 requireIncludes('.v2-btn, .v2-secondary-btn, .v2-small-btn, .v2-danger-btn { min-width:0; max-width:100%; min-height:42px; border-radius:11px; padding:0 16px; font-weight:900; cursor:pointer; border:1px solid var(--line); white-space:normal; line-height:1.25; text-align:center; }', 'buttons should allow responsive wrapping');
@@ -104,6 +112,9 @@ if (core.includes('document.querySelector(\'[data-workflow-step="bid"]\')') || c
 }
 
 requireStyleIncludes('.v2-next-step-card {\n  border-left: 4px solid var(--accent);', 'next-step card visual anchor');
+requireStyleIncludes('.v2-case-overview-card {\n  padding: 0;\n  overflow: hidden;', 'case overview card should use an edge-to-edge hero band');
+requireStyleIncludes('.v2-case-metrics {\n  display: grid;\n  grid-template-columns: repeat(4,minmax(0,1fr));', 'desktop case overview metric grid');
+requireStyleIncludes('body .v2-case-metrics {\n    grid-template-columns: repeat(2,minmax(0,1fr));', 'mobile case overview metric grid');
 requireStyleIncludes('.v2-next-flow {\n  list-style: none;\n  display: grid;\n  grid-template-columns: repeat(4,minmax(0,1fr));', 'desktop next-step flow grid');
 requireStyleIncludes('.v2-analysis-next {\n  margin-top: 14px;', 'post-analysis next panel styling');
 requireStyleIncludes('body .v2-next-flow {\n    grid-template-columns: repeat(2,minmax(0,1fr));', 'mobile next-step flow grid');

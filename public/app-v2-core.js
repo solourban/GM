@@ -80,6 +80,18 @@
       .results-section:empty { min-height:0; padding-top:0; padding-bottom:0; }
       .v2-result-card { border-radius:18px; margin-bottom:16px; box-shadow:0 12px 28px rgba(0,0,0,.05); }
       .v2-result-card.step2, .v2-result-card.analysis { border-left:4px solid var(--accent); }
+      .v2-case-overview-card { padding:0; overflow:hidden; }
+      .v2-case-hero { display:grid; gap:12px; padding:18px 20px; background:linear-gradient(135deg,#0b3d2e 0%,#052f21 100%); color:#fff; }
+      .v2-case-hero .v2-badge { width:max-content; background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.2); }
+      .v2-case-title { margin:0; color:#fff; font-size:24px; line-height:1.3; letter-spacing:0; }
+      .v2-case-meta { margin:0; color:rgba(255,255,255,.76); font-size:13px; line-height:1.55; }
+      .v2-case-chip-row { display:flex; flex-wrap:wrap; gap:7px; }
+      .v2-case-chip { display:inline-flex; align-items:center; min-height:28px; padding:0 9px; border-radius:999px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.18); color:rgba(255,255,255,.86); font-size:12px; font-weight:850; }
+      .v2-case-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; padding:14px 20px 0; }
+      .v2-case-metric { min-width:0; border:1px solid var(--line); border-radius:12px; background:var(--bg); padding:12px; }
+      .v2-case-metric span { display:block; color:var(--ink-3); font-size:12px; font-weight:850; }
+      .v2-case-metric strong { display:block; margin-top:4px; color:var(--ink); font-size:18px; line-height:1.35; overflow-wrap:anywhere; }
+      .v2-case-detail-grid { padding:0 20px 20px; }
       .v2-error { background:#fff7f7; border-color:#fecdca; }
       .v2-error h3 { color:#b42318; }
       .v2-result-head, .v2-table-head, .v2-repeat-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
@@ -138,7 +150,7 @@
       .v2-repeat-card { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--bg); margin-top:10px; }
       .v2-analysis-list { margin:12px 0 0; padding-left:18px; color:var(--ink-2); font-size:13px; line-height:1.7; }
       @media (max-width:900px){ .site-header{padding:8px 0;} .header-inner{align-items:stretch; flex-direction:column; gap:10px; min-height:0; padding:0 18px; overflow:visible;} .brand{align-self:flex-start}.brand-mark{width:34px;height:34px;border-radius:9px;font-size:17px}.brand-text h1{font-size:17px}.brand-text p{font-size:10.5px}.v2-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));justify-content:stretch;width:100%;max-width:100%;border-radius:16px}.v2-tab{width:100%;min-width:0;max-width:100%;white-space:normal}.hero{min-height:auto; padding:24px 0 24px;} .v2-form{grid-template-columns:minmax(0,1fr) minmax(0,110px)}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} }
-      @media (max-width:720px){ .container{width:100%;max-width:100%;padding-left:14px;padding-right:14px}.site-header{padding:6px 0;overflow:visible}.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}.brand{max-width:100%;min-width:0;align-self:flex-start}.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;padding:7px 5px;font-size:11.5px;line-height:1.2;text-align:center;white-space:normal;display:flex;align-items:center;justify-content:center}.hero{min-height:auto; padding:14px 0 18px;} .hero-copy{text-align:left;margin-bottom:18px;} #v2HomePanels{min-height:0}.v2-card{min-height:0;padding:16px;border-radius:16px}.v2-card h3,.v2-result-card h3{font-size:19px}.v2-form{grid-template-columns:minmax(0,1fr);gap:9px;margin-top:12px;padding-top:12px}.v2-field input,.v2-field select{padding:12px 13px;font-size:14px}.v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;}.v2-tab-results-section{padding-top:18px;scroll-margin-top:118px}.v2-date-card-list,.v2-mobile-card-list{display:grid;gap:10px;margin-top:12px}.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}.v2-result-card{border-radius:16px;padding:16px} }
+      @media (max-width:720px){ .container{width:100%;max-width:100%;padding-left:14px;padding-right:14px}.site-header{padding:6px 0;overflow:visible}.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}.brand{max-width:100%;min-width:0;align-self:flex-start}.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;padding:7px 5px;font-size:11.5px;line-height:1.2;text-align:center;white-space:normal;display:flex;align-items:center;justify-content:center}.hero{min-height:auto; padding:14px 0 18px;} .hero-copy{text-align:left;margin-bottom:18px;} #v2HomePanels{min-height:0}.v2-card{min-height:0;padding:16px;border-radius:16px}.v2-card h3,.v2-result-card h3{font-size:19px}.v2-form{grid-template-columns:minmax(0,1fr);gap:9px;margin-top:12px;padding-top:12px}.v2-field input,.v2-field select{padding:12px 13px;font-size:14px}.v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;}.v2-tab-results-section{padding-top:18px;scroll-margin-top:118px}.v2-date-card-list,.v2-mobile-card-list{display:grid;gap:10px;margin-top:12px}.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}.v2-result-card{border-radius:16px;padding:16px}.v2-case-overview-card{padding:0}.v2-case-hero{padding:16px}.v2-case-title{font-size:21px}.v2-case-metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px 16px 0}.v2-case-metric{padding:10px}.v2-case-metric strong{font-size:15px}.v2-case-detail-grid{padding:0 16px 16px} }
       @media (max-width:360px){ .v2-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.v2-tab{min-height:34px;font-size:11px;padding-left:5px;padding-right:5px} }
     `;
     document.head.appendChild(style);
@@ -338,6 +350,20 @@
     return `<div class="v2-info ${extra}"><div class="k">${esc(k)}</div><div class="v">${html || '-'}</div></div>`;
   }
 
+  function firstValue(source, keys, fallback = '') {
+    const found = keys.map((key) => clean(source?.[key])).find(Boolean);
+    return found || clean(fallback);
+  }
+
+  function caseMetric(label, value) {
+    return `<div class="v2-case-metric"><span>${esc(label)}</span><strong>${esc(clean(value) || '-')}</strong></div>`;
+  }
+
+  function caseChip(value) {
+    const text = clean(value);
+    return text ? `<span class="v2-case-chip">${esc(text)}</span>` : '';
+  }
+
   function renderCaseResults() {
     const raw = state.raw || {};
     const basic = raw.basic || {};
@@ -345,21 +371,43 @@
     const schedule = Array.isArray(raw.schedule) ? raw.schedule : [];
     const interested = Array.isArray(raw.interested) ? raw.interested : [];
     const tenants = interested.filter((x) => x.type === '임차인');
+    const address = firstValue(basic, ['소재지', '주소'], objects[0]?.address || '');
+    const itemType = firstValue(basic, ['물건종별', '물건종류']);
+    const caseTitle = firstValue(basic, ['사건명', '물건명'], itemType || address || '물건 기본정보');
+    const court = firstValue(basic, ['법원'], raw.court || '');
+    const caseNo = firstValue(basic, ['사건번호'], raw.caseNo || '');
+    const minPrice = firstValue(basic, ['최저매각가격', '최저가']);
+    const appraisal = firstValue(basic, ['감정평가액', '감정가']);
+    const saleDate = firstValue(basic, ['매각기일', '기일']);
+    const statusText = raw.status === 'ok' ? '정상 수집' : clean(raw.status || '');
     return `
       ${state.status === 'loading' ? `<section class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>새 조회를 진행 중입니다.</h3><p class="v2-note">기존 결과는 유지하고 최신 응답 도착 후 교체합니다.</p></div></div></section>` : ''}
       ${state.error ? `<section class="v2-result-card v2-error"><h3>최근 조회 실패</h3><p>${esc(state.error)}</p><p class="v2-note">아래에는 마지막 성공 결과를 유지했습니다.</p></section>` : ''}
-      <section class="v2-result-card">
-        <div class="v2-result-head"><div><span class="v2-badge">Step 1 완료</span><h3>물건 기본정보</h3><p class="v2-note">${esc(raw.court || '')} ${esc(raw.caseNo || '')}${state.elapsed ? ` · ${esc(state.elapsed)}` : ''}</p></div></div>
-        <div class="v2-grid">
-          ${info('사건번호', basic['사건번호'] || raw.caseNo)}
-          ${info('법원', basic['법원'] || raw.court)}
+      <section class="v2-result-card v2-case-overview-card">
+        <div class="v2-case-hero">
+          <span class="v2-badge">Step 1 완료</span>
+          <div>
+            <h3 class="v2-case-title">${esc(caseTitle)}</h3>
+            <p class="v2-case-meta">${esc([court, caseNo].filter(Boolean).join(' '))}${state.elapsed ? ` · ${esc(state.elapsed)}` : ''}</p>
+          </div>
+          <div class="v2-case-chip-row">${caseChip(itemType)}${caseChip(basic['담당계'])}${caseChip(statusText)}</div>
+        </div>
+        <div class="v2-case-metrics">
+          ${caseMetric('최저매각가격', minPrice)}
+          ${caseMetric('감정평가액', appraisal)}
+          ${caseMetric('매각기일', saleDate)}
+          ${caseMetric('입찰보증금률', basic['입찰보증금률'])}
+        </div>
+        <div class="v2-grid v2-case-detail-grid">
+          ${info('사건번호', caseNo)}
+          ${info('법원', court)}
           ${info('담당계', basic['담당계'])}
           ${info('사건명', basic['사건명'])}
-          ${infoHtml('소재지', splitAddress(basic['소재지']), 'wide')}
-          ${info('물건종별', basic['물건종별'])}
-          ${info('감정평가액', basic['감정평가액'])}
-          ${info('최저매각가격', basic['최저매각가격'])}
-          ${info('매각기일', basic['매각기일'])}
+          ${infoHtml('소재지', splitAddress(address), 'wide')}
+          ${info('물건종별', itemType)}
+          ${info('감정평가액', appraisal)}
+          ${info('최저매각가격', minPrice)}
+          ${info('매각기일', saleDate)}
           ${info('유찰횟수', basic['유찰횟수'])}
           ${info('배당요구종기', basic['배당요구종기'])}
           ${info('입찰보증금률', basic['입찰보증금률'])}
