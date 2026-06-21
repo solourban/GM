@@ -26,32 +26,34 @@ if (/max-width:900px[\s\S]*\.hero\{min-height:560px/.test(core)) {
   fail('tablet hero must not keep the old 560px empty first-screen height.');
 }
 
-requireIncludes('.hero { min-height:clamp(300px,36vh,420px); padding:34px 0 30px; display:flex; align-items:center; background:linear-gradient(180deg,#074332 0%,#063727 100%); max-width:100%; overflow:hidden; }', 'compact desktop hero sizing');
+requireIncludes('.hero { min-height:auto; padding:32px 0 28px; display:flex; align-items:flex-start; background:linear-gradient(180deg,#074332 0%,#053525 100%); max-width:100%; overflow:hidden; }', 'compact desktop hero sizing');
 requireIncludes('#v2HomePanels { width:100%; min-width:0; max-width:100%; min-height:0; }', 'home panel should not reserve extra empty height');
 requireIncludes('.results-section:empty { min-height:0; padding-top:0; padding-bottom:0; }', 'empty search results should collapse');
-requireIncludes('.hero{min-height:auto; padding:28px 0 30px;}', 'compact tablet hero sizing');
+requireIncludes('.hero{min-height:auto; padding:24px 0 24px;}', 'compact tablet hero sizing');
 requireIncludes('.v2-panel { display:none; width:100%; min-width:0; max-width:var(--v2-card-width); margin:0 auto; }', 'home panels should shrink inside the viewport');
-requireIncludes('.v2-card, .v2-result-card { width:100%; min-width:0; max-width:100%; background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 18px 48px rgba(0,0,0,.08); overflow-wrap:anywhere; }', 'cards should wrap long values instead of overflowing');
+requireIncludes('.v2-card, .v2-result-card { width:100%; min-width:0; max-width:100%; background:#fff; color:var(--ink); border:1px solid rgba(229,228,222,.96); border-radius:18px; padding:20px; box-shadow:0 16px 38px rgba(11,15,20,.09); overflow-wrap:anywhere; }', 'cards should wrap long values instead of overflowing');
+requireIncludes('.v2-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }', 'home cards should have a designed title row');
+requireIncludes('.v2-eyebrow { display:inline-flex;', 'home cards should expose compact step labels');
 requireIncludes('.v2-form { width:100%; min-width:0; display:grid;', 'forms should not force wider than the card');
 requireIncludes('.v2-field input, .v2-field select { width:100%; min-width:0; max-width:100%;', 'inputs should shrink within mobile cards');
 requireIncludes('.v2-btn, .v2-secondary-btn, .v2-small-btn, .v2-danger-btn { min-width:0; max-width:100%; min-height:42px; border-radius:11px; padding:0 16px; font-weight:900; cursor:pointer; border:1px solid var(--line); white-space:normal; line-height:1.25; text-align:center; }', 'buttons should allow responsive wrapping');
-requireIncludes('.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch;overflow:visible}', 'mobile tabs should use two stable columns without clipping');
+requireIncludes('.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}', 'mobile tabs should keep all five tabs visible without horizontal scrolling');
 if (core.includes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:hidden}')) {
   fail('mobile header must not hide overflowing tabs by clipping them.');
 }
 
-requireIncludes('.site-header { position: sticky; top: 0; z-index: 100; background: rgba(246,245,241,.96); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); max-width:100%; overflow:visible; }', 'site header should not clip responsive tab rows');
-requireIncludes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}', 'mobile header should let tab rows fit instead of clipping');
-requireIncludes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:40px;padding:8px 5px;font-size:12px;line-height:1.25;text-align:center;white-space:normal;overflow-wrap:anywhere;display:flex;align-items:center;justify-content:center}', 'mobile tabs should wrap long labels');
-if (!style.includes('body .v2-tabs {\n    grid-template-columns: repeat(2,minmax(0,1fr));')) {
-  fail('mobile visual override should keep header tabs in two columns.');
+requireIncludes('.site-header { position: sticky; top: 0; z-index: 100; background: rgba(250,249,245,.98); backdrop-filter: blur(14px); border-bottom:1px solid rgba(209,207,197,.74); box-shadow:0 10px 28px rgba(11,15,20,.05); max-width:100%; overflow:visible; }', 'site header should feel designed and avoid clipping');
+requireIncludes('.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}', 'mobile header should let tab rows fit instead of clipping');
+requireIncludes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;padding:7px 5px;font-size:11.5px;line-height:1.2;text-align:center;white-space:normal;display:flex;align-items:center;justify-content:center}', 'mobile tabs should stay compact while showing every label');
+if (!style.includes('body .v2-tabs {\n    display: grid;\n    grid-template-columns: repeat(3,minmax(0,1fr));')) {
+  fail('mobile visual override should keep all header tabs visible in a compact grid.');
 }
 
 if (!style.includes('body .v2-tab {\n    min-height: 34px;')) {
   fail('mobile visual override should reduce tab height.');
 }
 
-if (!style.includes('body .hero {\n    padding: 18px 0 22px;\n    align-items: flex-start;')) {
+if (!style.includes('body .hero {\n    padding: 14px 0 18px;\n    align-items: flex-start;')) {
   fail('mobile visual override should reduce the green input area weight.');
 }
 
@@ -59,7 +61,7 @@ if (!style.includes('.hero-copy { display: none; }')) {
   fail('static CSS should hide the pre-boot marketing hero copy.');
 }
 
-if (!style.includes('body .v2-card,\n  body .v2-result-card {\n    border-radius: 16px;\n    padding: 14px;')) {
+if (!style.includes('body .v2-card,\n  body .v2-result-card {\n    border-radius: 16px;\n    padding: 16px;')) {
   fail('mobile visual override should compact input/result cards.');
 }
 

@@ -33,10 +33,11 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 .container { width: 100%; max-width: 1040px; margin: 0 auto; padding: 0 24px; }
 
 .site-header {
-  background: rgba(246,245,241,0.9);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--line);
-  padding: 14px 0;
+  background: rgba(250,249,245,0.98);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(209,207,197,0.74);
+  box-shadow: 0 10px 28px rgba(11,15,20,0.05);
+  padding: 12px 0;
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-logo {
@@ -63,7 +64,7 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 .brand-text h1 span { color: var(--accent); }
 .brand-text p { margin: 3px 0 0; font-size: 11px; color: var(--ink-3); }
 
-.hero { background: var(--accent); color: #F6F5F1; padding: 80px 0 60px; }
+.hero { background: linear-gradient(180deg,#074332 0%,#053525 100%); color: #F6F5F1; padding: 32px 0 28px; }
 .hero-copy { display: none; }
 .hero-title {
   font-family: var(--font-serif);
@@ -72,7 +73,7 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   text-align: center;
   margin: 0 0 20px;
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 .hero-title em { color: var(--accent-ink); font-style: normal; }
 .hero-sub {
@@ -378,6 +379,23 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   max-width: var(--v2-card-width, 920px);
   margin: 16px auto 0;
 }
+.v2-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.v2-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 950;
+}
 .v2-next-step-card {
   border-left: 4px solid var(--accent);
 }
@@ -449,17 +467,17 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
     height: 38px;
     max-width: 180px;
   }
-  .hero { padding: 60px 0 40px; }
+  .hero { padding: 20px 0 18px; }
   .search-row { flex-direction: column; }
 }
 
 @media (max-width: 720px) {
   body .site-header {
-    background: #fff;
-    padding: 4px 0;
+    background: rgba(250,249,245,0.99);
+    padding: 6px 0;
   }
   body .header-inner {
-    gap: 6px;
+    gap: 8px;
     padding: 0 12px;
   }
   body .brand-logo img {
@@ -467,17 +485,29 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
     max-width: 160px;
   }
   body .v2-tabs {
-    grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 6px;
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    gap: 5px;
+    overflow: visible;
+    padding: 3px;
+    border-radius: 14px;
   }
   body .v2-tab {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     min-height: 34px;
-    padding: 6px;
+    padding: 7px 5px;
     font-size: 11.5px;
     font-weight: 850;
+    white-space: normal;
+    line-height: 1.2;
   }
   body .hero {
-    padding: 18px 0 22px;
+    padding: 14px 0 18px;
     align-items: flex-start;
   }
   body .hero-inner {
@@ -487,8 +517,8 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   body .v2-card,
   body .v2-result-card {
     border-radius: 16px;
-    padding: 14px;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.06);
+    padding: 16px;
+    box-shadow: 0 12px 30px rgba(11,15,20,0.08);
   }
   body .v2-card h3,
   body .v2-result-card h3 {
@@ -503,7 +533,8 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   }
   body .v2-form {
     gap: 8px;
-    margin-top: 10px;
+    margin-top: 12px;
+    padding-top: 12px;
   }
   body .v2-field {
     gap: 4px;
@@ -661,11 +692,14 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
     gap: 5px;
   }
   body .v2-tabs {
+    display: grid;
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
   body .v2-tab {
     min-height: 34px;
     font-size: 11px;
+    padding-left: 5px;
+    padding-right: 5px;
   }
 }
 

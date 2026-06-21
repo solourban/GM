@@ -45,9 +45,9 @@ assert(
 );
 assert(
   core.includes('.site-header{padding:6px 0;overflow:visible}')
-    && core.includes('.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}')
-    && core.includes('.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch;overflow:visible}')
-    && core.includes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:40px;'),
+    && core.includes('.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}')
+    && core.includes('.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}')
+    && core.includes('.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;'),
   'mobile sticky header must stay compact without clipping tab rows'
 );
 assert(

@@ -37,26 +37,28 @@
     style.id = 'v2CoreStyles';
     style.textContent = `
       :root { --v2-card-width: 920px; }
-      .site-header { position: sticky; top: 0; z-index: 100; background: rgba(246,245,241,.96); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); max-width:100%; overflow:visible; }
-      .header-inner { width:100%; min-width:0; max-width:100%; min-height:82px; display:flex; justify-content:space-between; gap:20px; align-items:center; }
+      .site-header { position: sticky; top: 0; z-index: 100; background: rgba(250,249,245,.98); backdrop-filter: blur(14px); border-bottom:1px solid rgba(209,207,197,.74); box-shadow:0 10px 28px rgba(11,15,20,.05); max-width:100%; overflow:visible; }
+      .header-inner { width:100%; min-width:0; max-width:100%; min-height:76px; display:flex; justify-content:space-between; gap:18px; align-items:center; }
       .brand { cursor:pointer; text-decoration:none; min-width:0; max-width:100%; }
       .brand-text { min-width:0; }
       .brand-text h1, .brand-text p { overflow-wrap:anywhere; }
-      .v2-tabs { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; max-width:100%; min-width:0; box-sizing:border-box; }
-      .v2-tab { min-width:0; max-width:100%; box-sizing:border-box; border:1px solid var(--line); background:#fff; color:var(--ink-2); border-radius:999px; padding:9px 14px; font-size:13px; font-weight:900; cursor:pointer; white-space:nowrap; overflow-wrap:anywhere; }
-      .v2-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
-      .hero { min-height:clamp(300px,36vh,420px); padding:34px 0 30px; display:flex; align-items:center; background:linear-gradient(180deg,#074332 0%,#063727 100%); max-width:100%; overflow:hidden; }
+      .v2-tabs { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; max-width:100%; min-width:0; box-sizing:border-box; padding:4px; border:1px solid rgba(229,228,222,.88); border-radius:999px; background:rgba(255,255,255,.68); box-shadow:inset 0 1px 0 rgba(255,255,255,.9); }
+      .v2-tab { min-width:0; max-width:100%; box-sizing:border-box; border:0; background:transparent; color:var(--ink-2); border-radius:999px; padding:8px 13px; font-size:13px; font-weight:900; cursor:pointer; white-space:nowrap; overflow-wrap:anywhere; }
+      .v2-tab.active { background:var(--accent); color:#fff; box-shadow:0 8px 18px rgba(11,61,46,.18); }
+      .hero { min-height:auto; padding:32px 0 28px; display:flex; align-items:flex-start; background:linear-gradient(180deg,#074332 0%,#053525 100%); max-width:100%; overflow:hidden; }
       .hero-inner { width:100%; min-width:0; max-width:100%; }
       .hero-copy { display:none; }
       #v2HomePanels { width:100%; min-width:0; max-width:100%; min-height:0; }
       .v2-panel { display:none; width:100%; min-width:0; max-width:var(--v2-card-width); margin:0 auto; }
       .v2-panel.active { display:block; }
-      .v2-card, .v2-result-card { width:100%; min-width:0; max-width:100%; background:#fff; color:var(--ink); border:1px solid var(--line); border-radius:22px; padding:22px; box-shadow:0 18px 48px rgba(0,0,0,.08); overflow-wrap:anywhere; }
-      .v2-card { min-height:154px; }
-      .v2-card h3, .v2-result-card h3 { margin:0 0 8px; font-size:21px; letter-spacing:-.04em; }
+      .v2-card, .v2-result-card { width:100%; min-width:0; max-width:100%; background:#fff; color:var(--ink); border:1px solid rgba(229,228,222,.96); border-radius:18px; padding:20px; box-shadow:0 16px 38px rgba(11,15,20,.09); overflow-wrap:anywhere; }
+      .v2-card { min-height:0; }
+      .v2-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
+      .v2-eyebrow { display:inline-flex; align-items:center; min-height:22px; padding:0 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-size:11px; font-weight:950; }
+      .v2-card h3, .v2-result-card h3 { margin:4px 0 8px; font-size:21px; letter-spacing:0; }
       .v2-card p, .v2-note { margin:0; color:var(--ink-3); font-size:13px; line-height:1.6; }
       .v2-note { margin-top:10px; }
-      .v2-form { width:100%; min-width:0; display:grid; grid-template-columns:minmax(220px,1.4fr) minmax(90px,.55fr) minmax(180px,1fr) auto; gap:12px; align-items:end; margin-top:18px; }
+      .v2-form { width:100%; min-width:0; display:grid; grid-template-columns:minmax(220px,1.4fr) minmax(90px,.55fr) minmax(180px,1fr) auto; gap:12px; align-items:end; margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
       .v2-field { display:flex; flex-direction:column; gap:6px; min-width:0; max-width:100%; }
       .v2-field span { color:var(--ink-3); font-size:12px; font-weight:750; }
       .v2-field input, .v2-field select { width:100%; min-width:0; max-width:100%; background:#fff; border:1px solid var(--line-2); color:var(--ink); padding:13px 14px; border-radius:12px; font-size:15px; font-weight:650; outline:none; }
@@ -135,9 +137,9 @@
       .v2-input-grid .v2-field input, .v2-input-grid .v2-field select { padding:11px 12px; font-size:14px; }
       .v2-repeat-card { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--bg); margin-top:10px; }
       .v2-analysis-list { margin:12px 0 0; padding-left:18px; color:var(--ink-2); font-size:13px; line-height:1.7; }
-      @media (max-width:900px){ .site-header{padding:8px 0;} .header-inner{align-items:stretch; flex-direction:column; gap:12px; min-height:0; padding:0 18px; overflow:visible;} .brand{align-self:flex-start}.brand-mark{width:34px;height:34px;border-radius:9px;font-size:17px}.brand-text h1{font-size:17px}.brand-text p{font-size:10.5px}.v2-tabs{justify-content:flex-start;width:100%;max-width:100%;}.hero{min-height:auto; padding:28px 0 30px;} .v2-form{grid-template-columns:minmax(0,1fr) minmax(0,110px)}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} }
-      @media (max-width:720px){ .container{width:100%;max-width:100%;padding-left:18px;padding-right:18px}.site-header{padding:6px 0;overflow:visible}.header-inner{width:100%;gap:9px;padding:0 14px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}.brand{max-width:100%;min-width:0;align-self:flex-start}.v2-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:7px;align-items:stretch;overflow:visible}.v2-tab{width:100%;min-width:0;max-width:100%;min-height:40px;padding:8px 5px;font-size:12px;line-height:1.25;text-align:center;white-space:normal;overflow-wrap:anywhere;display:flex;align-items:center;justify-content:center}.hero{min-height:auto; padding:24px 0 28px;} .hero-copy{text-align:left;margin-bottom:18px;} #v2HomePanels{min-height:0}.v2-card{min-height:0;padding:18px;border-radius:18px}.v2-card h3,.v2-result-card h3{font-size:19px}.v2-form{grid-template-columns:minmax(0,1fr);gap:10px;margin-top:14px}.v2-field input,.v2-field select{padding:12px 13px;font-size:14px}.v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;}.v2-tab-results-section{padding-top:20px;scroll-margin-top:130px}.v2-date-card-list,.v2-mobile-card-list{display:grid;gap:10px;margin-top:12px}.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}.v2-result-card{border-radius:16px;padding:18px} }
-      @media (max-width:360px){ .v2-tabs{grid-template-columns:1fr}.v2-tab{min-height:38px} }
+      @media (max-width:900px){ .site-header{padding:8px 0;} .header-inner{align-items:stretch; flex-direction:column; gap:10px; min-height:0; padding:0 18px; overflow:visible;} .brand{align-self:flex-start}.brand-mark{width:34px;height:34px;border-radius:9px;font-size:17px}.brand-text h1{font-size:17px}.brand-text p{font-size:10.5px}.v2-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));justify-content:stretch;width:100%;max-width:100%;border-radius:16px}.v2-tab{width:100%;min-width:0;max-width:100%;white-space:normal}.hero{min-height:auto; padding:24px 0 24px;} .v2-form{grid-template-columns:minmax(0,1fr) minmax(0,110px)}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} }
+      @media (max-width:720px){ .container{width:100%;max-width:100%;padding-left:14px;padding-right:14px}.site-header{padding:6px 0;overflow:visible}.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}.brand{max-width:100%;min-width:0;align-self:flex-start}.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;padding:7px 5px;font-size:11.5px;line-height:1.2;text-align:center;white-space:normal;display:flex;align-items:center;justify-content:center}.hero{min-height:auto; padding:14px 0 18px;} .hero-copy{text-align:left;margin-bottom:18px;} #v2HomePanels{min-height:0}.v2-card{min-height:0;padding:16px;border-radius:16px}.v2-card h3,.v2-result-card h3{font-size:19px}.v2-form{grid-template-columns:minmax(0,1fr);gap:9px;margin-top:12px;padding-top:12px}.v2-field input,.v2-field select{padding:12px 13px;font-size:14px}.v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;}.v2-tab-results-section{padding-top:18px;scroll-margin-top:118px}.v2-date-card-list,.v2-mobile-card-list{display:grid;gap:10px;margin-top:12px}.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}.v2-result-card{border-radius:16px;padding:16px} }
+      @media (max-width:360px){ .v2-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.v2-tab{min-height:34px;font-size:11px;padding-left:5px;padding-right:5px} }
     `;
     document.head.appendChild(style);
   }
@@ -172,8 +174,7 @@
     panels.innerHTML = `
       <section class="v2-panel ${state.activeTab === 'search' ? 'active' : ''}" data-panel="search">
         <div class="v2-card">
-          <h3>물건 검색</h3>
-          <p>사건번호로 대법원 경매정보의 기본정보를 조회합니다.</p>
+          <div class="v2-card-head"><div><span class="v2-eyebrow">Step 1</span><h3>물건 검색</h3><p>사건번호로 대법원 경매정보의 기본정보를 조회하고, 입찰 전 검토 흐름으로 연결합니다.</p></div></div>
           <div class="v2-form">
             <label class="v2-field v2-court"><span>법원</span><select id="jiwonNmV2"></select></label>
             <label class="v2-field"><span>연도</span><input id="saYearV2" type="text" value="2024" inputmode="numeric"></label>
@@ -184,9 +185,9 @@
           <p class="v2-note">Step 1 — 조회 결과는 아래 결과 영역에 고정 표시됩니다.</p>
         </div>
       </section>
-      <section class="v2-panel ${state.activeTab === 'bulk' ? 'active' : ''}" data-panel="bulk"><div class="v2-card"><h3>여러 사건 일괄조회</h3><p>기본 조회 안정화 이후 연결합니다.</p></div></section>
-      <section class="v2-panel ${state.activeTab === 'date' ? 'active' : ''}" data-panel="date"><div class="v2-card"><h3>매각기일 추천</h3><p>대법원 목록 API 검증 후 다시 연결합니다.</p></div></section>
-      <section class="v2-panel ${state.activeTab === 'saved' ? 'active' : ''}" data-panel="saved"><div class="v2-card"><h3>저장 후보 TOP 5</h3><p>저장 구조 안정화 이후 연결합니다.</p></div></section>
+      <section class="v2-panel ${state.activeTab === 'bulk' ? 'active' : ''}" data-panel="bulk"><div class="v2-card"><div class="v2-card-head"><div><span class="v2-eyebrow">Batch</span><h3>여러 사건 일괄조회</h3><p>기본 조회 안정화 이후 연결합니다.</p></div></div></div></section>
+      <section class="v2-panel ${state.activeTab === 'date' ? 'active' : ''}" data-panel="date"><div class="v2-card"><div class="v2-card-head"><div><span class="v2-eyebrow">Date</span><h3>매각기일 추천</h3><p>대법원 목록 API 검증 후 다시 연결합니다.</p></div></div></div></section>
+      <section class="v2-panel ${state.activeTab === 'saved' ? 'active' : ''}" data-panel="saved"><div class="v2-card"><div class="v2-card-head"><div><span class="v2-eyebrow">Saved</span><h3>저장 후보 TOP 5</h3><p>저장 구조 안정화 이후 연결합니다.</p></div></div></div></section>
     `;
     bindHomeControls();
     loadCourts();
