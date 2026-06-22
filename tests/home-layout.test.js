@@ -38,6 +38,9 @@ requireIncludes("['onbid', '온비드 공매'],", 'core header tabs should inclu
 requireIncludes('function firstValue(source, keys, fallback = \'\')', 'case overview should normalize alternate source labels');
 requireIncludes('function caseMetric(label, value)', 'case overview should render key metrics');
 requireIncludes('function caseChip(value)', 'case overview should render compact chips');
+requireIncludes('function openStep2(options = {})', 'core should expose one action that opens Step 2');
+requireIncludes("window.__auctionWorkflowShell.moveTo('input')", 'Step 2 open action should sync the workflow shell');
+requireIncludes('openStep2, closeStep2, tabResultsRoot', 'public v2 API should expose Step 2 controls');
 requireIncludes('<section class="v2-result-card v2-case-overview-card">', 'case overview result card');
 requireIncludes('<div class="v2-case-hero">', 'case overview hero band');
 requireIncludes('class="v2-grid v2-case-detail-grid"', 'case overview detail grid should preserve full basic fields');

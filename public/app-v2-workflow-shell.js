@@ -301,12 +301,21 @@
 
   function renderControls() {
     const index = stepIndex(activeStep);
+    const nextLabel = activeStep === 'basic' ? 'Step 2 입력 열기' : '다음 단계';
     return `
       <div class="v2-workflow-controls">
         <button type="button" class="v2-secondary-btn" id="${PREV_ID}" ${index <= 0 ? 'disabled' : ''}>이전 단계</button>
-        <button type="button" class="v2-btn" id="${NEXT_ID}" ${index >= STEPS.length - 1 ? 'disabled' : ''}>다음 단계</button>
+        <button type="button" class="v2-btn" id="${NEXT_ID}" ${index >= STEPS.length - 1 ? 'disabled' : ''}>${esc(nextLabel)}</button>
       </div>
     `;
+  }
+
+  function ensureStepContent(step) {
+    if (step?.id === 'input' && !document.getElementById('step2InputCard')) {
+      window.__auctionV2?.openStep2?.({ workflow: false, scroll: false });
+      return true;
+    }
+    return false;
   }
 
   function renderShell() {
@@ -417,6 +426,7 @@
   function moveTo(stepId) {
     const step = stepById(stepId);
     activeStep = step.id;
+    ensureStepContent(step);
     syncShell({ immediate: true });
     const target = anchorFor(step) || emptyState() || shell();
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });

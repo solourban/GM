@@ -577,6 +577,25 @@
     return `<h4 class="v2-detail-title">권리별 판단 근거</h4><div class="v2-detail-table-wrap"><table class="v2-detail-table"><thead><tr><th>접수일</th><th>권리</th><th>권리자</th><th>금액</th><th>판단</th><th>사유</th></tr></thead><tbody>${rights.map((r) => `<tr><td>${esc(r.date || '-')}</td><td>${esc(r.type || '-')} ${r.isMalso ? '<span class="v2-badge">말소기준</span>' : ''}</td><td>${esc(r.holder || '-')}</td><td>${won(r.amount)}</td><td><span class="v2-pill ${r.status === '인수' ? 'yes' : r.status === '소멸' ? 'no' : 'unknown'}">${esc(r.status || '?')}</span></td><td>${esc(r.reason || '-')}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
+  function openStep2(options = {}) {
+    state.step2Visible = true;
+    renderResults({ keepScroll: true });
+    const shouldMoveWorkflow = options.workflow !== false && window.__auctionWorkflowShell?.activeStep?.() !== 'input';
+    if (shouldMoveWorkflow && typeof window.__auctionWorkflowShell?.moveTo === 'function') {
+      setTimeout(() => window.__auctionWorkflowShell.moveTo('input'), 0);
+      return true;
+    }
+    if (options.scroll !== false) {
+      setTimeout(() => $('step2InputCard')?.scrollIntoView({ behavior:'smooth', block:'start' }), 50);
+    }
+    return true;
+  }
+
+  function closeStep2() {
+    state.step2Visible = false;
+    renderResults({ keepScroll: true });
+  }
+
   function bindHomeControls() {
     $('btnFetchV2')?.addEventListener('click', fetchCase);
     $('saSerV2')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') fetchCase(); });
@@ -595,8 +614,8 @@
       if (!btn) return;
       const action = btn.dataset.action;
       if (action === 'toggle-interested') state.interestedExpanded = !state.interestedExpanded;
-      if (action === 'open-step2') state.step2Visible = true;
-      if (action === 'close-step2') state.step2Visible = false;
+      if (action === 'open-step2') { openStep2(); return; }
+      if (action === 'close-step2') { closeStep2(); return; }
       if (action === 'add-tenant') state.manual.tenants.push({ name:'', moveIn:'', fixed:'', deposit:'' });
       if (action === 'remove-tenant' && state.manual.tenants.length > 1) state.manual.tenants.splice(Number(btn.dataset.index), 1);
       if (action === 'add-special') state.manual.specials.push({ type:'유치권', holder:'', date:'', amount:'' });
@@ -655,7 +674,7 @@
     ensureHomePanels();
     bindGlobal();
     renderResults();
-    window.__auctionV2 = { state, renderResults, tabResultsRoot: ensureTabResultsSection, syncTabResultsVisibility };
+    window.__auctionV2 = { state, renderResults, openStep2, closeStep2, tabResultsRoot: ensureTabResultsSection, syncTabResultsVisibility };
   }
 
   document.addEventListener('DOMContentLoaded', boot);
