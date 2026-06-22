@@ -18,6 +18,10 @@ function requireStyleIncludes(needle, label) {
   if (!style.includes(needle)) fail(`${label} is missing.`);
 }
 
+function requireNotIncludes(source, needle, label) {
+  if (source.includes(needle)) fail(`${label} should not be present.`);
+}
+
 if (/\.hero\s*\{\s*min-height:660px/.test(core)) {
   fail('desktop hero must not keep the old 660px empty first-screen height.');
 }
@@ -101,11 +105,15 @@ if (!style.includes('body #v2ServiceStatusCard {\n    margin-top: 10px;')) {
   fail('mobile service status card should keep a visible gap from the search card.');
 }
 
-requireIncludes('function renderFlowItem(label, status, note, tone = \'\')', 'next-step flow item renderer');
 requireIncludes('function hasManualInput() {', 'manual input evidence helper');
 requireIncludes("return hasManualInput();", 'analysis gate should ignore default select-only values');
-requireIncludes('v2-next-step-card', 'next-step workflow card');
-requireIncludes('v2-next-flow', 'next-step workflow list');
+requireIncludes("${info('물건 수', `${objects.length || 1}개`)}", 'case overview should absorb object count');
+requireIncludes("${info('이해관계인', `${interested.length}명`)}", 'case overview should absorb interested-party count');
+requireIncludes("${info('임차인', `${tenants.length}명`)}", 'case overview should absorb tenant count');
+requireNotIncludes(core, '<h3>현황 요약</h3>', 'duplicate status summary card');
+requireNotIncludes(core, 'function renderNextStep()', 'duplicate next-step card renderer');
+requireNotIncludes(core, 'v2-next-step-card', 'duplicate next-step workflow card');
+requireNotIncludes(core, 'v2-next-flow', 'duplicate next-step workflow list');
 requireIncludes('data-action="scroll-bid-plan"', 'bid-plan scroll action');
 requireIncludes('data-action="scroll-essential-docs"', 'essential-documents scroll action');
 requireIncludes('v2-analysis-next', 'post-analysis next-step panel');
@@ -115,13 +123,12 @@ if (core.includes('document.querySelector(\'[data-workflow-step="bid"]\')') || c
   fail('post-analysis scroll buttons should not target workflow tab buttons.');
 }
 
-requireStyleIncludes('.v2-next-step-card {\n  border-left: 4px solid var(--accent);', 'next-step card visual anchor');
 requireStyleIncludes('.v2-case-overview-card {\n  padding: 0;\n  overflow: hidden;', 'case overview card should use an edge-to-edge hero band');
 requireStyleIncludes('.v2-case-metrics {\n  display: grid;\n  grid-template-columns: repeat(4,minmax(0,1fr));', 'desktop case overview metric grid');
 requireStyleIncludes('body .v2-case-metrics {\n    grid-template-columns: repeat(2,minmax(0,1fr));', 'mobile case overview metric grid');
-requireStyleIncludes('.v2-next-flow {\n  list-style: none;\n  display: grid;\n  grid-template-columns: repeat(4,minmax(0,1fr));', 'desktop next-step flow grid');
+requireNotIncludes(style, '.v2-next-step-card', 'unused next-step card CSS');
+requireNotIncludes(style, '.v2-next-flow', 'unused next-step flow CSS');
 requireStyleIncludes('.v2-analysis-next {\n  margin-top: 14px;', 'post-analysis next panel styling');
-requireStyleIncludes('body .v2-next-flow {\n    grid-template-columns: repeat(2,minmax(0,1fr));', 'mobile next-step flow grid');
 requireStyleIncludes('body .v2-analysis-next {\n    margin-top: 10px;', 'mobile post-analysis panel spacing');
 
 if (!style.includes('html, body { margin: 0; padding: 0; max-width: 100%; overflow-x: hidden; }')) {

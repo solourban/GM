@@ -412,12 +412,14 @@
           ${info('유찰횟수', basic['유찰횟수'])}
           ${info('배당요구종기', basic['배당요구종기'])}
           ${info('입찰보증금률', basic['입찰보증금률'])}
+          ${info('물건 수', `${objects.length || 1}개`)}
+          ${info('이해관계인', `${interested.length}명`)}
+          ${info('임차인', `${tenants.length}명`)}
+          ${info('조회 상태', raw.status === 'ok' ? '정상 수집' : clean(raw.status || '-'))}
         </div>
       </section>
-      <section class="v2-result-card"><h3>현황 요약</h3><div class="v2-grid compact">${info('물건 수', `${objects.length || 1}개`)}${info('이해관계인', `${interested.length}명`)}${info('임차인', `${tenants.length}명`)}${info('조회 상태', raw.status === 'ok' ? '정상 수집' : clean(raw.status || '-'))}</div></section>
       ${renderSchedule(schedule)}
       ${renderInterested(interested)}
-      ${renderNextStep()}
       ${state.step2Visible ? renderStep2() : ''}
       ${renderAnalysis()}
     `;
@@ -434,23 +436,6 @@
     const limit = 8;
     const visible = state.interestedExpanded ? rows : rows.slice(0, limit);
     return `<section class="v2-result-card"><div class="v2-table-head"><h3>이해관계인</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="v2-badge">${rows.length}명</span>${rows.length > limit ? `<button class="v2-small-btn" data-action="toggle-interested">${state.interestedExpanded ? '상세 목록 접기' : '상세 목록 펼치기'}</button>` : ''}</div></div><div class="v2-table-wrap"><table class="v2-table"><thead><tr><th>구분</th><th>이름</th><th>순번</th></tr></thead><tbody>${visible.map((r) => `<tr><td>${esc(r.type || '')}</td><td>${esc(r.name || '')}</td><td>${esc(r.seq || '')}</td></tr>`).join('')}</tbody></table></div>${rows.length > limit && !state.interestedExpanded ? `<p class="v2-note">전체 ${rows.length}명 중 ${limit}명만 우선 표시합니다.</p>` : ''}</section>`;
-  }
-
-  function renderFlowItem(label, status, note, tone = '') {
-    return `<li class="${tone ? `is-${esc(tone)}` : ''}"><b>${esc(label)}</b><span>${esc(status)}</span><small>${esc(note)}</small></li>`;
-  }
-
-  function renderNextStep() {
-    const hasMalso = hasValue(state.manual.malso, ['date','holder','amount']);
-    const readyToAnalyze = hasManualInput();
-    const analyzed = Boolean(state.report);
-    const flow = [
-      renderFlowItem('1. 기본정보 확인', '완료', '사건번호, 법원, 매각기일, 최저가를 우선 확인했습니다.', 'done'),
-      renderFlowItem('2. 원문서 입력', readyToAnalyze ? '진행 중' : '필요', '매각물건명세서·등기부 기준으로 말소기준권리와 점유관계를 입력합니다.', readyToAnalyze ? 'ready' : 'todo'),
-      renderFlowItem('3. 권리분석', analyzed ? '완료' : (readyToAnalyze ? '실행 가능' : '대기'), '입력값 기준으로 대항력, 인수금액, 특수권리를 1차 판단합니다.', analyzed ? 'done' : (readyToAnalyze ? 'ready' : 'todo')),
-      renderFlowItem('4. 입찰가·자금', analyzed ? '다음' : '분석 후', '권리 리스크를 반영한 뒤 필요 현금과 입찰가 범위를 검토합니다.', analyzed ? 'ready' : 'todo'),
-    ].join('');
-    return `<section class="v2-result-card v2-next-step-card"><h3>다음 단계</h3><p class="v2-note">조회 결과는 시작점입니다. 원문 서류 입력 → 권리분석 → 입찰가·자금 검토 순서로 이어가세요.</p><ol class="v2-next-flow">${flow}</ol><div class="v2-grid compact">${info('최선순위', hasMalso ? '입력 중' : '미입력')}${info('임차인 입력', `${state.manual.tenants.length}명`)}${info('특수권리 입력', `${state.manual.specials.length}건`)}</div><div class="v2-cta-row"><button class="v2-btn" data-action="open-step2">${state.step2Visible ? 'Step 2 입력 계속하기' : 'Step 2 명세서 입력 시작'}</button>${state.step2Visible ? '<button class="v2-secondary-btn" data-action="close-step2">Step 2 접기</button>' : ''}${analyzed ? '<button class="v2-secondary-btn" data-action="scroll-bid-plan">입찰가·자금 계산 보기</button>' : ''}</div><p class="v2-note">자동 수집값이 비어 있거나 애매하면 법원경매정보 원문 문서를 우선 기준으로 보세요.</p></section>`;
   }
 
   function getManual(path) {
