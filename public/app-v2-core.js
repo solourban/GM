@@ -168,6 +168,7 @@
       ['bulk', '여러 사건 일괄조회'],
       ['date', '매각기일 추천'],
       ['saved', '저장 후보 TOP 5'],
+      ['onbid', '온비드 공매'],
     ].map(([tab, label]) => `<button class="v2-tab ${state.activeTab === tab ? 'active' : ''}" data-tab="${tab}">${label}</button>`).join('');
     header.appendChild(nav);
   }

@@ -34,6 +34,7 @@ requireIncludes('.v2-panel { display:none; width:100%; min-width:0; max-width:va
 requireIncludes('.v2-card, .v2-result-card { width:100%; min-width:0; max-width:100%; background:#fff; color:var(--ink); border:1px solid rgba(229,228,222,.96); border-radius:18px; padding:20px; box-shadow:0 16px 38px rgba(11,15,20,.09); overflow-wrap:anywhere; }', 'cards should wrap long values instead of overflowing');
 requireIncludes('.v2-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }', 'home cards should have a designed title row');
 requireIncludes('.v2-eyebrow { display:inline-flex;', 'home cards should expose compact step labels');
+requireIncludes("['onbid', '온비드 공매'],", 'core header tabs should include Onbid directly');
 requireIncludes('function firstValue(source, keys, fallback = \'\')', 'case overview should normalize alternate source labels');
 requireIncludes('function caseMetric(label, value)', 'case overview should render key metrics');
 requireIncludes('function caseChip(value)', 'case overview should render compact chips');
