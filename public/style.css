@@ -491,6 +491,79 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   font-size: 13px;
   line-height: 1.65;
 }
+.v2-step2-card {
+  display: grid;
+  gap: 16px;
+}
+.v2-step2-guide {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 10px;
+}
+.v2-step2-guide-item {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--bg);
+  padding: 12px;
+}
+.v2-step2-guide-item span {
+  display: block;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 950;
+  margin-bottom: 5px;
+}
+.v2-step2-guide-item strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.v2-step2-guide-item small {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.v2-step2-card .v2-step-section {
+  margin-top: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+}
+.v2-step2-card .v2-step-section:first-of-type {
+  margin-top: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.v2-step-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.v2-step-section-head h4 {
+  margin-bottom: 4px;
+}
+.v2-step-section-head .v2-note {
+  margin-top: 0;
+}
+.v2-step2-required {
+  background: #fff8e6;
+  border-color: #fedf89;
+}
+.v2-step2-optional {
+  background: #fff;
+}
+.v2-step2-actions {
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
 
 @media (max-width: 640px) {
   .brand-logo img {
@@ -642,6 +715,28 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
     margin-bottom: 8px;
     font-size: 14px;
     letter-spacing: 0;
+  }
+  body .v2-step2-card {
+    gap: 12px;
+  }
+  body .v2-step2-guide {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  body .v2-step2-guide-item {
+    border-radius: 10px;
+    padding: 10px;
+  }
+  body .v2-step-section-head {
+    display: grid;
+    gap: 8px;
+  }
+  body .v2-step-section-head .v2-row-actions {
+    justify-content: space-between;
+  }
+  body .v2-step2-actions {
+    align-items: stretch;
+    padding-top: 12px;
   }
   body .v2-input-grid {
     gap: 8px;

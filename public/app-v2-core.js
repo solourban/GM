@@ -145,6 +145,21 @@
       .v2-step-section { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
       .v2-step-section:first-of-type { margin-top:10px; padding-top:0; border-top:0; }
       .v2-step-section h4, .v2-detail-title { margin:0 0 10px; font-size:16px; letter-spacing:-.03em; }
+      .v2-step2-card { display:grid; gap:16px; }
+      .v2-step2-head .v2-note { max-width:640px; }
+      .v2-step2-guide { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+      .v2-step2-guide-item { min-width:0; border:1px solid var(--line); border-radius:13px; background:var(--bg); padding:12px; }
+      .v2-step2-guide-item span { display:block; color:var(--accent); font-size:11px; font-weight:950; margin-bottom:5px; }
+      .v2-step2-guide-item strong { display:block; font-size:15px; line-height:1.35; overflow-wrap:anywhere; }
+      .v2-step2-guide-item small { display:block; margin-top:5px; color:var(--ink-3); font-size:12px; line-height:1.45; }
+      .v2-step2-card .v2-step-section { margin-top:0; border:1px solid var(--line); border-radius:14px; padding:14px; }
+      .v2-step2-card .v2-step-section:first-of-type { margin-top:0; padding-top:14px; border-top:1px solid var(--line); }
+      .v2-step-section-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; }
+      .v2-step-section-head h4 { margin-bottom:4px; }
+      .v2-step-section-head .v2-note { margin-top:0; }
+      .v2-step2-required { background:#fff8e6; border-color:#fedf89; }
+      .v2-step2-optional { background:#fff; }
+      .v2-step2-actions { align-items:center; justify-content:space-between; border-top:1px solid var(--line); padding-top:14px; }
       .v2-input-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
       .v2-input-grid .v2-field input, .v2-input-grid .v2-field select { padding:11px 12px; font-size:14px; }
       .v2-repeat-card { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--bg); margin-top:10px; }
@@ -462,6 +477,33 @@
     return `<div class="v2-repeat-card"><div class="v2-repeat-head"><b>특수권리 ${index + 1}</b><button class="v2-danger-btn" data-action="remove-special" data-index="${index}">삭제</button></div><div class="v2-input-grid">${select(`specials.${index}.type`, '권리 유형', ['유치권','법정지상권','분묘기지권','예고등기','가처분','가압류','기타'])}${input(`specials.${index}.holder`, '권리자', '예: 김OO')}${input(`specials.${index}.date`, '신고/접수일', '예: 2024.01.01')}${input(`specials.${index}.amount`, '금액/비고', '예: 10,000,000')}</div></div>`;
   }
 
+  function filledRows(rows, keys) {
+    return rows.filter((row) => hasValue(row, keys)).length;
+  }
+
+  function stepStatusPill(ready, readyText = '입력됨', waitingText = '대기') {
+    return `<span class="v2-pill ${ready ? 'no' : 'unknown'}">${ready ? readyText : waitingText}</span>`;
+  }
+
+  function renderStepGuideItem(label, title, note, ready) {
+    return `<div class="v2-step2-guide-item"><span>${esc(label)}</span><strong>${esc(title)}</strong><small>${esc(note)}</small>${stepStatusPill(ready)}</div>`;
+  }
+
+  function renderStep2Guide() {
+    const malsoReady = hasValue(state.manual.malso, ['date','holder','amount']);
+    const tenantCount = filledRows(state.manual.tenants, ['name','moveIn','fixed','deposit']);
+    const specialCount = filledRows(state.manual.specials, ['holder','date','amount']);
+    return `<div class="v2-step2-guide">
+      ${renderStepGuideItem('필수 확인', '최선순위 권리', '등기부의 말소기준권리 후보를 먼저 입력합니다.', malsoReady)}
+      ${renderStepGuideItem('점유 확인', `임차인 ${tenantCount}명`, '전입일·확정일자·보증금은 대항력 판단의 기준입니다.', tenantCount > 0)}
+      ${renderStepGuideItem('선택 입력', `특수권리 ${specialCount}건`, '유치권·법정지상권 등 별도 위험 문구가 있을 때만 추가합니다.', specialCount > 0)}
+    </div>`;
+  }
+
+  function renderStepSectionHead(title, note, ready, action = '') {
+    return `<div class="v2-step-section-head"><div><h4>${esc(title)}</h4><p class="v2-note">${esc(note)}</p></div><div class="v2-row-actions">${stepStatusPill(ready)}${action}</div></div>`;
+  }
+
   function hasManualInput() {
     return hasValue(state.manual.malso, ['date','holder','amount']) || state.manual.tenants.some((t) => hasValue(t, ['name','moveIn','fixed','deposit'])) || state.manual.specials.some((s) => hasValue(s, ['holder','date','amount']));
   }
@@ -471,7 +513,37 @@
   }
 
   function renderStep2() {
-    return `<section class="v2-result-card step2" id="step2InputCard"><span class="v2-badge">Step 2 입력</span><h3>명세서·권리 입력</h3><p class="v2-note">입력값은 화면 상태에 즉시 저장됩니다. 권리분석 실패 시에도 입력값은 유지됩니다.</p><div id="v2SpecExtractorMount"></div><div class="v2-step-section"><h4>1. 최선순위 권리</h4><div class="v2-input-grid">${input('malso.date','접수일자','예: 2020.05.01')}${select('malso.type','권리종류',['근저당권','저당권','압류','가압류','담보가등기','전세권','기타'])}${input('malso.holder','권리자','예: OO은행')}${input('malso.amount','채권금액','예: 120,000,000')}</div><p class="v2-note">말소기준권리 판단의 기준입니다. 접수일자와 권리종류를 정확히 입력하세요.</p></div><div class="v2-step-section"><div class="v2-table-head"><h4>2. 임차인</h4><button class="v2-small-btn" data-action="add-tenant">임차인 추가</button></div>${state.manual.tenants.map(renderTenant).join('')}</div><div class="v2-step-section"><div class="v2-table-head"><h4>3. 특수권리</h4><button class="v2-small-btn" data-action="add-special">특수권리 추가</button></div>${state.manual.specials.length ? state.manual.specials.map(renderSpecial).join('') : '<p class="v2-note">유치권·법정지상권 등 별도 확인 권리가 있으면 추가하세요.</p>'}</div><div class="v2-cta-row"><button class="v2-btn" data-action="analyze" ${state.analyzing || !canAnalyze() ? 'disabled' : ''}>${state.analyzing ? '분석 중...' : '권리분석 실행'}</button>${!canAnalyze() ? '<span class="v2-note">최선순위·임차인·특수권리 중 하나 이상 입력하면 실행할 수 있습니다.</span>' : '<button class="v2-secondary-btn" data-action="scroll-analysis">결과 영역 보기</button>'}</div></section>`;
+    const malsoReady = hasValue(state.manual.malso, ['date','holder','amount']);
+    const tenantCount = filledRows(state.manual.tenants, ['name','moveIn','fixed','deposit']);
+    const specialCount = filledRows(state.manual.specials, ['holder','date','amount']);
+    return `<section class="v2-result-card step2 v2-step2-card" id="step2InputCard">
+      <div class="v2-result-head v2-step2-head">
+        <div>
+          <span class="v2-badge">Step 2 입력</span>
+          <h3>명세서·권리 입력</h3>
+          <p class="v2-note">등기부와 매각물건명세서에서 확인한 내용만 넣으세요. 입력값은 화면 상태에 즉시 저장되고, 분석 실패 시에도 유지됩니다.</p>
+        </div>
+        <button class="v2-small-btn" data-action="close-step2">입력 닫기</button>
+      </div>
+      ${renderStep2Guide()}
+      <div id="v2SpecExtractorMount"></div>
+      <div class="v2-step-section v2-step2-required">
+        ${renderStepSectionHead('1. 최선순위 권리', '말소기준권리 판단의 기준입니다. 접수일자와 권리종류를 원본 기준으로 입력하세요.', malsoReady)}
+        <div class="v2-input-grid">${input('malso.date','접수일자','예: 2020.05.01')}${select('malso.type','권리종류',['근저당권','저당권','압류','가압류','담보가등기','전세권','기타'])}${input('malso.holder','권리자','예: OO은행')}${input('malso.amount','채권금액','예: 120,000,000')}</div>
+      </div>
+      <div class="v2-step-section">
+        ${renderStepSectionHead('2. 임차인', '매각물건명세서의 점유자, 전입일, 확정일자, 보증금을 입력합니다.', tenantCount > 0, '<button class="v2-small-btn" data-action="add-tenant">임차인 추가</button>')}
+        ${state.manual.tenants.map(renderTenant).join('')}
+      </div>
+      <div class="v2-step-section v2-step2-optional">
+        ${renderStepSectionHead('3. 특수권리', '유치권·법정지상권처럼 별도 확인이 필요한 권리가 있으면 추가하세요.', specialCount > 0, '<button class="v2-small-btn" data-action="add-special">특수권리 추가</button>')}
+        ${state.manual.specials.length ? state.manual.specials.map(renderSpecial).join('') : '<p class="v2-note">특수권리 문구가 없으면 비워둬도 됩니다.</p>'}
+      </div>
+      <div class="v2-cta-row v2-step2-actions">
+        <button class="v2-btn" data-action="analyze" ${state.analyzing || !canAnalyze() ? 'disabled' : ''}>${state.analyzing ? '분석 중...' : '권리분석 실행'}</button>
+        ${!canAnalyze() ? '<span class="v2-note">최선순위·임차인·특수권리 중 하나 이상 입력하면 실행할 수 있습니다.</span>' : '<button class="v2-secondary-btn" data-action="scroll-analysis">결과 영역 보기</button>'}
+      </div>
+    </section>`;
   }
 
   function setManual(path, value) {
