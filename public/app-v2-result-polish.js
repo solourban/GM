@@ -26,10 +26,28 @@
       .v2-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(11,61,46,.12); }
       .v2-list, .v2-check-list { margin:14px 0 0; padding-left:20px; color:var(--ink-2); font-size:14px; line-height:1.75; }
       .v2-list li + li, .v2-check-list li + li { margin-top:4px; }
+      .v2-decision-strip { margin:14px 0 12px; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:13px; background:#f7fbf8; padding:12px 14px; display:grid; gap:4px; }
+      .v2-decision-strip span { color:var(--accent); font-size:12px; font-weight:950; line-height:1.35; }
+      .v2-decision-strip strong { color:var(--ink); font-size:16px; line-height:1.55; overflow-wrap:anywhere; }
+      .v2-decision-strip small { color:var(--ink-3); font-size:12px; line-height:1.55; }
+      .v2-decision-strip.warn { border-left-color:#b7791f; background:#fff8e6; }
+      .v2-decision-strip.warn span { color:#8a5a00; }
+      .v2-decision-strip.danger { border-left-color:#b42318; background:#fff5f3; }
+      .v2-decision-strip.danger span { color:#b42318; }
+      .v2-decision-strip.ok { border-left-color:var(--ok); background:var(--ok-bg); }
       .v2-summary-inline { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin-top:14px; }
       .v2-summary-inline > div { background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; }
       .v2-summary-inline span { display:block; color:var(--ink-3); font-size:12px; margin-bottom:4px; }
       .v2-summary-inline strong { display:block; font-size:16px; line-height:1.45; overflow-wrap:anywhere; }
+      @media (max-width:720px) {
+        .v2-grid.four { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+        .v2-info-box { border-radius:10px; padding:9px; }
+        .v2-info-box span { font-size:11px; }
+        .v2-info-box strong { font-size:14px; line-height:1.35; }
+        .v2-list, .v2-check-list { margin-top:10px; padding-left:18px; font-size:12px; line-height:1.6; }
+        .v2-decision-strip { margin:10px 0; border-radius:10px; padding:10px 11px; }
+        .v2-decision-strip strong { font-size:14px; line-height:1.45; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -63,38 +81,9 @@
     `;
   }
 
-  function patchStatusSummary() {
-    const state = appState();
-    const raw = state?.raw || null;
-    if (!raw) return;
-    const card = findCardByTitle('현황 요약');
-    if (!card || card.dataset.v2StatusSummaryPatched === '1') return;
-
-    const objects = Array.isArray(raw.objects) ? raw.objects : [];
-    const interested = Array.isArray(raw.interested) ? raw.interested : [];
-    const collectedTenants = interested.filter((item) => clean(item.type) === '임차인');
-    const inputTenants = Array.isArray(state?.manual?.tenants)
-      ? state.manual.tenants.filter((tenant) => ['name', 'moveIn', 'fixed', 'deposit'].some((key) => clean(tenant?.[key])))
-      : [];
-
-    card.dataset.v2StatusSummaryPatched = '1';
-    card.innerHTML = `
-      <h3>현황 요약</h3>
-      <p class="v2-note">자동 수집 정보와 사용자가 입력한 권리분석 정보를 구분해서 표시합니다.</p>
-      <div class="v2-grid compact">
-        ${info('물건 수', `${objects.length || 1}개`)}
-        ${info('이해관계인', `${interested.length}명`)}
-        ${info('수집 임차인', `${collectedTenants.length}명`)}
-        ${info('입력 임차인', `${inputTenants.length || 0}명`)}
-        ${info('조회 상태', raw.status === 'ok' ? '정상 수집' : clean(raw.status || '-'))}
-      </div>
-    `;
-  }
-
   function patch() {
     injectStyles();
     patchScheduleFallback();
-    patchStatusSummary();
   }
 
   document.addEventListener('DOMContentLoaded', () => {

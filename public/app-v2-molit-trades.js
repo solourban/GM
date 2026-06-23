@@ -233,6 +233,23 @@
     return '동일 단지 여부 미확인';
   }
 
+  function scopeTone(scope) {
+    if (scope.level === 'specific') return 'ok';
+    if (scope.level === 'regional') return 'warn';
+    return 'danger';
+  }
+
+  function renderTradeSummaryBand(scope, comparison, stats) {
+    const countText = stats.count ? `${stats.count}건 표본` : '표본 없음';
+    return `
+      <div class="v2-decision-strip ${scopeTone(scope)}">
+        <span>${esc(`${scope.label} · ${countText}`)}</span>
+        <strong>${esc(scope.judgment)}</strong>
+        <small>${esc(comparison.judgment)}</small>
+      </div>
+    `;
+  }
+
   function renderStatsSummary(trades, result) {
     const stats = tradeStats(trades);
     const scope = tradeScope(result, trades);
@@ -240,11 +257,8 @@
     const avgRatioLabel = comparison.avgRatio ? `${comparison.avgRatio.toFixed(1)}%${comparison.priceComparable ? '' : ' · 참고'}` : '-';
     const minRatioLabel = comparison.minRatio ? `${comparison.minRatio.toFixed(1)}%${comparison.priceComparable ? '' : ' · 참고'}` : '-';
     return `
+      ${renderTradeSummaryBand(scope, comparison, stats)}
       <div class="v2-grid compact">
-        ${info('참고 범위', scope.label, 'wide')}
-        ${info('참고지표 성격', '수익 예측이나 적정가 확정값이 아닙니다.', 'wide')}
-        ${info('표본 해석', scope.judgment, 'wide')}
-        ${info('가격 참고 메모', comparison.judgment, 'wide')}
         ${info('동일 단지 여부', complexReferenceText(scope), 'wide')}
         ${info('면적 매칭 주의', areaReferenceText(stats), 'wide')}
         ${info('경매 최저가', formatWon(comparison.minBidWon))}
@@ -376,7 +390,7 @@
           ${info('유형별 결과', renderTypeSummary(result.data?.tradeTypes), 'wide')}
         </div>
         ${renderTradeRows(trades)}
-        <p class="v2-note">실거래가는 참고지표입니다. 수익 예측이나 적정가 확정값이 아니며 동일 단지·동·층·전용면적, 계약해제 여부, 시점 차이를 별도 확인해야 합니다.</p>
+        <p class="v2-note">실거래가는 참고지표입니다. 수익 예측이나 적정가 확정값이 아닙니다. 동일 단지·동·층·전용면적, 계약해제 여부, 시점 차이를 별도 확인해야 합니다.</p>
       </section>
     `;
   }

@@ -132,11 +132,10 @@ const displayFix = read('public/app-v2-display-fix.js');
   '${esc(money(minBid))}',
   '${esc(money(practicalBurden))}',
   '${esc(`입력 임차인 ${tenants}명, 인수 가능 항목 ${inheritedItems}건 기준입니다.`)}',
-  '${esc(decisionMessage(report, inheritedTotal, minBid))}',
+  'function decisionStrip(label, message, tone = \'neutral\')',
+  '<strong>${esc(message)}</strong>',
   '${esc(percent(upperRate))}',
-  '${esc(bidRangeMessage(report, lower, upper, base, inheritedTotal))}',
   '${esc(`입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.`)}',
-  '${esc(fundingMessage(report, minTotal, upperTotal))}',
   'items.map((item) => `<li>□ ${esc(item)}</li>`).join',
 ].forEach((needle) => requireIncludes(displayFix, needle, `display fix ${needle}`));
 
@@ -239,7 +238,6 @@ const resultPolish = read('public/app-v2-result-polish.js');
   '<div class="v2-info ${extra}"><div class="k">${esc(label)}</div><div class="v">${esc(clean(value) || \'-\')}</div></div>',
   "${info('기본정보 매각기일', saleDate)}",
   "${info('최저매각가격', basic['최저매각가격'])}",
-  "${info('조회 상태', raw.status === 'ok' ? '정상 수집' : clean(raw.status || '-'))}",
 ].forEach((needle) => requireIncludes(resultPolish, needle, `result polish ${needle}`));
 
 const workflowShell = read('public/app-v2-workflow-shell.js');

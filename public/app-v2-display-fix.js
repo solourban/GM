@@ -109,6 +109,16 @@
     return '위험도 낮음';
   }
 
+  function toneForRisk(level) {
+    if (level === 'danger') return 'danger';
+    if (level === 'warn') return 'warn';
+    return 'ok';
+  }
+
+  function decisionStrip(label, message, tone = 'neutral') {
+    return `<div class="v2-decision-strip ${tone}"><span>${esc(label)}</span><strong>${esc(message)}</strong></div>`;
+  }
+
   function decisionMessage(report, inheritedTotal, minBid) {
     const level = report?.risk?.level || 'ok';
     const tenantRisk = Array.isArray(report?.tenants) && report.tenants.some((tenant) => tenant.daehang === '있음');
@@ -192,6 +202,7 @@
     const tenants = Array.isArray(report.tenants) ? report.tenants.length : 0;
     const inheritedItems = Array.isArray(report.inherited?.items) ? report.inherited.items.length : 0;
     const level = report.risk?.level || 'ok';
+    const decision = decisionMessage(report, inheritedTotal, minBid);
 
     let card = document.getElementById('v2BiddingSummaryCard');
     if (!card) {
@@ -208,11 +219,12 @@
       practicalBurden,
       tenants,
       inheritedItems,
-      decisionMessage(report, inheritedTotal, minBid),
+      decision,
     ].join('|'), `
       <span class="v2-badge">입찰 판단</span>
       <h3>입찰 전 핵심 요약</h3>
       <p class="v2-note">권리분석 결과를 입찰 판단 기준으로 다시 정리한 요약입니다. 원본 서류 확인을 대체하지 않습니다.</p>
+      ${decisionStrip('이번 판단', decision, toneForRisk(level))}
       <div class="v2-grid four">
         <div class="v2-info-box"><span>위험도</span><strong>${esc(riskLabel(level))}</strong></div>
         <div class="v2-info-box"><span>최저가</span><strong>${esc(money(minBid))}</strong></div>
@@ -221,7 +233,7 @@
       </div>
       <ul class="v2-list">
         <li>${esc(`입력 임차인 ${tenants}명, 인수 가능 항목 ${inheritedItems}건 기준입니다.`)}</li>
-        <li>${esc(decisionMessage(report, inheritedTotal, minBid))}</li>
+        <li>등기부·매각물건명세서·전입세대열람 원본 확인 전에는 참고 판단으로만 보세요.</li>
       </ul>
     `);
   }
@@ -241,6 +253,8 @@
     const inheritedTotal = numberValue(report.inherited?.total);
     const upperAfterInherited = Math.max(0, upper - inheritedTotal);
     const upperRate = base ? (upper / base) * 100 : 0;
+    const rangeMessage = bidRangeMessage(report, lower, upper, base, inheritedTotal);
+    const rangeTone = report.risk?.level === 'danger' ? 'danger' : inheritedTotal > 0 ? 'warn' : 'neutral';
 
     let card = document.getElementById('v2BidRangeCard');
     if (!card) {
@@ -259,11 +273,12 @@
       inheritedTotal,
       upperAfterInherited,
       upperRate,
-      bidRangeMessage(report, lower, upper, base, inheritedTotal),
+      rangeMessage,
     ].join('|'), `
       <span class="v2-badge">가격 검토</span>
       <h3>입찰가 검토 기준</h3>
       <p class="v2-note">자동 산식으로 만든 참고 범위입니다. 실제 입찰가는 실거래가, 현장 상태, 명도비, 경쟁률을 별도로 반영해야 합니다.</p>
+      ${decisionStrip('가격 기준', rangeMessage, rangeTone)}
       <div class="v2-grid four">
         <div class="v2-info-box"><span>입찰 하한 기준</span><strong>${esc(money(lower))}</strong></div>
         <div class="v2-info-box"><span>검토 상한 기준</span><strong>${esc(money(upper))}</strong></div>
@@ -271,8 +286,8 @@
         <div class="v2-info-box"><span>인수 반영 후 여유</span><strong>${esc(money(upperAfterInherited))}</strong></div>
       </div>
       <ul class="v2-list">
-        <li>${esc(bidRangeMessage(report, lower, upper, base, inheritedTotal))}</li>
         <li>입찰가를 정할 때는 낙찰가가 아니라 낙찰가 + 인수금액 + 취득비용 + 수리·명도비용 기준으로 다시 계산하세요.</li>
+        <li>시세·관리비·수리비·명도비·경쟁률 확인 뒤 실제 입찰 예정가를 별도 입력하세요.</li>
       </ul>
     `);
   }
@@ -296,6 +311,8 @@
     const upperBidDeposit = Math.round(upper * bidDepositRate / 100);
     const minTotal = minBid + inheritedTotal;
     const upperTotal = upper + inheritedTotal;
+    const cashMessage = fundingMessage(report, minTotal, upperTotal);
+    const cashTone = report.risk?.level === 'danger' || upperTotal > minTotal ? 'warn' : 'neutral';
 
     let card = document.getElementById('v2FundingReviewCard');
     if (!card) {
@@ -317,11 +334,12 @@
       upperBidDeposit,
       minTotal,
       upperTotal,
-      fundingMessage(report, minTotal, upperTotal),
+      cashMessage,
     ].join('|'), `
       <span class="v2-badge">자금 검토</span>
       <h3>입찰 전 자금 검토</h3>
       <p class="v2-note">현재 입력값 기준의 단순 추정입니다. 대출 가능액, 잔금기한, 세금, 수리·명도비는 별도로 확인해야 합니다.</p>
+      ${decisionStrip('자금 체크', cashMessage, cashTone)}
       <div class="v2-grid four">
         <div class="v2-info-box"><span>최저가 보증금</span><strong>${esc(money(minBidDeposit))}</strong></div>
         <div class="v2-info-box"><span>최저가+인수</span><strong>${esc(money(minTotal))}</strong></div>
@@ -330,7 +348,7 @@
       </div>
       <ul class="v2-list">
         <li>${esc(`입찰보증금률은 현재 ${bidDepositRate}% 기준으로 계산했습니다.`)}</li>
-        <li>${esc(fundingMessage(report, minTotal, upperTotal))}</li>
+        <li>잔금, 취득세, 법무비, 미납관리비, 명도비는 별도 예비비로 분리해서 보세요.</li>
       </ul>
     `);
   }
@@ -364,6 +382,7 @@
       <span class="v2-badge">확인 목록</span>
       <h3>입찰 전 확인 체크리스트</h3>
       <p class="v2-note">분석 결과에서 파생된 확인 항목입니다. 입찰 전 원본 서류와 현장 확인 기준으로 하나씩 점검하세요.</p>
+      ${decisionStrip('체크 시작점', `${items.length}개 항목을 원본 서류와 현장 확인 기준으로 다시 확인하세요.`, 'neutral')}
       <ul class="v2-list">
         ${items.map((item) => `<li>□ ${esc(item)}</li>`).join('')}
       </ul>

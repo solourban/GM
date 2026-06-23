@@ -108,10 +108,10 @@ requireIncludes(SERVICE_STATUS, 'JavaScript SDK 도메인', 'Kakao JavaScript SD
 [
   [MOLIT, '실거래가 참고지표', 'MOLIT reference badge'],
   [MOLIT, '국토부 실거래가 참고지표', 'MOLIT reference title'],
-  [MOLIT, '참고지표 성격', 'reference nature field'],
+  [MOLIT, 'function renderTradeSummaryBand', 'reference judgment summary band'],
+  [MOLIT, 'v2-decision-strip', 'reference judgment strip marker'],
   [MOLIT, '수익 예측이나 적정가 확정값이 아닙니다.', 'no-profit/no-fair-price copy'],
-  [MOLIT, '표본 해석', 'sample interpretation label'],
-  [MOLIT, '가격 참고 메모', 'price reference memo label'],
+  [MOLIT, '<small>${esc(comparison.judgment)}</small>', 'secondary price reference copy'],
   [MOLIT, '동일 단지 여부', 'same-complex uncertainty label'],
   [MOLIT, '면적 매칭 주의', 'area matching caution label'],
   [MOLIT, '표본 수', 'sample count label'],
