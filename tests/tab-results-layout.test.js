@@ -40,7 +40,7 @@ assert(
   'date results must provide mobile cards instead of relying only on a wide table'
 );
 assert(
-  core.includes('.v2-date-card-list,.v2-mobile-card-list{display:grid') && core.includes('.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}'),
+  core.includes('.v2-date-card-list,.v2-mobile-card-list,.v2-analysis-mobile-list{display:grid') && core.includes('.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap,.v2-analysis-detail-table-wrap{display:none}'),
   'mobile date result layout must hide the wide table and show card rows'
 );
 assert(
@@ -110,7 +110,7 @@ assert(
   'onbid results must provide mobile cards and keep the wide table desktop-only'
 );
 assert(
-  core.includes('.v2-date-card-list,.v2-mobile-card-list{display:grid') && core.includes('.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}'),
+  core.includes('.v2-date-card-list,.v2-mobile-card-list,.v2-analysis-mobile-list{display:grid') && core.includes('.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap,.v2-analysis-detail-table-wrap{display:none}'),
   'shared mobile result cards must show while wide tab result tables are hidden on mobile'
 );
 assert(

@@ -491,6 +491,59 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   font-size: 13px;
   line-height: 1.65;
 }
+.v2-analysis-mobile-list {
+  display: none;
+}
+.v2-analysis-mobile-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+.v2-analysis-mobile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.v2-analysis-mobile-head h5 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.v2-analysis-mobile-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+}
+.v2-analysis-mobile-grid span,
+.v2-analysis-mobile-reason {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 9px;
+}
+.v2-analysis-mobile-grid small,
+.v2-analysis-mobile-reason small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+.v2-analysis-mobile-grid b,
+.v2-analysis-mobile-reason b {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.v2-analysis-mobile-reason {
+  margin-top: 8px;
+}
 .v2-step2-card {
   display: grid;
   gap: 16px;
@@ -693,6 +746,21 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   }
   body .v2-grid.compact {
     grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  body .v2-analysis-mobile-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  body .v2-analysis-detail-table-wrap {
+    display: none;
+  }
+  body .v2-analysis-mobile-card {
+    border-radius: 12px;
+    padding: 10px;
+  }
+  body .v2-analysis-mobile-grid {
+    gap: 7px;
   }
   body .v2-info {
     border-radius: 10px;

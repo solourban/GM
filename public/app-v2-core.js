@@ -115,6 +115,15 @@
       .v2-table th, .v2-detail-table th { text-align:left; color:var(--ink-3); background:var(--bg); border-bottom:1px solid var(--line); padding:10px 9px; white-space:nowrap; }
       .v2-table td, .v2-detail-table td { border-bottom:1px solid var(--line); padding:10px 9px; vertical-align:top; }
       .v2-table tr:last-child td, .v2-detail-table tr:last-child td { border-bottom:0; }
+      .v2-analysis-mobile-list { display:none; }
+      .v2-analysis-mobile-card { border:1px solid var(--line); border-radius:14px; background:#fff; padding:12px; }
+      .v2-analysis-mobile-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+      .v2-analysis-mobile-head h5 { margin:0; font-size:15px; line-height:1.35; overflow-wrap:anywhere; }
+      .v2-analysis-mobile-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+      .v2-analysis-mobile-grid span, .v2-analysis-mobile-reason { min-width:0; border:1px solid var(--line); border-radius:10px; background:var(--bg); padding:9px; }
+      .v2-analysis-mobile-grid small, .v2-analysis-mobile-reason small { display:block; color:var(--ink-3); font-size:11px; font-weight:800; margin-bottom:3px; }
+      .v2-analysis-mobile-grid b, .v2-analysis-mobile-reason b { display:block; font-size:13px; line-height:1.4; overflow-wrap:anywhere; }
+      .v2-analysis-mobile-reason { margin-top:8px; }
       .v2-date-card-list { display:none; }
       .v2-date-item-card { border:1px solid var(--line); border-radius:14px; padding:14px; background:#fff; }
       .v2-date-item-card[data-selected-candidate="1"] { border-color:var(--accent); box-shadow:0 0 0 3px rgba(11,61,46,.08); }
@@ -165,7 +174,7 @@
       .v2-repeat-card { border:1px solid var(--line); border-radius:14px; padding:12px; background:var(--bg); margin-top:10px; }
       .v2-analysis-list { margin:12px 0 0; padding-left:18px; color:var(--ink-2); font-size:13px; line-height:1.7; }
       @media (max-width:900px){ .site-header{padding:8px 0;} .header-inner{align-items:stretch; flex-direction:column; gap:10px; min-height:0; padding:0 18px; overflow:visible;} .brand{align-self:flex-start}.brand-mark{width:34px;height:34px;border-radius:9px;font-size:17px}.brand-text h1{font-size:17px}.brand-text p{font-size:10.5px}.v2-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));justify-content:stretch;width:100%;max-width:100%;border-radius:16px}.v2-tab{width:100%;min-width:0;max-width:100%;white-space:normal}.hero{min-height:auto; padding:24px 0 24px;} .v2-form{grid-template-columns:minmax(0,1fr) minmax(0,110px)}.v2-court,.v2-case,.v2-btn{grid-column:1/-1}.v2-btn{width:100%;} }
-      @media (max-width:720px){ .container{width:100%;max-width:100%;padding-left:14px;padding-right:14px}.site-header{padding:6px 0;overflow:visible}.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}.brand{max-width:100%;min-width:0;align-self:flex-start}.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;padding:7px 5px;font-size:11.5px;line-height:1.2;text-align:center;white-space:normal;display:flex;align-items:center;justify-content:center}.hero{min-height:auto; padding:14px 0 18px;} .hero-copy{text-align:left;margin-bottom:18px;} #v2HomePanels{min-height:0}.v2-card{min-height:0;padding:16px;border-radius:16px}.v2-card h3,.v2-result-card h3{font-size:19px}.v2-form{grid-template-columns:minmax(0,1fr);gap:9px;margin-top:12px;padding-top:12px}.v2-field input,.v2-field select{padding:12px 13px;font-size:14px}.v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;}.v2-tab-results-section{padding-top:18px;scroll-margin-top:118px}.v2-date-card-list,.v2-mobile-card-list{display:grid;gap:10px;margin-top:12px}.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap{display:none}.v2-result-card{border-radius:16px;padding:16px}.v2-case-overview-card{padding:0}.v2-case-hero{padding:16px}.v2-case-title{font-size:21px}.v2-case-metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px 16px 0}.v2-case-metric{padding:10px}.v2-case-metric strong{font-size:15px}.v2-case-detail-grid{padding:0 16px 16px} }
+      @media (max-width:720px){ .container{width:100%;max-width:100%;padding-left:14px;padding-right:14px}.site-header{padding:6px 0;overflow:visible}.header-inner{width:100%;gap:8px;padding:0 12px;max-width:100%;min-width:0;overflow:visible;align-items:stretch}.brand{max-width:100%;min-width:0;align-self:flex-start}.v2-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;min-width:0;max-width:100%;gap:5px;align-items:stretch;overflow:visible;padding:3px}.v2-tab{width:100%;min-width:0;max-width:100%;min-height:34px;padding:7px 5px;font-size:11.5px;line-height:1.2;text-align:center;white-space:normal;display:flex;align-items:center;justify-content:center}.hero{min-height:auto; padding:14px 0 18px;} .hero-copy{text-align:left;margin-bottom:18px;} #v2HomePanels{min-height:0}.v2-card{min-height:0;padding:16px;border-radius:16px}.v2-card h3,.v2-result-card h3{font-size:19px}.v2-form{grid-template-columns:minmax(0,1fr);gap:9px;margin-top:12px;padding-top:12px}.v2-field input,.v2-field select{padding:12px 13px;font-size:14px}.v2-cta-row .v2-btn,.v2-cta-row .v2-secondary-btn{width:100%;}.v2-tab-results-section{padding-top:18px;scroll-margin-top:118px}.v2-date-card-list,.v2-mobile-card-list,.v2-analysis-mobile-list{display:grid;gap:10px;margin-top:12px}.v2-date-table-wrap,.v2-bulk-table-wrap,.v2-saved-table-wrap,.v2-onbid-table-wrap,.v2-analysis-detail-table-wrap{display:none}.v2-result-card{border-radius:16px;padding:16px}.v2-case-overview-card{padding:0}.v2-case-hero{padding:16px}.v2-case-title{font-size:21px}.v2-case-metrics{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px 16px 0}.v2-case-metric{padding:10px}.v2-case-metric strong{font-size:15px}.v2-case-detail-grid{padding:0 16px 16px} }
       @media (max-width:360px){ .v2-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.v2-tab{min-height:34px;font-size:11px;padding-left:5px;padding-right:5px} }
     `;
     document.head.appendChild(style);
@@ -611,6 +620,14 @@
     return Math.max(0, deposit - paid);
   }
 
+  function analysisMobileField(label, value) {
+    return `<span><small>${esc(label)}</small><b>${esc(value || '-')}</b></span>`;
+  }
+
+  function analysisMobileReason(reason) {
+    return `<div class="v2-analysis-mobile-reason"><small>판단 사유</small><b>${esc(reason || '-')}</b></div>`;
+  }
+
   function renderAnalysis() {
     if (state.analyzing) return `<section class="v2-result-card analysis"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>권리분석 중...</h3><p class="v2-note">입력값은 유지됩니다.</p></div></div></section>`;
     if (state.analyzeError) return `<section class="v2-result-card v2-error" id="analysisCard"><h3>권리분석 실패</h3><p>${esc(state.analyzeError)}</p><p class="v2-note">Step 2 입력값은 유지됩니다.</p></section>`;
@@ -626,12 +643,14 @@
 
   function renderTenantDetails(tenants) {
     if (!tenants.length) return '';
-    return `<h4 class="v2-detail-title">임차인별 판단 근거</h4><div class="v2-detail-table-wrap"><table class="v2-detail-table"><thead><tr><th>임차인</th><th>전입일</th><th>확정일자</th><th>보증금</th><th>대항력</th><th>인수 가능액</th><th>판단 사유</th></tr></thead><tbody>${tenants.map((t) => `<tr><td>${esc(t.name || '임차인')}</td><td>${esc(t.moveIn || '-')}</td><td>${esc(t.fixed || '-')}</td><td>${won(t.deposit)}</td><td><span class="v2-pill ${tenantStatusClass(t.daehang)}">${esc(t.daehang || '확인필요')}</span></td><td>${won(tenantUnpaid(t))}</td><td>${esc(t.reason || '-')}</td></tr>`).join('')}</tbody></table></div>`;
+    const mobile = `<div class="v2-analysis-mobile-list" aria-label="임차인별 판단 카드">${tenants.map((t, index) => `<article class="v2-analysis-mobile-card"><div class="v2-analysis-mobile-head"><h5>${esc(t.name || `임차인 ${index + 1}`)}</h5><span class="v2-pill ${tenantStatusClass(t.daehang)}">${esc(t.daehang || '확인필요')}</span></div><div class="v2-analysis-mobile-grid">${analysisMobileField('전입일', t.moveIn)}${analysisMobileField('확정일자', t.fixed)}${analysisMobileField('보증금', won(t.deposit))}${analysisMobileField('인수 가능액', won(tenantUnpaid(t)))}</div>${analysisMobileReason(t.reason)}</article>`).join('')}</div>`;
+    return `<h4 class="v2-detail-title">임차인별 판단 근거</h4>${mobile}<div class="v2-detail-table-wrap v2-analysis-detail-table-wrap"><table class="v2-detail-table"><thead><tr><th>임차인</th><th>전입일</th><th>확정일자</th><th>보증금</th><th>대항력</th><th>인수 가능액</th><th>판단 사유</th></tr></thead><tbody>${tenants.map((t) => `<tr><td>${esc(t.name || '임차인')}</td><td>${esc(t.moveIn || '-')}</td><td>${esc(t.fixed || '-')}</td><td>${won(t.deposit)}</td><td><span class="v2-pill ${tenantStatusClass(t.daehang)}">${esc(t.daehang || '확인필요')}</span></td><td>${won(tenantUnpaid(t))}</td><td>${esc(t.reason || '-')}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function renderRightDetails(rights) {
     if (!rights.length) return '';
-    return `<h4 class="v2-detail-title">권리별 판단 근거</h4><div class="v2-detail-table-wrap"><table class="v2-detail-table"><thead><tr><th>접수일</th><th>권리</th><th>권리자</th><th>금액</th><th>판단</th><th>사유</th></tr></thead><tbody>${rights.map((r) => `<tr><td>${esc(r.date || '-')}</td><td>${esc(r.type || '-')} ${r.isMalso ? '<span class="v2-badge">말소기준</span>' : ''}</td><td>${esc(r.holder || '-')}</td><td>${won(r.amount)}</td><td><span class="v2-pill ${r.status === '인수' ? 'yes' : r.status === '소멸' ? 'no' : 'unknown'}">${esc(r.status || '?')}</span></td><td>${esc(r.reason || '-')}</td></tr>`).join('')}</tbody></table></div>`;
+    const mobile = `<div class="v2-analysis-mobile-list" aria-label="권리별 판단 카드">${rights.map((r, index) => `<article class="v2-analysis-mobile-card"><div class="v2-analysis-mobile-head"><h5>${esc(r.type || `권리 ${index + 1}`)} ${r.isMalso ? '<span class="v2-badge">말소기준</span>' : ''}</h5><span class="v2-pill ${r.status === '인수' ? 'yes' : r.status === '소멸' ? 'no' : 'unknown'}">${esc(r.status || '?')}</span></div><div class="v2-analysis-mobile-grid">${analysisMobileField('접수일', r.date)}${analysisMobileField('권리자', r.holder)}${analysisMobileField('금액', won(r.amount))}${analysisMobileField('말소기준', r.isMalso ? '해당' : '-')}</div>${analysisMobileReason(r.reason)}</article>`).join('')}</div>`;
+    return `<h4 class="v2-detail-title">권리별 판단 근거</h4>${mobile}<div class="v2-detail-table-wrap v2-analysis-detail-table-wrap"><table class="v2-detail-table"><thead><tr><th>접수일</th><th>권리</th><th>권리자</th><th>금액</th><th>판단</th><th>사유</th></tr></thead><tbody>${rights.map((r) => `<tr><td>${esc(r.date || '-')}</td><td>${esc(r.type || '-')} ${r.isMalso ? '<span class="v2-badge">말소기준</span>' : ''}</td><td>${esc(r.holder || '-')}</td><td>${won(r.amount)}</td><td><span class="v2-pill ${r.status === '인수' ? 'yes' : r.status === '소멸' ? 'no' : 'unknown'}">${esc(r.status || '?')}</span></td><td>${esc(r.reason || '-')}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function openStep2(options = {}) {
