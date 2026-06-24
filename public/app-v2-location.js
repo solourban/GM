@@ -177,6 +177,8 @@
 
   let kakaoSdkPromise = null;
   let mapConfigPromise = null;
+  const kakaoMapRegistry = new Map();
+  let kakaoMapSeq = 0;
 
   function getMapConfig() {
     if (!mapConfigPromise) {
@@ -205,6 +207,38 @@
     `;
     target.style.display = 'grid';
     target.style.placeItems = 'center';
+  }
+
+  function mapRegistryKey(target) {
+    if (!target.dataset.mapInstanceId) {
+      kakaoMapSeq += 1;
+      target.dataset.mapInstanceId = `kakao-map-${kakaoMapSeq}`;
+    }
+    return target.dataset.mapInstanceId;
+  }
+
+  function relayoutKakaoMapEntry(entry) {
+    if (!entry?.target?.isConnected) {
+      if (entry?.key) kakaoMapRegistry.delete(entry.key);
+      return;
+    }
+    if (!window.kakao?.maps?.LatLng || !entry.map?.relayout) return;
+    const coords = new window.kakao.maps.LatLng(entry.point.y, entry.point.x);
+    entry.map.relayout();
+    entry.map.setCenter(coords);
+    entry.marker?.setPosition?.(coords);
+  }
+
+  function relayoutKakaoMaps(reason = 'manual') {
+    if (!kakaoMapRegistry.size || !window.kakao?.maps?.LatLng) return;
+    const run = () => {
+      Array.from(kakaoMapRegistry.values()).forEach(relayoutKakaoMapEntry);
+    };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(run);
+    else run();
+    window.setTimeout(run, 80);
+    window.setTimeout(run, 240);
+    window.__auctionLocationMapsLastRelayout = reason;
   }
 
   function distanceText(value) {
@@ -364,7 +398,10 @@
     }
 
     targets.forEach((target) => {
-      if (target.dataset.ready === '1') return;
+      if (target.dataset.ready === '1') {
+        relayoutKakaoMaps('existing-preview');
+        return;
+      }
       try {
         const x = Number(target.dataset.x);
         const y = Number(target.dataset.y);
@@ -377,8 +414,10 @@
         target.innerHTML = '';
         target.style.display = 'block';
         const map = new window.kakao.maps.Map(target, { center: coords, level: 4 });
-        new window.kakao.maps.Marker({ map, position: coords });
-        window.setTimeout(() => map.relayout(), 0);
+        const marker = new window.kakao.maps.Marker({ map, position: coords });
+        const key = mapRegistryKey(target);
+        kakaoMapRegistry.set(key, { key, target, map, marker, point: { x, y } });
+        relayoutKakaoMaps('preview-init');
         target.dataset.ready = '1';
         analyzeNearby(target, coords).catch(() => renderNearbyFailure(target, '주변 시설 분석 중 오류가 발생했습니다.'));
       } catch (_) {
@@ -665,5 +704,24 @@
   ensureLocationStyles();
   observeResults();
   document.addEventListener('DOMContentLoaded', () => scheduleUpsert(0));
+  document.addEventListener('auction:workflow-step-change', (event) => {
+    if (event.detail?.step !== 'market') return;
+    initKakaoMapPreviews(document.getElementById(CARD_ID) || document);
+    relayoutKakaoMaps('workflow-step-change');
+  });
+  document.addEventListener(CHANGE_EVENT, (event) => {
+    if (!event.detail?.id || event.detail.id === CARD_ID) {
+      window.setTimeout(() => relayoutKakaoMaps('result-card-change'), 0);
+    }
+  });
+  window.addEventListener('resize', () => relayoutKakaoMaps('resize'));
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) relayoutKakaoMaps('visibilitychange');
+  });
+  window.__auctionLocationMaps = {
+    init: initKakaoMapPreviews,
+    relayout: relayoutKakaoMaps,
+    count: () => kakaoMapRegistry.size,
+  };
   scheduleUpsert(0);
 })();

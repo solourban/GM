@@ -7,6 +7,7 @@
   const NEXT_ID = 'v2WorkflowNextBtn';
   const EMPTY_ID = 'v2WorkflowEmptyState';
   const HIDDEN_CLASS = 'v2-workflow-card-hidden';
+  const STEP_CHANGE_EVENT = 'auction:workflow-step-change';
 
   const STEPS = [
     { id: 'basic', label: '기본정보', wrapperId: 'v2StepBasic', anchors: ['resultsSection'] },
@@ -140,6 +141,16 @@
     resultCards().forEach((card) => {
       setCardVisibility(card);
     });
+  }
+
+  function notifyStepChange(reason = 'sync') {
+    document.dispatchEvent(new CustomEvent(STEP_CHANGE_EVENT, {
+      detail: {
+        step: activeStep,
+        reason,
+        visibleCardIds: resultCards().filter((card) => !card.hidden).map((card) => card.id || '(basic)'),
+      },
+    }));
   }
 
   function syncEmptyState() {
@@ -408,6 +419,7 @@
     bindShell(card);
     applyStepVisibility();
     syncEmptyState();
+    notifyStepChange('apply-shell');
   }
 
   function syncShell(options = {}) {
