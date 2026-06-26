@@ -18,11 +18,11 @@
       #${CARD_ID} { overflow-anchor:none; }
       #${CARD_ID}.v2-location-loading { min-height:1040px; }
       #${CARD_ID} .v2-location-map-reserve { min-height:820px; margin-top:14px; border:1px solid var(--line); border-radius:18px; background:var(--bg); }
-      #${CARD_ID} [data-nearby-summary] { min-height:142px; align-content:start; }
+      #${CARD_ID} [data-nearby-summary] { min-height:0; align-content:start; }
       @media (max-width:720px) {
         #${CARD_ID}.v2-location-loading { min-height:1460px; }
         #${CARD_ID} .v2-location-map-reserve { min-height:1240px; }
-        #${CARD_ID} [data-nearby-summary] { min-height:400px; }
+        #${CARD_ID} [data-nearby-summary] { min-height:0; }
       }
     `;
     document.head.appendChild(style);

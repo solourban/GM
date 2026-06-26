@@ -38,7 +38,7 @@ const required = [
   [script, 'v2-location-map-reserve', 'loading map space reservation'],
   [script, 'min-height:1040px', 'desktop location card height reservation'],
   [script, 'min-height:1460px', 'mobile location card height reservation'],
-  [script, 'min-height:400px', 'mobile nearby summary height reservation'],
+  [script, '[data-nearby-summary] { min-height:0', 'nearby summary should not reserve blank mobile space'],
   [script, 'loadCachedLocation', 'same-case location cache restore'],
   [script, 'commitWhenScrollIdle', 'scroll-idle location update'],
   [script, 'MutationObserver', 'result rerender restore observer'],
@@ -60,6 +60,7 @@ const forbidden = [
   [script, '<iframe', 'iframe preview'],
   [script, 'existing.outerHTML', 'full location card replacement'],
   [script, 'setInterval(upsertLocationCard', 'periodic location card upsert'],
+  [script, 'min-height:400px', 'mobile nearby summary blank space regression'],
 ];
 
 const missing = required.filter(([source, needle]) => !source.includes(needle)).map(([, , label]) => label);
