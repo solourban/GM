@@ -344,7 +344,24 @@
           ${inputHtml('expectedSalePrice', '예상 매도가', '예: 650,000,000')}
         </div>
       </div>
-      <div class="v2-form-block">
+      <div class="v2-form-block v2-bid-summary-block">
+        <h4>핵심 계산 결과</h4>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>필요 현금</span><strong data-bid-plan="requiredCash">0원</strong></div>
+          <div class="v2-info-box"><span>입찰보증금</span><strong data-bid-plan="deposit">0원</strong></div>
+          <div class="v2-info-box"><span>대출 반영액</span><strong data-bid-plan="loanAmount">0원</strong><small data-bid-plan="loanSource">-</small></div>
+          <div class="v2-info-box"><span>세후수익</span><strong data-bid-plan="afterTaxProfit">-</strong></div>
+        </div>
+        <div class="v2-grid four">
+          <div class="v2-info-box"><span>입찰가+인수 포함 부담</span><strong data-bid-plan="burden">0원</strong></div>
+          <div class="v2-info-box"><span>총 취득비용</span><strong data-bid-plan="totalAcquisitionCost">0원</strong></div>
+          <div class="v2-info-box"><span>월 이자</span><strong data-bid-plan="monthlyInterest">0원</strong></div>
+          <div class="v2-info-box"><span>수익률</span><strong data-bid-plan="roi">-</strong></div>
+        </div>
+      </div>
+      <details class="v2-form-block v2-bid-advanced-inputs">
+        <summary style="cursor:pointer;font-weight:900;">상세 비용·대출·세금 입력</summary>
+        <p class="v2-note" style="margin-top:8px;">기본값으로 먼저 계산하고, 실제 비용이나 대출 조건이 있으면 이 영역에서 조정하세요.</p>
         <h4>취득·보유 비용</h4>
         <div class="v2-input-grid">
           ${inputHtml('acquisitionTaxRate', '취득세율+지방세율(%)', '예: 1.1')}
@@ -354,8 +371,6 @@
           ${inputHtml('repairCost', '수리비', '예: 20,000,000')}
           ${inputHtml('evictionCost', '명도비', '예: 5,000,000')}
         </div>
-      </div>
-      <div class="v2-form-block">
         <h4>대출·이자</h4>
         <div class="v2-input-grid">
           ${inputHtml('loanAmount', '대출금액', '비우면 참고 한도 반영')}
@@ -366,32 +381,20 @@
           ${inputHtml('holdingMonths', '보유기간(개월)', '예: 6')}
           ${inputHtml('prepaymentPenaltyRate', '중도상환수수료율(%)', '예: 1')}
         </div>
-      </div>
-      <div class="v2-form-block">
         <h4>매도·세금</h4>
         <div class="v2-input-grid">
           ${inputHtml('sellBrokerageFee', '매도 중개수수료', '예: 3,000,000')}
           ${inputHtml('incomeTaxRate', '양도세/소득세율(%)', '직접 입력')}
           ${inputHtml('localIncomeTaxRate', '양도세 지방세율(%)', '예: 10')}
         </div>
-      </div>
-      <div class="v2-grid four">
-        <div class="v2-info-box"><span>입찰보증금</span><strong data-bid-plan="deposit">0원</strong></div>
-        <div class="v2-info-box"><span>총 취득비용</span><strong data-bid-plan="totalAcquisitionCost">0원</strong></div>
-        <div class="v2-info-box"><span>대출 반영액</span><strong data-bid-plan="loanAmount">0원</strong><small data-bid-plan="loanSource">-</small></div>
-        <div class="v2-info-box"><span>필요 현금</span><strong data-bid-plan="requiredCash">0원</strong></div>
-      </div>
-      <div class="v2-grid four">
-        <div class="v2-info-box"><span>입찰가+인수 포함 부담</span><strong data-bid-plan="burden">0원</strong></div>
-        <div class="v2-info-box"><span>월 이자</span><strong data-bid-plan="monthlyInterest">0원</strong></div>
+      </details>
+      <details class="v2-form-block v2-bid-detail-panel">
+        <summary style="cursor:pointer;font-weight:900;">상세 계산값 보기</summary>
+        <div class="v2-grid four" style="margin-top:12px;">
         <div class="v2-info-box"><span>보유기간 이자</span><strong data-bid-plan="holdingInterest">0원</strong></div>
         <div class="v2-info-box"><span>최저가 / 감정가 대비</span><strong><span data-bid-plan="minRate">-</span> / <span data-bid-plan="appraisedRate">-</span></strong></div>
-      </div>
-      <div class="v2-grid four">
         <div class="v2-info-box"><span>과세표준 참고</span><strong data-bid-plan="taxableBase">0원</strong></div>
         <div class="v2-info-box"><span>세금 참고액</span><strong data-bid-plan="totalTax">0원</strong></div>
-        <div class="v2-info-box"><span>세후수익</span><strong data-bid-plan="afterTaxProfit">-</strong></div>
-        <div class="v2-info-box"><span>수익률</span><strong data-bid-plan="roi">-</strong></div>
       </div>
       <div class="v2-grid four">
         <div class="v2-info-box"><span>세전수익</span><strong data-bid-plan="preTaxProfit">-</strong></div>
@@ -423,9 +426,8 @@
           <div class="v2-info-box"><span>양도세/소득세</span><strong data-bid-plan="incomeTax">0원</strong></div>
           <div class="v2-info-box"><span>양도세 지방세</span><strong data-bid-plan="localIncomeTax">0원</strong></div>
           <div class="v2-info-box"><span>총 비용(세금 포함)</span><strong data-bid-plan="totalCost">0원</strong></div>
-          <div class="v2-info-box"><span>총 취득비용</span><strong data-bid-plan="totalAcquisitionCost">0원</strong></div>
         </div>
-      </div>
+      </details>
       <ul class="v2-list">
         <li data-bid-plan="message">입찰가와 예상 매도가를 입력하면 필요 현금과 세후수익을 계산합니다.</li>
         <li>대출 가능 여부는 LTV, DSR, 지역 규제, 신용, 소득, 주택 수에 따라 달라집니다. 금융기관 확인이 필요합니다.</li>

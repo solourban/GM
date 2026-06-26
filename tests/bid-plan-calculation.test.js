@@ -123,6 +123,11 @@ for (const needle of requiredCopySummaryHooks) {
 }
 
 const requiredBidPlanDisplayHooks = [
+  '핵심 계산 결과',
+  '상세 비용·대출·세금 입력',
+  '상세 계산값 보기',
+  'v2-bid-summary-block',
+  'v2-bid-advanced-inputs',
   '계산 상세',
   '취득세+지방세',
   '감정가 기준 대출',
@@ -138,6 +143,10 @@ const requiredBidPlanDisplayHooks = [
 for (const needle of requiredBidPlanDisplayHooks) {
   assert(bidPlanSource.includes(needle), `bid plan display should include ${needle}`);
 }
+
+const dataBindings = [...bidPlanSource.matchAll(/data-bid-plan="([^"]+)"/g)].map((match) => match[1]);
+const duplicateBindings = dataBindings.filter((key, index) => dataBindings.indexOf(key) !== index);
+assert.deepStrictEqual(duplicateBindings, [], 'bid plan display bindings should not be duplicated');
 
 const requiredFinalJudgmentHooks = [
   'function bidPlanSnapshot',
