@@ -32,6 +32,7 @@ function requireBefore(content, first, second, label) {
 const requiredServerRoutes = [
   ["app.get('/api/health'", 'health route'],
   ["app.get('/api/config'", 'config route'],
+  ["app.get('/api/readiness'", 'readiness route'],
   ["app.post('/api/fetch'", 'court auction fetch route'],
   ["app.post('/api/analyze'", 'analysis route'],
   ["app.get('/api/courts'", 'court list route'],

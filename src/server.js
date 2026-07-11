@@ -180,6 +180,55 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+function readinessCheck(id, label, ready, weight, note = '') {
+  return { id, label, ready: Boolean(ready), weight, note };
+}
+
+function buildReadiness(keys) {
+  const courts = listCourts();
+  const checks = [
+    readinessCheck('server', 'Server process', true, 15, 'Express service is responding.'),
+    readinessCheck('courts', 'Court list', courts.length >= 50, 15, `${courts.length} courts configured.`),
+    readinessCheck('kakaoRest', 'Kakao address search', keys.kakaoRestKey, 12, 'Required for address to coordinate conversion.'),
+    readinessCheck('kakaoMap', 'Kakao map rendering', keys.kakaoMapKey, 12, 'Required for in-card map rendering.'),
+    readinessCheck('molit', 'MOLIT trade reference', keys.molitKey, 12, 'Required for trade reference data.'),
+    readinessCheck('onbid', 'Onbid public sale search', keys.onbidKey, 12, 'Required for Onbid list and detail lookup.'),
+    readinessCheck('dateRecommendations', 'Court date recommendations', true, 10, 'Empty court/date results are returned as valid empty states.'),
+    readinessCheck('security', 'Public key protection', true, 12, 'External API keys are used server-side and not returned by config routes.'),
+  ];
+  const totalWeight = checks.reduce((sum, check) => sum + check.weight, 0);
+  const readyWeight = checks.reduce((sum, check) => sum + (check.ready ? check.weight : 0), 0);
+  const score = Math.round((readyWeight / totalWeight) * 100);
+  const missing = checks.filter((check) => !check.ready).map(({ id, label, note }) => ({ id, label, note }));
+  const stage = score >= 95 ? 'release-candidate' : score >= 80 ? 'public-beta' : 'internal-beta';
+  return {
+    score,
+    stage,
+    checks,
+    missing,
+    coverage: {
+      courtCount: courts.length,
+      requiredExternalServicesReady: checks.filter((check) => ['kakaoRest', 'kakaoMap', 'molit', 'onbid'].includes(check.id) && check.ready).length,
+      requiredExternalServicesTotal: 4,
+    },
+    caveats: [
+      'Legal and bidding decisions still require original court documents and field verification.',
+      'Per-court single-case coverage depends on valid case-number samples.',
+    ],
+  };
+}
+
+app.get('/api/readiness', (req, res) => {
+  const keys = externalApiConfig();
+  res.json({
+    ok: true,
+    service: SERVICE_NAME,
+    version: SERVICE_VERSION,
+    ...buildReadiness(keys),
+    requestId: req.requestId,
+  });
+});
+
 app.get('/api/kakao/maps-sdk.js', (req, res) => {
   const keys = externalApiConfig();
   if (!keys.kakaoMapKey) {
