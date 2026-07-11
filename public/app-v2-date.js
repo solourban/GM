@@ -28,6 +28,8 @@
     messageType: 'info',
     items: [],
     meta: null,
+    empty: false,
+    emptyReason: '',
     handoff: null,
     selectedCandidate: null,
     sortMode: 'score',
@@ -334,9 +336,22 @@
     `;
   }
 
+  function renderQueriedEmptyState() {
+    const reason = clean(state.emptyReason) || '선택한 법원·기간에 표시할 매각기일 후보가 없습니다.';
+    return `
+      <div class="v2-step-section" id="v2DateQueriedEmptyState">
+        <span class="v2-badge">정상 조회 완료</span>
+        <h3>조건에 맞는 후보가 없습니다.</h3>
+        <p class="v2-note">${esc(reason)}</p>
+        <p class="v2-note">기간을 넓히거나 용도 필터를 전체로 바꿔 다시 조회해보세요.</p>
+      </div>
+    `;
+  }
+
   function renderResultsArea() {
     const displayItems = visibleItems();
     const hasResult = state.meta || state.items.length;
+    const queriedEmpty = state.meta && !state.items.length && state.empty;
     return `
       ${state.loading ? `<section class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>매각기일 목록을 조회 중입니다.</h3><p class="v2-note">조회 결과는 이 영역에 표시됩니다.</p></div></div></section>` : ''}
       ${hasResult ? `
@@ -346,7 +361,7 @@
           <p class="v2-note">${esc(state.meta?.court || state.form.court)} ${displayDate(state.meta?.start || '')} ~ ${displayDate(state.meta?.end || '')} / 표시 ${displayItems.length}건 · 전체 ${state.items.length}건</p>
           <p class="v2-note">검증 상태: 요청 법원과 응답 법원이 다르면 결과를 표시하지 않습니다.</p>
           ${renderSortControls(state.items)}
-          ${renderRows(displayItems)}
+          ${queriedEmpty ? renderQueriedEmptyState() : renderRows(displayItems)}
           <p class="v2-note">관심 물건은 “이 사건 조회”로 물건검색 탭에 값을 옮긴 뒤, 기본정보 조회 버튼을 눌러 권리분석을 진행하세요.</p>
         </section>
         ${renderCandidateComparison()}
@@ -398,6 +413,8 @@
     if (error) {
       state.items = [];
       state.meta = null;
+      state.empty = false;
+      state.emptyReason = '';
       state.message = error;
       state.messageType = 'error';
       render(panel);
@@ -413,6 +430,8 @@
     state.loading = true;
     state.items = [];
     state.meta = null;
+    state.empty = false;
+    state.emptyReason = '';
     state.message = '매각기일 목록을 조회하고 있습니다.';
     state.messageType = 'info';
     render(panel);
@@ -424,11 +443,15 @@
       if (!sameCourt(data.court || court, court)) throw new Error('응답 법원 불일치');
       state.items = Array.isArray(data.items) ? data.items : [];
       state.meta = { court: data.court || court, start: data.start || start, end: data.end || end };
-      state.message = state.items.length ? '매각기일 조회가 완료되었습니다.' : '조회된 후보가 없습니다. 기간이나 조건을 바꿔 다시 조회해 주세요.';
+      state.empty = Boolean(data.empty) || !state.items.length;
+      state.emptyReason = clean(data.emptyReason || '');
+      state.message = state.items.length ? '매각기일 조회가 완료되었습니다.' : '정상 조회됐지만 조건에 맞는 후보가 없습니다. 기간이나 조건을 바꿔 다시 조회해 주세요.';
       state.messageType = state.items.length ? 'info' : 'warn';
     } catch (error) {
       state.items = [];
       state.meta = null;
+      state.empty = false;
+      state.emptyReason = '';
       state.message = userMessageFromError(error.message);
       state.messageType = 'error';
     } finally {

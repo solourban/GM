@@ -36,6 +36,13 @@ assert(
   'date results must be written to the shared tab results outlet'
 );
 assert(
+  date.includes('v2DateQueriedEmptyState')
+    && date.includes('정상 조회 완료')
+    && date.includes('state.empty = Boolean(data.empty)')
+    && date.includes('emptyReason'),
+  'date tab must distinguish a successful empty response from a failed lookup'
+);
+assert(
   date.includes('function renderMobileCards(items)') && date.includes('v2-date-card-list') && date.includes('v2-date-table-wrap'),
   'date results must provide mobile cards instead of relying only on a wide table'
 );
