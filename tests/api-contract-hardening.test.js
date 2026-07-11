@@ -26,6 +26,9 @@ requireIncludes('function handleDateRecommendations', 'shared date recommendatio
 requireIncludes("app.get('/api/date/recommendations'", 'date recommendations compatibility route');
 requireIncludes("handleDateRecommendations(req, res, 'date/recommendations')", 'compatibility route uses shared handler');
 requireIncludes('const { debug, ...publicResult } = result', 'date recommendation debug stripping');
+requireIncludes('const DATE_RATE_LIMIT_MAX', 'date recommendation route-specific rate limit');
+requireIncludes('function rateLimitMax', 'route-aware API rate limit helper');
+requireIncludes("req.path === '/date/recommendations' || req.path === '/recommendations/by-date'", 'date recommendation rate limit routes');
 requireIncludes('res.json({ ok: true, result, report: result, requestId: req.requestId })', 'analyze report alias');
 requireIncludes('async function handleMolitTrades', 'shared MOLIT trades handler');
 requireIncludes("app.get('/api/molit/apt-trades'", 'MOLIT apartment compatibility route');

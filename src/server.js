@@ -100,12 +100,20 @@ const { findAuctionsByDate } = require('./dateRecommendations');
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 30);
+const DATE_RATE_LIMIT_MAX = Number(process.env.DATE_RATE_LIMIT_MAX || 90);
 const apiHits = new Map();
 
 function clientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
   return req.socket.remoteAddress || 'unknown';
+}
+
+function rateLimitMax(req) {
+  if (req.path === '/date/recommendations' || req.path === '/recommendations/by-date') {
+    return Math.max(RATE_LIMIT_MAX, DATE_RATE_LIMIT_MAX);
+  }
+  return RATE_LIMIT_MAX;
 }
 
 function rateLimit(req, res, next) {
@@ -116,7 +124,7 @@ function rateLimit(req, res, next) {
   recent.push(now);
   apiHits.set(ip, recent);
 
-  if (recent.length > RATE_LIMIT_MAX) {
+  if (recent.length > rateLimitMax(req)) {
     return res.status(429).json(errorBody(req, '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'));
   }
   return next();
