@@ -336,8 +336,16 @@
     `;
   }
 
+  function emptyReasonMessage(reason) {
+    const key = clean(reason);
+    if (key === 'no_items_for_selected_court_and_period') return '선택한 법원·기간에 표시할 매각기일 후보가 없습니다.';
+    if (key === 'court_response_empty') return '선택한 법원 응답은 정상이나 표시할 후보가 없습니다.';
+    if (key === 'filtered_out') return '조회는 완료됐지만 현재 조건에 맞는 후보가 없습니다.';
+    return '선택한 조건에서 표시할 매각기일 후보가 없습니다.';
+  }
+
   function renderQueriedEmptyState() {
-    const reason = clean(state.emptyReason) || '선택한 법원·기간에 표시할 매각기일 후보가 없습니다.';
+    const reason = emptyReasonMessage(state.emptyReason);
     return `
       <div class="v2-step-section" id="v2DateQueriedEmptyState">
         <span class="v2-badge">정상 조회 완료</span>

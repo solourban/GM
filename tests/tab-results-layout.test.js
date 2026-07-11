@@ -39,6 +39,8 @@ assert(
   date.includes('v2DateQueriedEmptyState')
     && date.includes('정상 조회 완료')
     && date.includes('state.empty = Boolean(data.empty)')
+    && date.includes('emptyReasonMessage')
+    && date.includes('no_items_for_selected_court_and_period')
     && date.includes('emptyReason'),
   'date tab must distinguish a successful empty response from a failed lookup'
 );
