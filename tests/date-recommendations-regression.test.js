@@ -60,4 +60,15 @@ assert.strictEqual(extracted.duplicateCount, 1, 'same court and case number shou
 assert.strictEqual(extracted.items.length, 1, 'same court and case number should render once');
 assert.strictEqual(__test.canonicalDateItemKey(extracted.items[0]), 'B000410|2024타경120591');
 
+assert.strictEqual(
+  __test.hasReachableEmptyDateResult({ attempts: [{ ok: true, status: 200, rawCount: 0, count: 0, rawHasCaseNo: false }] }),
+  true,
+  'empty court/date results should be treated as reachable empty results, not gateway failures'
+);
+assert.strictEqual(
+  __test.hasReachableEmptyDateResult({ attempts: [{ ok: true, status: 200, rawCount: 1, count: 0, rawHasCaseNo: true }] }),
+  false,
+  'raw items that fail strict verification must not be downgraded to empty results'
+);
+
 console.log('date recommendations regression guard passed');

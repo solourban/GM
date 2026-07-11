@@ -348,12 +348,22 @@ function applyFilters(items, options) {
     .slice(0, Number(options.limit || 20));
 }
 
+function hasReachableEmptyDateResult(debug) {
+  const attempts = Array.isArray(debug?.attempts) ? debug.attempts : [];
+  return attempts.some((attempt) => {
+    const status = Number(attempt.status || 0);
+    const rawCount = Number(attempt.rawCount || attempt.rawResultCount || 0);
+    const itemCount = Number(attempt.count || 0);
+    return attempt.ok && status >= 200 && status < 300 && rawCount === 0 && itemCount === 0 && !attempt.rawHasCaseNo;
+  });
+}
+
 async function findAuctionsByDate(options = {}) {
   const startYmd = compactDate(options.start) || todayYmd();
   const endYmd = compactDate(options.end) || addDaysYmd(7);
   const courtName = normalizeCourtName(options.court || '서울중앙');
   const cortOfcCd = COURT_CODES[courtName];
-  const debug = { engine: 'date-recommendations-v5-strict-court-verification', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
+  const debug = { engine: 'date-recommendations-v6-empty-result-ok', courtName, cortOfcCd, startYmd, endYmd, attempts: [] };
 
   if (!cortOfcCd) return { ok: false, verified: false, error: `지원하지 않는 법원명입니다: ${options.court}`, debug, items: [] };
 
@@ -402,6 +412,21 @@ async function findAuctionsByDate(options = {}) {
   }
 
   const sawRawItems = debug.attempts.some((a) => Number(a.rawCount || a.rawResultCount || 0) > 0 || a.rawHasCaseNo);
+  if (!sawRawItems && hasReachableEmptyDateResult(debug)) {
+    return {
+      ok: true,
+      verified: true,
+      empty: true,
+      emptyReason: 'no_items_for_selected_court_and_period',
+      court: courtName,
+      start: formatYmd(startYmd),
+      end: formatYmd(endYmd),
+      count: 0,
+      items: [],
+      debug,
+    };
+  }
+
   return {
     ok: false,
     verified: false,
@@ -418,5 +443,5 @@ async function findAuctionsByDate(options = {}) {
 
 module.exports = {
   findAuctionsByDate,
-  __test: { buildPayload, extractItems, canonicalDateItemKey },
+  __test: { buildPayload, extractItems, canonicalDateItemKey, hasReachableEmptyDateResult },
 };
