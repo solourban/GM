@@ -97,6 +97,7 @@ app.use(express.static(PUBLIC_DIR));
 const { analyzeCase } = require('./analyzer');
 const { fetchCase, listCourts } = require('./crawler');
 const { findAuctionsByDate } = require('./dateRecommendations');
+const { listPublicDataSources, dataGovernanceSummary } = require('./dataGovernance');
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 30);
@@ -186,6 +187,7 @@ function readinessCheck(id, label, ready, weight, note = '') {
 
 function buildReadiness(keys) {
   const courts = listCourts();
+  const governance = dataGovernanceSummary();
   const checks = [
     readinessCheck('server', 'Server process', true, 15, 'Express service is responding.'),
     readinessCheck('courts', 'Court list', courts.length >= 50, 15, `${courts.length} courts configured.`),
@@ -194,6 +196,7 @@ function buildReadiness(keys) {
     readinessCheck('molit', 'MOLIT trade reference', keys.molitKey, 12, 'Required for trade reference data.'),
     readinessCheck('onbid', 'Onbid public sale search', keys.onbidKey, 12, 'Required for Onbid list and detail lookup.'),
     readinessCheck('dateRecommendations', 'Court date recommendations', true, 10, 'Empty court/date results are returned as valid empty states.'),
+    readinessCheck('dataGovernance', 'Data source transparency', governance.sources >= 5, 8, `${governance.sources} source records are published.`),
     readinessCheck('security', 'Public key protection', true, 12, 'External API keys are used server-side and not returned by config routes.'),
   ];
   const totalWeight = checks.reduce((sum, check) => sum + check.weight, 0);
@@ -210,10 +213,13 @@ function buildReadiness(keys) {
       courtCount: courts.length,
       requiredExternalServicesReady: checks.filter((check) => ['kakaoRest', 'kakaoMap', 'molit', 'onbid'].includes(check.id) && check.ready).length,
       requiredExternalServicesTotal: 4,
+      dataSources: governance.sources,
+      dataGovernanceLastReviewed: governance.lastReviewed,
     },
     caveats: [
       'Legal and bidding decisions still require original court documents and field verification.',
       'Per-court single-case coverage depends on valid case-number samples.',
+      'External provider terms and public data policies can change; source notices must stay reviewed.',
     ],
   };
 }
@@ -225,6 +231,17 @@ app.get('/api/readiness', (req, res) => {
     service: SERVICE_NAME,
     version: SERVICE_VERSION,
     ...buildReadiness(keys),
+    requestId: req.requestId,
+  });
+});
+
+app.get('/api/data-sources', (req, res) => {
+  res.json({
+    ok: true,
+    service: SERVICE_NAME,
+    version: SERVICE_VERSION,
+    summary: dataGovernanceSummary(),
+    sources: listPublicDataSources(),
     requestId: req.requestId,
   });
 });
