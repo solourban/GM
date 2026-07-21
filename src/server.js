@@ -70,12 +70,39 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res, next) => {
+function publicBuildId() {
+  const raw = process.env.RAILWAY_GIT_COMMIT_SHA
+    || process.env.GIT_COMMIT_SHA
+    || process.env.COMMIT_SHA
+    || process.env.SOURCE_VERSION
+    || process.env.RENDER_GIT_COMMIT
+    || process.env.VERCEL_GIT_COMMIT_SHA
+    || process.env.HEROKU_SLUG_COMMIT
+    || '';
+  return String(raw || SERVICE_VERSION).trim().slice(0, 12) || SERVICE_VERSION;
+}
+
+function htmlAttribute(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function injectIndexRuntimeMarkers(html) {
+  const tag = `<html lang="ko" data-app-version="${htmlAttribute(SERVICE_VERSION)}" data-app-build="${htmlAttribute(publicBuildId())}">`;
+  return String(html || '').replace(/<html\s+lang=["']ko["'][^>]*>/i, tag);
+}
+
+function serveIndex(req, res, next) {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), 'utf8', (err, html) => {
     if (err) return next(err);
-    res.type('html').send(html);
+    res.type('html').send(injectIndexRuntimeMarkers(html));
   });
-});
+}
+
+app.get(['/', '/index.html'], serveIndex);
 
 function normalizeAdsensePublisherId(value) {
   const id = String(value || '').trim();
@@ -177,6 +204,54 @@ app.get('/api/config', (req, res) => {
       molit: 'MOLIT_API_KEY',
       onbid: 'ONBID_API_KEY',
     },
+    requestId: req.requestId,
+  });
+});
+
+function boolEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  return /^(1|true|yes|on)$/i.test(String(raw));
+}
+
+function numberEnv(name, fallback, min, max) {
+  const n = Number(process.env[name]);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function publicRuntimeConfig(keys) {
+  const updateMode = String(process.env.UPDATE_POLICY || 'soft').trim().toLowerCase();
+  const safeUpdateMode = ['soft', 'force', 'silent'].includes(updateMode) ? updateMode : 'soft';
+  return {
+    releaseChannel: process.env.RELEASE_CHANNEL || 'production',
+    updatePolicy: {
+      mode: safeUpdateMode,
+      latestVersion: SERVICE_VERSION,
+      minimumClientVersion: process.env.MIN_CLIENT_VERSION || SERVICE_VERSION,
+      checkIntervalSeconds: numberEnv('VERSION_CHECK_INTERVAL_SECONDS', 300, 60, 3600),
+    },
+    flags: {
+      search: boolEnv('FEATURE_SEARCH', true),
+      bulkLookup: boolEnv('FEATURE_BULK_LOOKUP', true),
+      dateRecommendations: boolEnv('FEATURE_DATE_RECOMMENDATIONS', true),
+      savedCandidates: boolEnv('FEATURE_SAVED_CANDIDATES', true),
+      onbid: boolEnv('FEATURE_ONBID', Boolean(keys.onbidKey)),
+      dataSourceNotice: boolEnv('FEATURE_DATA_SOURCE_NOTICE', true),
+    },
+  };
+}
+
+app.get('/api/version', (req, res) => {
+  const keys = externalApiConfig();
+  res.json({
+    ok: true,
+    service: SERVICE_NAME,
+    version: SERVICE_VERSION,
+    buildId: publicBuildId(),
+    startedAt: startedAt.toISOString(),
+    timestamp: new Date().toISOString(),
+    remoteConfig: publicRuntimeConfig(keys),
     requestId: req.requestId,
   });
 });
