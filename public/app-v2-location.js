@@ -2,6 +2,8 @@
   const CARD_ID = 'v2LocationCard';
   const LOCATION_STORAGE_KEY = 'auction-note:v2:location-geocode';
   const CHANGE_EVENT = 'auction:result-card-change';
+  const MAP_SDK_TIMEOUT_MS = 8000;
+  const MAP_TILE_WATCHDOG_MS = 3600;
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
   const NEARBY_CATEGORIES = [
     { id: 'subway', code: 'SW8', label: '지하철역', radius: 1500 },
@@ -18,10 +20,25 @@
       #${CARD_ID} { overflow-anchor:none; }
       #${CARD_ID}.v2-location-loading { min-height:1040px; }
       #${CARD_ID} .v2-location-map-reserve { min-height:820px; margin-top:14px; border:1px solid var(--line); border-radius:18px; background:var(--bg); }
+      #${CARD_ID} .v2-map-card { position:relative; }
+      #${CARD_ID} .v2-map-fallback-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); background:#fff; }
+      #${CARD_ID} .v2-map-fallback-actions p { margin:0; color:var(--ink-3); font-size:12px; line-height:1.45; }
+      #${CARD_ID} .v2-map-fallback-actions .v2-cta-row { margin:0; }
+      #${CARD_ID} .v2-map-watchdog { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:10px 14px; padding:12px; border:1px solid rgba(11,61,46,.18); border-radius:14px; background:rgba(255,255,255,.94); box-shadow:0 12px 26px rgba(11,15,20,.10); }
+      #${CARD_ID} .v2-map-watchdog[hidden] { display:none; }
+      #${CARD_ID} .v2-map-watchdog strong { display:block; font-size:13px; }
+      #${CARD_ID} .v2-map-watchdog span { display:block; margin-top:2px; color:var(--ink-3); font-size:12px; line-height:1.45; }
+      #${CARD_ID} .v2-kakao-map-fallback { background:linear-gradient(135deg,#f6f5f1,#ebe9e1); }
       #${CARD_ID} [data-nearby-summary] { min-height:0; align-content:start; }
       @media (max-width:720px) {
         #${CARD_ID}.v2-location-loading { min-height:1460px; }
         #${CARD_ID} .v2-location-map-reserve { min-height:1240px; }
+        #${CARD_ID} .v2-map-watchdog { margin:10px; flex-direction:column; align-items:stretch; }
+        #${CARD_ID} .v2-map-fallback-actions { align-items:flex-start; flex-direction:column; }
+        #${CARD_ID} .v2-map-fallback-actions .v2-secondary-btn,
+        #${CARD_ID} .v2-map-fallback-actions .v2-small-btn,
+        #${CARD_ID} .v2-map-watchdog .v2-secondary-btn,
+        #${CARD_ID} .v2-map-watchdog .v2-small-btn { width:100%; justify-content:center; }
         #${CARD_ID} [data-nearby-summary] { min-height:0; }
       }
     `;
@@ -195,14 +212,44 @@
     return '카카오 지도 SDK 연결에 실패했습니다. Kakao Developers의 JavaScript SDK 도메인에 현재 배포 주소를 등록했는지 확인하세요.';
   }
 
-  function renderMapFailure(target, message) {
+  function mapActionUrls(target) {
     const title = clean(target?.dataset?.title);
-    const searchUrl = title ? `https://map.kakao.com/link/search/${encodeURIComponent(title)}` : '';
+    return {
+      mapUrl: clean(target?.dataset?.mapUrl),
+      searchUrl: clean(target?.dataset?.searchUrl) || (title ? `https://map.kakao.com/link/search/${encodeURIComponent(title)}` : ''),
+    };
+  }
+
+  function mapActionLinks(target) {
+    const { mapUrl, searchUrl } = mapActionUrls(target);
+    return `
+      <div class="v2-cta-row">
+        ${mapUrl ? `<a class="v2-secondary-btn" href="${esc(mapUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">카카오맵에서 보기</a>` : ''}
+        ${searchUrl ? `<a class="v2-small-btn" href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">주소 검색</a>` : ''}
+      </div>
+    `;
+  }
+
+  function showMapWatchdog(target) {
+    const panel = target.closest('.v2-map-card')?.querySelector('[data-map-watchdog]');
+    if (!panel || target.dataset.tilesLoaded === '1') return;
+    panel.hidden = false;
+  }
+
+  function hideMapWatchdog(target) {
+    const panel = target.closest('.v2-map-card')?.querySelector('[data-map-watchdog]');
+    if (panel) panel.hidden = true;
+  }
+
+  function renderMapFailure(target, message) {
+    hideMapWatchdog(target);
+    target.dataset.mapState = 'fallback';
+    target.classList.add('v2-kakao-map-fallback');
     target.innerHTML = `
       <div style="max-width:520px;padding:24px;text-align:center;">
         <strong style="display:block;font-size:15px;">지도 연결 확인 필요</strong>
         <p class="v2-note" style="margin:8px 0 14px;">${esc(message)}</p>
-        ${searchUrl ? `<a class="v2-secondary-btn" href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">카카오맵에서 보기</a>` : ''}
+        ${mapActionLinks(target)}
       </div>
     `;
     target.style.display = 'grid';
@@ -337,15 +384,22 @@
     if (kakaoSdkPromise) return kakaoSdkPromise;
     kakaoSdkPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
+      const timer = window.setTimeout(() => {
+        reject(new Error('Kakao map SDK proxy load timed out.'));
+      }, MAP_SDK_TIMEOUT_MS);
       script.src = '/api/kakao/maps-sdk.js';
       script.async = true;
       script.dataset.kakaoMapsSdk = 'proxy';
       script.onload = () => {
+        window.clearTimeout(timer);
         if (window.__kakaoMapsSdkLoader) window.__kakaoMapsSdkLoader.then(resolve, reject);
         else if (window.kakao?.maps?.load) window.kakao.maps.load(resolve);
         else reject(new Error('Kakao map SDK is unavailable.'));
       };
-      script.onerror = () => reject(new Error('Kakao map SDK proxy load failed.'));
+      script.onerror = () => {
+        window.clearTimeout(timer);
+        reject(new Error('Kakao map SDK proxy load failed.'));
+      };
       document.head.appendChild(script);
     });
     return kakaoSdkPromise;
@@ -355,6 +409,8 @@
     const point = kakaoMapPoint(doc);
     if (!point) return '';
     const title = clean(doc?.buildingName || doc?.roadAddress || doc?.addressName || address || '경매 물건 위치');
+    const kakaoMapUrl = mapCoordUrl(doc, address);
+    const kakaoSearchUrl = mapSearchUrl(doc, address);
     return `
       <div class="v2-map-card" style="margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--bg);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
@@ -369,8 +425,22 @@
           data-x="${esc(point.x)}"
           data-y="${esc(point.y)}"
           data-title="${esc(title)}"
+          data-map-url="${esc(kakaoMapUrl)}"
+          data-search-url="${esc(kakaoSearchUrl)}"
+          data-map-state="loading"
           style="height:320px;display:grid;place-items:center;color:var(--ink-3);">
-          Kakao map loading...
+          카카오 지도 불러오는 중...
+        </div>
+        <div class="v2-map-watchdog" data-map-watchdog hidden>
+          <div>
+            <strong>지도가 늦게 표시되고 있습니다</strong>
+            <span>회색 화면이 계속되면 외부 카카오맵으로 위치를 먼저 확인하세요.</span>
+          </div>
+          ${mapActionLinks({ dataset: { mapUrl: kakaoMapUrl, searchUrl: kakaoSearchUrl } })}
+        </div>
+        <div class="v2-map-fallback-actions" data-map-fallback-actions>
+          <p>지도가 회색으로 보이면 브라우저/도메인 설정 또는 SDK 로딩 문제일 수 있습니다. 좌표는 이미 변환됐으니 외부 지도에서도 확인할 수 있습니다.</p>
+          ${mapActionLinks({ dataset: { mapUrl: kakaoMapUrl, searchUrl: kakaoSearchUrl } })}
         </div>
         <div
           data-nearby-summary
@@ -400,6 +470,9 @@
     targets.forEach((target) => {
       if (target.dataset.ready === '1') {
         relayoutKakaoMaps('existing-preview');
+        if (target.dataset.tilesLoaded !== '1') {
+          window.setTimeout(() => showMapWatchdog(target), 120);
+        }
         return;
       }
       try {
@@ -413,12 +486,26 @@
         const coords = new window.kakao.maps.LatLng(y, x);
         target.innerHTML = '';
         target.style.display = 'block';
+        target.dataset.mapState = 'rendering';
         const map = new window.kakao.maps.Map(target, { center: coords, level: 4 });
         const marker = new window.kakao.maps.Marker({ map, position: coords });
+        const markTilesLoaded = () => {
+          target.dataset.tilesLoaded = '1';
+          target.dataset.mapState = 'ready';
+          target.classList.remove('v2-kakao-map-fallback');
+          hideMapWatchdog(target);
+        };
+        window.kakao.maps.event?.addListener?.(map, 'tilesloaded', markTilesLoaded);
         const key = mapRegistryKey(target);
         kakaoMapRegistry.set(key, { key, target, map, marker, point: { x, y } });
         relayoutKakaoMaps('preview-init');
         target.dataset.ready = '1';
+        window.setTimeout(() => {
+          if (target.dataset.tilesLoaded === '1') return;
+          target.dataset.mapState = 'slow';
+          showMapWatchdog(target);
+          relayoutKakaoMaps('tile-watchdog');
+        }, MAP_TILE_WATCHDOG_MS);
         analyzeNearby(target, coords).catch(() => renderNearbyFailure(target, '주변 시설 분석 중 오류가 발생했습니다.'));
       } catch (_) {
         renderMapFailure(target, '카카오 지도 렌더링에 실패했습니다. 잠시 후 다시 시도하세요.');
