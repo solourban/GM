@@ -8,6 +8,7 @@ const pages = [
   'about.html',
   'guide.html',
   'privacy.html',
+  'terms.html',
   'disclaimer.html',
   'contact.html',
 ];

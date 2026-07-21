@@ -60,6 +60,7 @@ requireIncludes(robots, 'Sitemap: https://gm-production-0846.up.railway.app/site
   '<loc>https://gm-production-0846.up.railway.app/about.html</loc>',
   '<loc>https://gm-production-0846.up.railway.app/guide.html</loc>',
   '<loc>https://gm-production-0846.up.railway.app/privacy.html</loc>',
+  '<loc>https://gm-production-0846.up.railway.app/terms.html</loc>',
   '<loc>https://gm-production-0846.up.railway.app/disclaimer.html</loc>',
   '<loc>https://gm-production-0846.up.railway.app/contact.html</loc>',
 ].forEach((needle) => requireIncludes(sitemap, needle, `sitemap ${needle}`));

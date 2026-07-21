@@ -8,6 +8,7 @@ const staticPages = [
   'about.html',
   'guide.html',
   'privacy.html',
+  'terms.html',
   'disclaimer.html',
   'contact.html',
 ];
@@ -17,6 +18,7 @@ const requiredLinks = [
   '/about.html',
   '/guide.html',
   '/privacy.html',
+  '/terms.html',
   '/disclaimer.html',
   '/contact.html',
 ];
@@ -70,12 +72,16 @@ for (const fileName of staticPages) {
 
 const indexHtml = readPublic('index.html');
 assertStylesheet('index.html', indexHtml);
-['/about.html', '/guide.html', '/privacy.html', '/disclaimer.html', '/contact.html']
+['/about.html', '/guide.html', '/privacy.html', '/terms.html', '/disclaimer.html', '/contact.html']
   .forEach((href) => assertContainsLink('index.html', indexHtml, href));
 assertNoAdCode('index.html', indexHtml);
 
 const privacyHtml = readPublic('privacy.html');
 assert(/localStorage|sessionStorage/.test(privacyHtml), 'privacy.html must mention localStorage or sessionStorage.');
+
+const termsHtml = readPublic('terms.html');
+['이용약관', '서비스의 성격', '이용자의 책임', '법률·세무·금융 자문']
+  .forEach((text) => assert(termsHtml.includes(text), `terms.html is missing "${text}".`));
 
 const disclaimerHtml = readPublic('disclaimer.html');
 ['참고용', '법률 자문이 아닙니다', '금융·세무 자문이 아닙니다']

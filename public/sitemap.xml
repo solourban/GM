@@ -17,6 +17,10 @@
     <priority>0.4</priority>
   </url>
   <url>
+    <loc>https://gm-production-0846.up.railway.app/terms.html</loc>
+    <priority>0.4</priority>
+  </url>
+  <url>
     <loc>https://gm-production-0846.up.railway.app/disclaimer.html</loc>
     <priority>0.4</priority>
   </url>
