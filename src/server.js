@@ -65,7 +65,12 @@ app.use((req, res, next) => {
   req.requestId = req.headers['x-request-id'] || createRequestId();
   res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  }
   res.setHeader('Cache-Control', 'no-store');
   next();
 });
