@@ -66,6 +66,8 @@ requireIncludes(index, '<script src="/app-v2-version-guard.js"></script>', 'vers
   'const CLIENT_VERSION',
   'const CLIENT_BUILD_ID',
   'window[CONFIG_GLOBAL] = payload.remoteConfig || {}',
+  "const CONFIG_EVENT = 'nakchalnote:remote-config'",
+  'document.dispatchEvent(new CustomEvent(CONFIG_EVENT',
   'function compareVersion',
   'function renderUpdateBanner',
   'v2VersionBanner',

@@ -1,6 +1,7 @@
 (function () {
   const VERSION_ENDPOINT = '/api/version';
   const CONFIG_GLOBAL = '__NAKCHALNOTE_REMOTE_CONFIG';
+  const CONFIG_EVENT = 'nakchalnote:remote-config';
   const DISMISS_KEY = 'nakchalnote.dismissedBuildId';
   const html = document.documentElement;
   const CLIENT_VERSION = html?.dataset?.appVersion || '2.0.0';
@@ -92,6 +93,7 @@
       const payload = await res.json();
       if (!payload?.ok) return;
       window[CONFIG_GLOBAL] = payload.remoteConfig || {};
+      document.dispatchEvent(new CustomEvent(CONFIG_EVENT, { detail: window[CONFIG_GLOBAL] }));
       const update = shouldShowUpdate(payload);
       if (update) renderUpdateBanner(update);
       scheduleNextCheck(payload);

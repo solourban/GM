@@ -58,6 +58,8 @@ indexScripts
 assertOrder(indexScripts, '/app-v2-request-id-bridge.js', '/app-v2-core.js');
 assertOrder(indexScripts, '/app-v2-request-id-bridge.js', '/app-v2-spec-extractor-parser.js');
 assertOrder(indexScripts, '/app-v2-spec-extractor-parser.js', '/app-v2-core.js');
+assertOrder(indexScripts, '/app-v2-core.js', '/app-v2-feature-flags.js');
+assertOrder(indexScripts, '/app-v2-feature-flags.js', '/app-v2-deeplink.js');
 assertOrder(indexScripts, '/app-v2-core.js', '/app-v2-spec-extractor.js');
 assertOrder(indexScripts, '/app-v2-case-reset.js', '/app-v2-spec-extractor.js');
 assertOrder(indexScripts, '/app-v2-core.js', '/app-v2-service-status.js');
