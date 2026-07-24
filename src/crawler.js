@@ -107,6 +107,7 @@ const HEADERS = {
 
 function normalizeCourtName(name) {
   const raw = String(name || '').trim();
+  if (!raw) return '';
   if (COURT_CODES[raw]) return raw;
   const compact = compactCourtKey(raw);
   if (COURT_ALIASES[raw]) return COURT_ALIASES[raw];

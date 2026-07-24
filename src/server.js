@@ -5,6 +5,11 @@ const cors = require('cors');
 const packageJson = require('../package.json');
 
 const app = express();
+app.disable('x-powered-by');
+// Railway terminates TLS at one reverse-proxy hop. Trust only that hop so
+// req.ip resolves the proxy-appended client address instead of a spoofed
+// left-most X-Forwarded-For value.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const SERVICE_NAME = packageJson.name || 'auction-analyzer';
@@ -26,6 +31,12 @@ if (allowedOrigins.length) {
 
 function createRequestId() {
   return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function safeRequestId(value) {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  const normalized = String(candidate || '').trim();
+  return /^[A-Za-z0-9._:-]{1,100}$/.test(normalized) ? normalized : createRequestId();
 }
 
 function errorBody(req, message, extra = {}) {
@@ -62,7 +73,7 @@ function sanitizeFetchCaseResult(result) {
 
 app.use(express.json({ limit: '2mb' }));
 app.use((req, res, next) => {
-  req.requestId = req.headers['x-request-id'] || createRequestId();
+  req.requestId = safeRequestId(req.headers['x-request-id']);
   res.setHeader('X-Request-Id', req.requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -137,9 +148,7 @@ const DATE_RATE_LIMIT_MAX = Number(process.env.DATE_RATE_LIMIT_MAX || 90);
 const apiHits = new Map();
 
 function clientIp(req) {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
-  return req.socket.remoteAddress || 'unknown';
+  return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
 function rateLimitMax(req) {
@@ -356,6 +365,8 @@ app.get('/api/kakao/maps-sdk.js', (req, res) => {
   `);
 });
 
+const KAKAO_FETCH_TIMEOUT_MS = 10_000;
+
 function validateAddressInput(address) {
   const value = String(address || '').trim();
   if (!value) return { error: '주소를 입력해주세요.' };
@@ -407,12 +418,25 @@ app.get('/api/location/geocode', async (req, res) => {
     url.searchParams.set('query', input.value);
     url.searchParams.set('size', '5');
 
-    const apiRes = await fetch(url.toString(), {
-      headers: {
-        Authorization: `KakaoAK ${keys.kakaoRestKey}`,
-        Accept: 'application/json',
-      },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), KAKAO_FETCH_TIMEOUT_MS);
+    let apiRes;
+    try {
+      apiRes = await fetch(url.toString(), {
+        signal: controller.signal,
+        headers: {
+          Authorization: `KakaoAK ${keys.kakaoRestKey}`,
+          Accept: 'application/json',
+        },
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        return res.status(504).json(errorBody(req, '카카오 주소검색 API 응답 시간이 초과되었습니다.'));
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
     const data = await apiRes.json().catch(() => null);
 
     if (!apiRes.ok) {
@@ -998,13 +1022,44 @@ app.get('/api/onbid/detail', async (req, res) => {
   }
 });
 
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function validateFetchInput(body) {
+  if (!isPlainObject(body)) return { error: '사건 조회 요청 형식이 올바르지 않습니다.' };
+
+  const jiwonNm = typeof body.jiwonNm === 'string' ? body.jiwonNm.trim() : '';
+  const saYear = ['string', 'number'].includes(typeof body.saYear) ? String(body.saYear).trim() : '';
+  const saSer = ['string', 'number'].includes(typeof body.saSer) ? String(body.saSer).trim() : '';
+  const currentYear = new Date().getFullYear();
+
+  if (jiwonNm.length < 2 || jiwonNm.length > 60) return { error: '법원명을 올바르게 입력하세요.' };
+  if (!/^\d{4}$/.test(saYear) || Number(saYear) < 1900 || Number(saYear) > currentYear + 1) {
+    return { error: '사건연도를 4자리 숫자로 입력하세요.' };
+  }
+  if (!/^\d{1,10}$/.test(saSer) || Number(saSer) < 1) return { error: '사건번호를 숫자로 입력하세요.' };
+
+  return { value: { jiwonNm, saYear, saSer } };
+}
+
+function validateAnalyzeInput(body) {
+  if (!isPlainObject(body)) return { error: '분석 요청 형식이 올바르지 않습니다.' };
+  if ('raw' in body && !isPlainObject(body.raw)) return { error: '조회 원자료 형식이 올바르지 않습니다.' };
+  if ('manual' in body && !isPlainObject(body.manual)) return { error: '직접 입력 자료 형식이 올바르지 않습니다.' };
+  if ('region' in body && (typeof body.region !== 'string' || body.region.length > 40)) {
+    return { error: '지역 구분 형식이 올바르지 않습니다.' };
+  }
+  return { value: body };
+}
+
 app.post('/api/fetch', async (req, res) => {
   try {
-    const { jiwonNm, saYear, saSer } = req.body || {};
-    if (!jiwonNm || !saYear || !saSer) {
-      return res.status(400).json(errorBody(req, '법원, 연도, 사건번호를 모두 입력하세요.'));
-    }
-    const result = sanitizeFetchCaseResult(await fetchCase({ jiwonNm, saYear, saSer }));
+    const input = validateFetchInput(req.body);
+    if (input.error) return res.status(400).json(errorBody(req, input.error));
+    const result = sanitizeFetchCaseResult(await fetchCase(input.value));
     return res.json({ ok: true, raw: result, elapsed: result.elapsed, requestId: req.requestId });
   } catch (e) {
     logException('fetch', req, e);
@@ -1014,7 +1069,9 @@ app.post('/api/fetch', async (req, res) => {
 
 app.post('/api/analyze', (req, res) => {
   try {
-    const result = analyzeCase(req.body || {});
+    const input = validateAnalyzeInput(req.body);
+    if (input.error) return res.status(400).json(errorBody(req, input.error));
+    const result = analyzeCase(input.value);
     res.json({ ok: true, result, report: result, requestId: req.requestId });
   } catch (e) {
     logException('analyze', req, e);
