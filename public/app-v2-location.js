@@ -21,6 +21,10 @@
       #${CARD_ID}.v2-location-loading { min-height:1040px; }
       #${CARD_ID} .v2-location-map-reserve { min-height:820px; margin-top:14px; border:1px solid var(--line); border-radius:18px; background:var(--bg); }
       #${CARD_ID} .v2-map-card { position:relative; }
+      #${CARD_ID} .v2-map-card-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+      #${CARD_ID} .v2-map-card-head .v2-cta-row { margin:0; }
+      #${CARD_ID} .v2-map-status-text { display:block; margin-top:4px; color:var(--ink-3); font-size:12px; line-height:1.45; }
+      #${CARD_ID} .v2-kakao-map-preview { width:100%; min-height:320px; overflow:hidden; background:#ebe9e1; }
       #${CARD_ID} .v2-map-fallback-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); background:#fff; }
       #${CARD_ID} .v2-map-fallback-actions p { margin:0; color:var(--ink-3); font-size:12px; line-height:1.45; }
       #${CARD_ID} .v2-map-fallback-actions .v2-cta-row { margin:0; }
@@ -33,6 +37,10 @@
       @media (max-width:720px) {
         #${CARD_ID}.v2-location-loading { min-height:1460px; }
         #${CARD_ID} .v2-location-map-reserve { min-height:1240px; }
+        #${CARD_ID} .v2-map-card-head { align-items:flex-start; flex-direction:column; }
+        #${CARD_ID} .v2-map-card-head .v2-cta-row { width:100%; }
+        #${CARD_ID} .v2-map-card-head .v2-secondary-btn,
+        #${CARD_ID} .v2-map-card-head .v2-small-btn { flex:1 1 120px; justify-content:center; }
         #${CARD_ID} .v2-map-watchdog { margin:10px; flex-direction:column; align-items:stretch; }
         #${CARD_ID} .v2-map-fallback-actions { align-items:flex-start; flex-direction:column; }
         #${CARD_ID} .v2-map-fallback-actions .v2-secondary-btn,
@@ -224,15 +232,34 @@
     const { mapUrl, searchUrl } = mapActionUrls(target);
     return `
       <div class="v2-cta-row">
+        <button class="v2-small-btn" type="button" data-map-relayout>지도 다시 맞춤</button>
         ${mapUrl ? `<a class="v2-secondary-btn" href="${esc(mapUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">카카오맵에서 보기</a>` : ''}
         ${searchUrl ? `<a class="v2-small-btn" href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;text-decoration:none;">주소 검색</a>` : ''}
       </div>
     `;
   }
 
+  function mapStatusNodes(target) {
+    const card = target.closest('.v2-map-card');
+    return {
+      pill: card?.querySelector('[data-map-status-pill]') || null,
+      text: card?.querySelector('[data-map-status-text]') || null,
+    };
+  }
+
+  function setMapStatus(target, tone, label, message) {
+    const { pill, text } = mapStatusNodes(target);
+    if (pill) {
+      pill.className = `v2-pill ${tone === 'ok' ? 'ok' : 'warn'}`;
+      pill.textContent = label;
+    }
+    if (text) text.textContent = message;
+  }
+
   function showMapWatchdog(target) {
     const panel = target.closest('.v2-map-card')?.querySelector('[data-map-watchdog]');
     if (!panel || target.dataset.tilesLoaded === '1') return;
+    setMapStatus(target, 'warn', '지도 확인 중', '지도 타일이 늦게 뜨고 있습니다. 아래 버튼으로 다시 맞추거나 외부 지도에서 먼저 확인하세요.');
     panel.hidden = false;
   }
 
@@ -245,6 +272,7 @@
     hideMapWatchdog(target);
     target.dataset.mapState = 'fallback';
     target.classList.add('v2-kakao-map-fallback');
+    setMapStatus(target, 'warn', '지도 확인 필요', message);
     target.innerHTML = `
       <div style="max-width:520px;padding:24px;text-align:center;">
         <strong style="display:block;font-size:15px;">지도 연결 확인 필요</strong>
@@ -274,6 +302,17 @@
     entry.map.relayout();
     entry.map.setCenter(coords);
     entry.marker?.setPosition?.(coords);
+  }
+
+  function relayoutMapTarget(target, reason = 'target-manual') {
+    const key = target?.dataset?.mapInstanceId;
+    if (!key) return false;
+    const entry = kakaoMapRegistry.get(key);
+    if (!entry) return false;
+    relayoutKakaoMapEntry(entry);
+    window.setTimeout(() => relayoutKakaoMapEntry(entry), 120);
+    window.__auctionLocationMapsLastRelayout = reason;
+    return true;
   }
 
   function relayoutKakaoMaps(reason = 'manual') {
@@ -413,12 +452,16 @@
     const kakaoSearchUrl = mapSearchUrl(doc, address);
     return `
       <div class="v2-map-card" style="margin-top:14px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--bg);">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;">
+        <div class="v2-map-card-head">
           <div>
             <strong style="display:block;font-size:15px;">지도·주변시설 분석</strong>
             <span class="v2-note" style="margin-top:2px;display:block;">${esc(title)}</span>
+            <span class="v2-map-status-text" data-map-status-text>지도 타일을 불러오는 중입니다.</span>
           </div>
-          <span class="v2-pill ok">좌표 확인</span>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="v2-pill warn" data-map-status-pill>지도 로딩</span>
+            ${mapActionLinks({ dataset: { mapUrl: kakaoMapUrl, searchUrl: kakaoSearchUrl } })}
+          </div>
         </div>
         <div
           class="v2-kakao-map-preview"
@@ -486,13 +529,17 @@
         const coords = new window.kakao.maps.LatLng(y, x);
         target.innerHTML = '';
         target.style.display = 'block';
+        target.style.width = '100%';
+        target.style.minHeight = '320px';
         target.dataset.mapState = 'rendering';
+        setMapStatus(target, 'warn', '지도 렌더링', '지도 영역을 맞추는 중입니다. 회색 화면이면 지도 다시 맞춤을 눌러주세요.');
         const map = new window.kakao.maps.Map(target, { center: coords, level: 4 });
         const marker = new window.kakao.maps.Marker({ map, position: coords });
         const markTilesLoaded = () => {
           target.dataset.tilesLoaded = '1';
           target.dataset.mapState = 'ready';
           target.classList.remove('v2-kakao-map-fallback');
+          setMapStatus(target, 'ok', '지도 표시됨', '카카오 지도 타일이 표시됐습니다. 외부 지도와 현장 확인은 별도로 진행하세요.');
           hideMapWatchdog(target);
         };
         window.kakao.maps.event?.addListener?.(map, 'tilesloaded', markTilesLoaded);
@@ -805,9 +852,24 @@
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) relayoutKakaoMaps('visibilitychange');
   });
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-map-relayout]');
+    if (!button) return;
+    const target = button.closest('.v2-map-card')?.querySelector('.v2-kakao-map-preview[data-x][data-y]');
+    if (!target) return;
+    if (target.dataset.ready !== '1') {
+      initKakaoMapPreviews(button.closest('.v2-map-card') || document);
+      return;
+    }
+    const relaid = relayoutMapTarget(target, 'manual-button');
+    if (relaid && target.dataset.tilesLoaded !== '1') {
+      showMapWatchdog(target);
+    }
+  });
   window.__auctionLocationMaps = {
     init: initKakaoMapPreviews,
     relayout: relayoutKakaoMaps,
+    relayoutTarget: relayoutMapTarget,
     count: () => kakaoMapRegistry.size,
   };
   scheduleUpsert(0);
