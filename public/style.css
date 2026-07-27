@@ -414,6 +414,25 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
 .v2-onbid-next-check {
   background: var(--accent-soft);
 }
+.v2-onbid-failure-guide {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(180,35,24,.16);
+  border-radius: 12px;
+  background: rgba(255,255,255,.72);
+}
+.v2-onbid-failure-guide strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+}
+.v2-onbid-failure-guide ul {
+  margin: 7px 0 0 18px;
+  padding: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.65;
+}
 .v2-onbid-checklist {
   margin: 8px 0 0 18px;
   padding: 0;
@@ -898,6 +917,14 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   body .v2-onbid-checklist {
     font-size: 12px;
     line-height: 1.55;
+  }
+  body .v2-onbid-failure-guide {
+    margin-top: 8px;
+    padding: 9px 10px;
+  }
+  body .v2-onbid-failure-guide strong,
+  body .v2-onbid-failure-guide ul {
+    font-size: 12px;
   }
   body .v2-onbid-raw {
     margin-top: 10px;

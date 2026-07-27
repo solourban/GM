@@ -35,6 +35,11 @@ requireIncludes(front, 'class="v2-step-section v2-onbid-search"', 'Onbid compact
 requireIncludes(front, "event.target.closest('.brand')", 'Onbid tab must resync after the logo resets core tabs');
 requireIncludes(front, 'renderUpstreamDiagnostic(onbidState.upstream)', 'Onbid error diagnostic display');
 requireIncludes(front, 'renderDiagnosticNote(onbidState.diagnostic)', 'Onbid success/empty diagnostic display');
+requireIncludes(front, 'function renderFailureChecklist(scope = \'search\')', 'Onbid failure checklist renderer');
+requireIncludes(front, '목록 조회 확인 순서', 'Onbid list failure next-step copy');
+requireIncludes(front, '상세 조회 확인 순서', 'Onbid detail failure next-step copy');
+requireIncludes(front, 'onbidState.detailCltrMngNo = clean(cltrMngNo)', 'Onbid detail retry should preserve item number');
+requireIncludes(front, 'data-onbid-action="detail" data-cltr-mng-no="${esc(onbidState.detailCltrMngNo)}"', 'Onbid detail retry action');
 requireIncludes(front, 'function filterSummary(filters = onbidState.filters)', 'Onbid filter summary helper');
 requireIncludes(front, 'function renderResultState(kind, title, message, options = {})', 'Onbid dedicated result state renderer');
 requireIncludes(front, "'empty',", 'Onbid empty result state branch');
@@ -48,6 +53,8 @@ requireIncludes(style, 'body .v2-onbid-status {', 'Onbid mobile status strip sty
 requireIncludes(style, '.v2-onbid-head .v2-badge {', 'Onbid badge should not stretch across the card');
 requireIncludes(style, '.v2-onbid-state {', 'Onbid state card styles');
 requireIncludes(style, '.v2-onbid-state-empty {', 'Onbid empty result state styles');
+requireIncludes(style, '.v2-onbid-failure-guide {', 'Onbid failure guide styles');
+requireIncludes(style, 'body .v2-onbid-failure-guide {', 'Onbid mobile failure guide styles');
 requireIncludes(style, '.v2-onbid-next-check {', 'Onbid next-check card styles');
 requireIncludes(style, '.v2-onbid-raw summary {', 'Onbid raw detail disclosure styles');
 requireIncludes(style, 'body .v2-onbid-search .v2-input-grid {', 'Onbid mobile search grid should be compact');

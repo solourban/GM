@@ -349,7 +349,7 @@
     if (state.status === 'loading' && !(options.preserveSuccess && state.raw)) {
       root.innerHTML = `<div class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>기본정보를 가져오는 중...</h3><p class="v2-note">조회 결과가 나오면 이 영역에 표시됩니다.</p></div></div></div>`;
     } else if (state.status === 'error') {
-      root.innerHTML = `<div class="v2-result-card v2-error"><h3>조회 실패</h3><p>${esc(state.error)}</p></div>`;
+      root.innerHTML = renderFetchFailureCard();
     } else {
       root.innerHTML = renderCaseResults();
     }
@@ -373,6 +373,56 @@
   }
   function infoHtml(k, html, extra = '') {
     return `<div class="v2-info ${extra}"><div class="k">${esc(k)}</div><div class="v">${html || '-'}</div></div>`;
+  }
+
+  function searchSnapshot() {
+    const court = clean($('jiwonNmV2')?.value);
+    const year = clean($('saYearV2')?.value);
+    const serial = clean($('saSerV2')?.value);
+    return {
+      court,
+      year,
+      serial,
+      caseNo: year && serial ? `${year}타경${serial}` : '',
+    };
+  }
+
+  function renderFetchFailureCard(mode = 'full') {
+    const query = searchSnapshot();
+    const recent = mode === 'recent';
+    const title = recent ? '최근 조회 실패' : '조회 실패';
+    const queryText = [query.court, query.caseNo].filter(Boolean).join(' · ') || '입력값 확인 필요';
+    return `
+      <section class="v2-result-card v2-error" data-fetch-failure-card>
+        <div class="v2-result-head">
+          <div>
+            <span class="v2-badge">조회 확인</span>
+            <h3>${title}</h3>
+            <p>${esc(state.error || '사건 조회 중 오류가 발생했습니다.')}</p>
+            ${recent ? '<p class="v2-note">아래에는 마지막 성공 결과를 유지했습니다.</p>' : ''}
+          </div>
+          <div class="v2-cta-row" style="margin-top:0;">
+            <button class="v2-secondary-btn" data-action="retry-fetch">다시 조회</button>
+            <button class="v2-small-btn" data-action="focus-search">입력값 확인</button>
+          </div>
+        </div>
+        <div class="v2-grid compact">
+          ${info('현재 입력값', queryText, 'wide')}
+          ${info('법원', query.court || '미선택')}
+          ${info('사건연도', query.year || '-')}
+          ${info('사건번호', query.serial || '-')}
+          <div class="v2-info wide">
+            <div class="k">다음 확인 순서</div>
+            <div class="v">법원·연도·사건번호를 원문 기준으로 다시 맞춰보세요.</div>
+            <ul class="v2-note" style="margin:8px 0 0 18px;line-height:1.7;">
+              <li>사건번호는 숫자만 입력하고, 연도는 사건 접수연도 4자리로 입력</li>
+              <li>대법원 경매정보 원문에서 같은 법원·사건번호가 조회되는지 확인</li>
+              <li>일시적인 외부 조회 실패일 수 있으므로 잠시 후 다시 조회</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    `;
   }
 
   function firstValue(source, keys, fallback = '') {
@@ -407,7 +457,7 @@
     const statusText = raw.status === 'ok' ? '정상 수집' : clean(raw.status || '');
     return `
       ${state.status === 'loading' ? `<section class="v2-result-card"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>새 조회를 진행 중입니다.</h3><p class="v2-note">기존 결과는 유지하고 최신 응답 도착 후 교체합니다.</p></div></div></section>` : ''}
-      ${state.error ? `<section class="v2-result-card v2-error"><h3>최근 조회 실패</h3><p>${esc(state.error)}</p><p class="v2-note">아래에는 마지막 성공 결과를 유지했습니다.</p></section>` : ''}
+      ${state.error ? renderFetchFailureCard('recent') : ''}
       <section class="v2-result-card v2-case-overview-card">
         <div class="v2-case-hero">
           <span class="v2-badge">Step 1 완료</span>
@@ -692,6 +742,12 @@
       if (action === 'toggle-interested') state.interestedExpanded = !state.interestedExpanded;
       if (action === 'open-step2') { openStep2(); return; }
       if (action === 'close-step2') { closeStep2(); return; }
+      if (action === 'retry-fetch') { fetchCase(); return; }
+      if (action === 'focus-search') {
+        $('saSerV2')?.focus();
+        document.querySelector('.hero')?.scrollIntoView({ behavior:'smooth', block:'start' });
+        return;
+      }
       if (action === 'add-tenant') state.manual.tenants.push({ name:'', moveIn:'', fixed:'', deposit:'' });
       if (action === 'remove-tenant' && state.manual.tenants.length > 1) state.manual.tenants.splice(Number(btn.dataset.index), 1);
       if (action === 'add-special') state.manual.specials.push({ type:'유치권', holder:'', date:'', amount:'' });

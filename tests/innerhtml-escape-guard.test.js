@@ -43,8 +43,10 @@ const core = read('public/app-v2-core.js');
   'select.innerHTML = courts.map((name) => `<option>${esc(name)}</option>`).join',
   'if (parts.length <= 1 && !building) return esc(s);',
   'parts.slice(1).map((p) => `<span class="sub">${esc(p)}</span>`).join',
-  'root.innerHTML = `<div class="v2-result-card v2-error"><h3>조회 실패</h3><p>${esc(state.error)}</p></div>`',
-  '<p>${esc(state.error)}</p><p class="v2-note">아래에는 마지막 성공 결과를 유지했습니다.</p>',
+  'root.innerHTML = renderFetchFailureCard()',
+  '<p>${esc(state.error || \'사건 조회 중 오류가 발생했습니다.\')}</p>',
+  '<li>사건번호는 숫자만 입력하고, 연도는 사건 접수연도 4자리로 입력</li>',
+  "${state.error ? renderFetchFailureCard('recent') : ''}",
   '<p>${esc(state.analyzeError)}</p><p class="v2-note">Step 2 입력값은 유지됩니다.</p>',
   'value="${esc(getManual(path))}" placeholder="${esc(placeholder)}" data-manual-path="${esc(path)}"',
   'items.map((x) => `<li>${esc(x)}</li>`).join',
@@ -158,6 +160,9 @@ const onbid = read('public/app-v2-onbid-entry.js');
   '<h4>${esc(row.name || \'물건명 확인 필요\')}</h4>',
   '<p class="v2-note">${esc(row.address || \'소재지 확인 필요\')}</p>',
   '<h3>${esc(row.name || \'공매 물건 상세\')}</h3>',
+  'items.map((item) => `<li>${esc(item)}</li>`).join',
+  '${esc(onbidState.detailCltrMngNo || \'-\')}',
+  'data-cltr-mng-no="${esc(onbidState.detailCltrMngNo)}"',
   'rawEntries.map(([key, value]) => `<tr><td>${esc(key)}</td><td>${esc(value)}</td></tr>`).join',
 ].forEach((needle) => requireIncludes(onbid, needle, `onbid ${needle}`));
 

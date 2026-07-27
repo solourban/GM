@@ -16,6 +16,8 @@
     detailError: '',
     detail: null,
     detailRequestId: '',
+    detailCltrMngNo: '',
+    detailPbctCdtnNo: '',
   };
 
   function esc(value) {
@@ -83,6 +85,28 @@
       upstream.resultMsg ? `메시지 ${upstream.resultMsg}` : '',
     ].filter(Boolean).join(' / ');
     return `<p class="v2-note">${parts ? `온비드 응답: ${esc(parts)}. ` : ''}${esc(upstream.hint || '조회 조건을 줄여 다시 시도하세요.')}</p>`;
+  }
+
+  function renderFailureChecklist(scope = 'search') {
+    const items = scope === 'detail'
+      ? [
+        '목록 응답에 물건관리번호와 공고번호가 함께 있는지 확인',
+        '해당 공고가 마감·취소·비공개로 바뀌었는지 온비드 원문에서 확인',
+        '목록을 다시 조회한 뒤 새 번호 기준으로 상세 재조회',
+      ]
+      : [
+        '시·도만 남기고 시·군·구, 키워드, 입찰기간을 비워 다시 조회',
+        'ONBID_API_KEY 설정과 공공데이터포털 활용 신청 상태 확인',
+        '온비드 원문 사이트에서 같은 조건으로 결과가 존재하는지 확인',
+      ];
+    return `
+      <div class="v2-onbid-failure-guide">
+        <strong>${esc(scope === 'detail' ? '상세 조회 확인 순서' : '목록 조회 확인 순서')}</strong>
+        <ul>
+          ${items.map((item) => `<li>${esc(item)}</li>`).join('')}
+        </ul>
+      </div>
+    `;
   }
 
   function filterSummary(filters = onbidState.filters) {
@@ -294,6 +318,8 @@
     onbidState.detailStatus = 'idle';
     onbidState.detailError = '';
     onbidState.detail = null;
+    onbidState.detailCltrMngNo = '';
+    onbidState.detailPbctCdtnNo = '';
     renderIntoDom();
 
     try {
@@ -335,6 +361,8 @@
     onbidState.detailStatus = 'idle';
     onbidState.detailError = '';
     onbidState.detail = null;
+    onbidState.detailCltrMngNo = '';
+    onbidState.detailPbctCdtnNo = '';
     renderIntoDom();
   }
 
@@ -348,6 +376,8 @@
     onbidState.detailStatus = 'loading';
     onbidState.detailError = '';
     onbidState.detail = null;
+    onbidState.detailCltrMngNo = clean(cltrMngNo);
+    onbidState.detailPbctCdtnNo = clean(pbctCdtnNo);
     renderIntoDom();
 
     try {
@@ -381,7 +411,7 @@
         '조건을 줄이거나 ONBID_API_KEY 설정 상태를 확인하세요.',
         {
           label: '조회 실패',
-          extra: `${renderUpstreamDiagnostic(onbidState.upstream)}<p class="v2-note">현재 조건: ${esc(filterSummary())}</p>`,
+          extra: `${renderUpstreamDiagnostic(onbidState.upstream)}${renderFailureChecklist('search')}<p class="v2-note">현재 조건: ${esc(filterSummary())}</p>`,
           actions: '<button class="v2-secondary-btn" data-onbid-action="search">다시 조회</button><button class="v2-secondary-btn" data-onbid-action="clear-filters">조건 초기화</button>',
         }
       );
@@ -437,7 +467,26 @@
       return `<section class="v2-result-card" id="v2OnbidDetailCard"><div class="v2-loading"><span class="v2-spinner"></span><div><h3>온비드 상세 조회 중...</h3><p class="v2-note">선택한 공매 물건의 상세 정보를 불러오고 있습니다.</p></div></div></section>`;
     }
     if (onbidState.detailStatus === 'error') {
-      return `<section class="v2-result-card v2-error" id="v2OnbidDetailCard"><h3>온비드 상세 조회 실패</h3><p>${esc(onbidState.detailError || '상세 조회 실패')}</p><p class="v2-note">물건관리번호와 공고번호가 목록 응답에 포함되어 있는지 확인하세요.</p></section>`;
+      return `
+        <section class="v2-result-card v2-error" id="v2OnbidDetailCard">
+          <span class="v2-badge">상세 확인</span>
+          <h3>온비드 상세 조회 실패</h3>
+          <p>${esc(onbidState.detailError || '상세 조회 실패')}</p>
+          <div class="v2-grid compact">
+            <div class="v2-info"><div class="k">물건관리번호</div><div class="v">${esc(onbidState.detailCltrMngNo || '-')}</div></div>
+            <div class="v2-info"><div class="k">공고번호</div><div class="v">${esc(onbidState.detailPbctCdtnNo || '-')}</div></div>
+            <div class="v2-info wide">
+              <div class="k">다음 조치</div>
+              <div class="v">목록을 새로 조회한 뒤 최신 번호로 상세를 다시 확인하세요.</div>
+              ${renderFailureChecklist('detail')}
+            </div>
+          </div>
+          <div class="v2-cta-row">
+            ${onbidState.detailCltrMngNo ? `<button class="v2-secondary-btn" data-onbid-action="detail" data-cltr-mng-no="${esc(onbidState.detailCltrMngNo)}" data-pbct-cdtn-no="${esc(onbidState.detailPbctCdtnNo)}">상세 다시 조회</button>` : ''}
+            <button class="v2-secondary-btn" data-onbid-action="search">목록 다시 조회</button>
+          </div>
+        </section>
+      `;
     }
     const detail = onbidState.detail || {};
     const row = normalizeDetail(detail);

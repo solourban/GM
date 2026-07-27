@@ -45,6 +45,11 @@ requireIncludes('function caseChip(value)', 'case overview should render compact
 requireIncludes('function openStep2(options = {})', 'core should expose one action that opens Step 2');
 requireIncludes("window.__auctionWorkflowShell.moveTo('input')", 'Step 2 open action should sync the workflow shell');
 requireIncludes('openStep2, closeStep2, tabResultsRoot', 'public v2 API should expose Step 2 controls');
+requireIncludes('function renderFetchFailureCard(mode = \'full\')', 'search failure card renderer');
+requireIncludes('data-fetch-failure-card', 'search failure card marker');
+requireIncludes('data-action="retry-fetch"', 'search failure retry action');
+requireIncludes('data-action="focus-search"', 'search failure input focus action');
+requireIncludes('법원·연도·사건번호를 원문 기준으로 다시 맞춰보세요.', 'search failure next-step guidance');
 requireIncludes('<section class="v2-result-card v2-case-overview-card">', 'case overview result card');
 requireIncludes('<div class="v2-case-hero">', 'case overview hero band');
 requireIncludes('class="v2-grid v2-case-detail-grid"', 'case overview detail grid should preserve full basic fields');
