@@ -6,6 +6,10 @@
     raw: null,
     elapsed: '',
     error: '',
+    courtOptions: [],
+    courtSupportCount: 0,
+    courtSupportLoaded: false,
+    courtLoadWarning: '',
     formMessage: '',
     formMessageType: 'info',
     interestedExpanded: false,
@@ -218,6 +222,7 @@
             <label class="v2-field v2-case"><span>사건번호</span><input id="saSerV2" type="text" placeholder="예: 110754" inputmode="numeric"></label>
             <button id="btnFetchV2" class="v2-btn">물건 기본정보 조회</button>
           </div>
+          <p id="v2CourtCoverageNote" class="v2-note" data-court-coverage>지원 법원 목록을 확인 중입니다.</p>
           <div id="v2FormMessage" class="v2-form-message"></div>
           <p class="v2-note">Step 1 — 조회 결과는 아래 결과 영역에 고정 표시됩니다.</p>
         </div>
@@ -265,14 +270,45 @@
     const fallback = ['서울중앙지방법원','서울동부지방법원','서울서부지방법원','서울남부지방법원','서울북부지방법원','수원지방법원','인천지방법원','대전지방법원','천안지원','청주지방법원','부산지방법원','대구지방법원','광주지방법원','전주지방법원','제주지방법원'];
     try {
       const res = await fetch('/api/courts');
+      if (!res.ok) throw new Error('court-list-unavailable');
       const data = await res.json();
       const courts = Array.isArray(data.courts) ? data.courts.map((x) => x.name) : fallback;
+      state.courtOptions = courts;
+      state.courtSupportCount = Number(data.count || courts.length || 0);
+      state.courtSupportLoaded = true;
+      state.courtLoadWarning = '';
       select.innerHTML = courts.map((name) => `<option>${esc(name)}</option>`).join('');
       if (courts.includes('서울중앙지방법원')) select.value = '서울중앙지방법원';
     } catch (_) {
+      state.courtOptions = fallback;
+      state.courtSupportCount = fallback.length;
+      state.courtSupportLoaded = false;
+      state.courtLoadWarning = '법원 목록을 불러오지 못해 기본 목록으로 조회 준비 중입니다.';
       select.innerHTML = fallback.map((name) => `<option>${esc(name)}</option>`).join('');
       setFormMessage('법원 목록을 불러오지 못해 기본 목록을 표시했습니다.', 'warn');
+    } finally {
+      renderCourtCoverage();
     }
+  }
+
+  function renderCourtCoverage() {
+    const el = $('v2CourtCoverageNote');
+    if (!el) return;
+    const count = state.courtSupportCount || state.courtOptions.length || 0;
+    if (state.courtLoadWarning) {
+      el.textContent = `${state.courtLoadWarning} 현재 ${count}곳을 표시합니다.`;
+      return;
+    }
+    if (!state.courtSupportLoaded) {
+      el.textContent = '지원 법원 목록을 확인 중입니다.';
+      return;
+    }
+    el.textContent = `지원 법원 ${count}곳 기준으로 조회합니다. 목록에 없는 법원은 조회 전에 안내됩니다.`;
+  }
+
+  function isSelectedCourtSupported(court) {
+    if (!state.courtOptions.length) return true;
+    return state.courtOptions.includes(court);
   }
 
   function renderFormMessage() {
@@ -293,6 +329,7 @@
     const year = clean($('saYearV2')?.value);
     const serial = clean($('saSerV2')?.value);
     if (!court) return '법원을 선택해주세요.';
+    if (!isSelectedCourtSupported(court)) return '지원 법원 목록에서 법원을 다시 선택해주세요.';
     if (!/^\d{4}$/.test(year)) return '사건연도는 4자리 숫자로 입력해주세요.';
     if (!serial) return '사건번호를 입력해주세요.';
     if (!/^\d+$/.test(serial)) return '사건번호는 숫자만 입력해주세요.';
@@ -392,6 +429,7 @@
     const recent = mode === 'recent';
     const title = recent ? '최근 조회 실패' : '조회 실패';
     const queryText = [query.court, query.caseNo].filter(Boolean).join(' · ') || '입력값 확인 필요';
+    const supportText = state.courtSupportLoaded ? `${state.courtSupportCount || state.courtOptions.length}곳` : '확인 중';
     return `
       <section class="v2-result-card v2-error" data-fetch-failure-card>
         <div class="v2-result-head">
@@ -411,6 +449,7 @@
           ${info('법원', query.court || '미선택')}
           ${info('사건연도', query.year || '-')}
           ${info('사건번호', query.serial || '-')}
+          ${info('지원 법원', supportText)}
           <div class="v2-info wide">
             <div class="k">다음 확인 순서</div>
             <div class="v">법원·연도·사건번호를 원문 기준으로 다시 맞춰보세요.</div>
@@ -726,8 +765,8 @@
     $('btnFetchV2')?.addEventListener('click', fetchCase);
     $('saSerV2')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') fetchCase(); });
     ['jiwonNmV2','saYearV2','saSerV2'].forEach((id) => {
-      $(id)?.addEventListener('input', () => { if (state.formMessageType === 'error') setFormMessage('', 'info'); });
-      $(id)?.addEventListener('change', () => { if (state.formMessageType === 'error') setFormMessage('', 'info'); });
+      $(id)?.addEventListener('input', () => { if (state.formMessageType === 'error') setFormMessage('', 'info'); renderCourtCoverage(); });
+      $(id)?.addEventListener('change', () => { if (state.formMessageType === 'error') setFormMessage('', 'info'); renderCourtCoverage(); });
     });
   }
 

@@ -127,7 +127,7 @@ app.get('/ads.txt', (req, res) => {
 app.use(express.static(PUBLIC_DIR));
 
 const { analyzeCase } = require('./analyzer');
-const { fetchCase, listCourts } = require('./crawler');
+const { fetchCase, courtSupport, listCourts } = require('./crawler');
 const { findAuctionsByDate } = require('./dateRecommendations');
 const { listPublicDataSources, dataGovernanceSummary } = require('./dataGovernance');
 
@@ -441,7 +441,15 @@ app.get('/api/location/geocode', async (req, res) => {
 });
 
 app.get('/api/courts', (req, res) => {
-  res.json({ ok: true, courts: listCourts(), requestId: req.requestId });
+  const courts = listCourts();
+  const queryName = String(req.query.name || '').trim();
+  res.json({
+    ok: true,
+    courts,
+    count: courts.length,
+    lookup: queryName ? courtSupport(queryName) : null,
+    requestId: req.requestId,
+  });
 });
 
 function publicDateRecommendationResult(result) {
@@ -998,14 +1006,43 @@ app.get('/api/onbid/detail', async (req, res) => {
   }
 });
 
+function validateFetchLookupInput(body = {}) {
+  const jiwonNm = String(body.jiwonNm || '').trim();
+  const saYear = String(body.saYear || '').trim();
+  const saSer = String(body.saSer || '').trim();
+
+  if (!jiwonNm || !saYear || !saSer) {
+    return { error: '법원, 연도, 사건번호를 모두 입력하세요.' };
+  }
+  if (!/^\d{4}$/.test(saYear)) {
+    return { error: '사건연도는 4자리 숫자로 입력하세요.' };
+  }
+  if (!/^\d+$/.test(saSer)) {
+    return { error: '사건번호는 숫자만 입력하세요.' };
+  }
+
+  const court = courtSupport(jiwonNm);
+  if (!court.supported) {
+    return {
+      error: '지원하지 않는 법원입니다. 법원 목록에서 다시 선택해주세요.',
+      court,
+    };
+  }
+
+  return {
+    value: { jiwonNm: court.normalized, saYear, saSer },
+    court,
+  };
+}
+
 app.post('/api/fetch', async (req, res) => {
   try {
-    const { jiwonNm, saYear, saSer } = req.body || {};
-    if (!jiwonNm || !saYear || !saSer) {
-      return res.status(400).json(errorBody(req, '법원, 연도, 사건번호를 모두 입력하세요.'));
+    const input = validateFetchLookupInput(req.body || {});
+    if (input.error) {
+      return res.status(400).json(errorBody(req, input.error, input.court ? { court: input.court } : {}));
     }
-    const result = sanitizeFetchCaseResult(await fetchCase({ jiwonNm, saYear, saSer }));
-    return res.json({ ok: true, raw: result, elapsed: result.elapsed, requestId: req.requestId });
+    const result = sanitizeFetchCaseResult(await fetchCase(input.value));
+    return res.json({ ok: true, raw: result, elapsed: result.elapsed, court: input.court, requestId: req.requestId });
   } catch (e) {
     logException('fetch', req, e);
     return res.status(500).json(errorBody(req, '사건 조회 중 오류가 발생했습니다.'));

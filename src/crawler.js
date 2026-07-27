@@ -107,14 +107,29 @@ const HEADERS = {
 
 function normalizeCourtName(name) {
   const raw = String(name || '').trim();
+  if (!raw) return '';
   if (COURT_CODES[raw]) return raw;
   const compact = compactCourtKey(raw);
   if (COURT_ALIASES[raw]) return COURT_ALIASES[raw];
   if (COURT_ALIASES[compact]) return COURT_ALIASES[compact];
   if (COURT_CODES[`${raw}지방법원`]) return `${raw}지방법원`;
   if (COURT_CODES[`${raw}지원`]) return `${raw}지원`;
-  const found = Object.keys(COURT_CODES).find((court) => court.includes(raw) || compactCourtKey(court).includes(compact));
+  const found = compact
+    ? Object.keys(COURT_CODES).find((court) => court.includes(raw) || compactCourtKey(court).includes(compact))
+    : '';
   return found || raw;
+}
+
+function courtSupport(name) {
+  const input = String(name || '').trim();
+  const normalized = normalizeCourtName(input);
+  const code = COURT_CODES[normalized] || '';
+  return {
+    input,
+    normalized,
+    supported: Boolean(code),
+    code,
+  };
 }
 
 function buildFailureHints(reason, { courtName, csNo, cortOfcCd }) {
@@ -287,4 +302,4 @@ function listCourts() {
   return Object.entries(COURT_CODES).map(([name, code]) => ({ name, code }));
 }
 
-module.exports = { fetchCase, COURT_CODES, normalizeCourtName, listCourts };
+module.exports = { fetchCase, COURT_CODES, normalizeCourtName, courtSupport, listCourts };
