@@ -4,6 +4,7 @@
   const CHANGE_EVENT = 'auction:result-card-change';
   const MAP_SDK_TIMEOUT_MS = 8000;
   const MAP_TILE_WATCHDOG_MS = 3600;
+  const MAP_RELAYOUT_SERIES_DELAYS = [0, 80, 220, 480, 900, 1500];
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
   const NEARBY_CATEGORIES = [
     { id: 'subway', code: 'SW8', label: '지하철역', radius: 1500 },
@@ -33,6 +34,7 @@
       #${CARD_ID} .v2-map-watchdog strong { display:block; font-size:13px; }
       #${CARD_ID} .v2-map-watchdog span { display:block; margin-top:2px; color:var(--ink-3); font-size:12px; line-height:1.45; }
       #${CARD_ID} .v2-kakao-map-fallback { background:linear-gradient(135deg,#f6f5f1,#ebe9e1); }
+      #${CARD_ID} .v2-kakao-map-preview[data-map-state="stabilizing"] { background:#efede6; }
       #${CARD_ID} [data-nearby-summary] { min-height:0; align-content:start; }
       @media (max-width:720px) {
         #${CARD_ID}.v2-location-loading { min-height:1460px; }
@@ -204,6 +206,8 @@
   let mapConfigPromise = null;
   const kakaoMapRegistry = new Map();
   let kakaoMapSeq = 0;
+  let mapVisibilityObserver = null;
+  let visibleRelayoutTimer = 0;
 
   function getMapConfig() {
     if (!mapConfigPromise) {
@@ -292,16 +296,35 @@
     return target.dataset.mapInstanceId;
   }
 
+  function mapHasVisibleBox(target) {
+    const rect = target?.getBoundingClientRect?.();
+    return Boolean(rect && rect.width >= 120 && rect.height >= 220);
+  }
+
+  function mapIsNearViewport(target) {
+    const rect = target?.getBoundingClientRect?.();
+    if (!rect) return false;
+    const height = window.innerHeight || document.documentElement.clientHeight || 0;
+    const width = window.innerWidth || document.documentElement.clientWidth || 0;
+    return rect.bottom >= -120 && rect.top <= height + 240 && rect.right >= 0 && rect.left <= width;
+  }
+
   function relayoutKakaoMapEntry(entry) {
     if (!entry?.target?.isConnected) {
       if (entry?.key) kakaoMapRegistry.delete(entry.key);
       return;
     }
     if (!window.kakao?.maps?.LatLng || !entry.map?.relayout) return;
+    if (!mapHasVisibleBox(entry.target)) {
+      entry.target.dataset.mapState = 'stabilizing';
+      setMapStatus(entry.target, 'warn', '지도 영역 대기', '지도 카드가 화면에 자리 잡으면 자동으로 다시 맞춥니다.');
+      return;
+    }
     const coords = new window.kakao.maps.LatLng(entry.point.y, entry.point.x);
     entry.map.relayout();
     entry.map.setCenter(coords);
     entry.marker?.setPosition?.(coords);
+    entry.target.dataset.lastRelayoutAt = String(Date.now());
   }
 
   function relayoutMapTarget(target, reason = 'target-manual') {
@@ -313,6 +336,51 @@
     window.setTimeout(() => relayoutKakaoMapEntry(entry), 120);
     window.__auctionLocationMapsLastRelayout = reason;
     return true;
+  }
+
+  function stabilizeMapTarget(target, reason = 'stabilize') {
+    if (!target?.isConnected) return false;
+    if (target.dataset.tilesLoaded !== '1') {
+      target.dataset.mapState = 'stabilizing';
+      setMapStatus(target, 'warn', '지도 자동 재정렬', '지도 타일 영역을 다시 맞추고 있습니다. 잠시 후에도 회색이면 외부 지도 버튼을 사용하세요.');
+    }
+    MAP_RELAYOUT_SERIES_DELAYS.forEach((delay, index) => {
+      window.setTimeout(() => {
+        if (!target.isConnected) return;
+        relayoutMapTarget(target, `${reason}-${index}`);
+        if (target.dataset.tilesLoaded !== '1' && index >= 3) showMapWatchdog(target);
+      }, delay);
+    });
+    window.__auctionLocationMapsLastStabilize = reason;
+    return true;
+  }
+
+  function ensureMapVisibilityObserver() {
+    if (mapVisibilityObserver || !window.IntersectionObserver) return mapVisibilityObserver;
+    mapVisibilityObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        stabilizeMapTarget(entry.target, 'intersection-visible');
+      });
+    }, { root: null, threshold: 0.08 });
+    return mapVisibilityObserver;
+  }
+
+  function observeMapTarget(target) {
+    if (!target || target.dataset.visibilityObserved === '1') return;
+    target.dataset.visibilityObserved = '1';
+    ensureMapVisibilityObserver()?.observe(target);
+  }
+
+  function relayoutVisibleKakaoMaps(reason = 'visible-relayout') {
+    Array.from(kakaoMapRegistry.values()).forEach((entry) => {
+      if (mapIsNearViewport(entry.target)) stabilizeMapTarget(entry.target, reason);
+    });
+  }
+
+  function scheduleVisibleMapRelayout(reason = 'visible-relayout') {
+    window.clearTimeout(visibleRelayoutTimer);
+    visibleRelayoutTimer = window.setTimeout(() => relayoutVisibleKakaoMaps(reason), 140);
   }
 
   function relayoutKakaoMaps(reason = 'manual') {
@@ -512,7 +580,8 @@
 
     targets.forEach((target) => {
       if (target.dataset.ready === '1') {
-        relayoutKakaoMaps('existing-preview');
+        observeMapTarget(target);
+        stabilizeMapTarget(target, 'existing-preview');
         if (target.dataset.tilesLoaded !== '1') {
           window.setTimeout(() => showMapWatchdog(target), 120);
         }
@@ -545,7 +614,8 @@
         window.kakao.maps.event?.addListener?.(map, 'tilesloaded', markTilesLoaded);
         const key = mapRegistryKey(target);
         kakaoMapRegistry.set(key, { key, target, map, marker, point: { x, y } });
-        relayoutKakaoMaps('preview-init');
+        observeMapTarget(target);
+        stabilizeMapTarget(target, 'preview-init');
         target.dataset.ready = '1';
         window.setTimeout(() => {
           if (target.dataset.tilesLoaded === '1') return;
@@ -841,16 +911,18 @@
   document.addEventListener('auction:workflow-step-change', (event) => {
     if (event.detail?.step !== 'market') return;
     initKakaoMapPreviews(document.getElementById(CARD_ID) || document);
-    relayoutKakaoMaps('workflow-step-change');
+    scheduleVisibleMapRelayout('workflow-step-change');
   });
   document.addEventListener(CHANGE_EVENT, (event) => {
     if (!event.detail?.id || event.detail.id === CARD_ID) {
-      window.setTimeout(() => relayoutKakaoMaps('result-card-change'), 0);
+      window.setTimeout(() => scheduleVisibleMapRelayout('result-card-change'), 0);
     }
   });
-  window.addEventListener('resize', () => relayoutKakaoMaps('resize'));
+  window.addEventListener('resize', () => scheduleVisibleMapRelayout('resize'));
+  window.addEventListener('orientationchange', () => scheduleVisibleMapRelayout('orientationchange'));
+  window.addEventListener('scroll', () => scheduleVisibleMapRelayout('scroll'), { passive: true });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) relayoutKakaoMaps('visibilitychange');
+    if (!document.hidden) scheduleVisibleMapRelayout('visibilitychange');
   });
   document.addEventListener('click', (event) => {
     const button = event.target.closest?.('[data-map-relayout]');
@@ -861,7 +933,7 @@
       initKakaoMapPreviews(button.closest('.v2-map-card') || document);
       return;
     }
-    const relaid = relayoutMapTarget(target, 'manual-button');
+    const relaid = stabilizeMapTarget(target, 'manual-button');
     if (relaid && target.dataset.tilesLoaded !== '1') {
       showMapWatchdog(target);
     }
@@ -870,6 +942,8 @@
     init: initKakaoMapPreviews,
     relayout: relayoutKakaoMaps,
     relayoutTarget: relayoutMapTarget,
+    stabilizeTarget: stabilizeMapTarget,
+    relayoutVisible: relayoutVisibleKakaoMaps,
     count: () => kakaoMapRegistry.size,
   };
   scheduleUpsert(0);
