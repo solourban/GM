@@ -16,9 +16,11 @@
     annualInterestRate: '5',
     holdingMonths: '6',
     prepaymentPenaltyRate: '0',
-    sellBrokerageFee: '0',
-    incomeTaxRate: '0',
+    sellBrokerageFee: '',
+    incomeTaxRate: '',
     localIncomeTaxRate: '10',
+    rentDeposit: '',
+    monthlyRent: '',
   });
 
   const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -61,6 +63,34 @@
     return `${n.toFixed(1)}%`;
   }
 
+  function manualValuePresent(value) {
+    return clean(value) !== '';
+  }
+
+  function brokerageRateForSale(price) {
+    const n = Number(price || 0);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    if (n < 50_000_000) return 0.6;
+    if (n < 200_000_000) return 0.5;
+    if (n < 900_000_000) return 0.4;
+    if (n < 1_200_000_000) return 0.5;
+    if (n < 1_500_000_000) return 0.6;
+    return 0.7;
+  }
+
+  function taxBracketForBase(taxableBase) {
+    const n = Math.max(0, Number(taxableBase || 0));
+    if (n <= 0) return { rate: 0, deduction: 0, label: '과세표준 없음' };
+    if (n <= 14_000_000) return { rate: 6, deduction: 0, label: '1,400만원 이하' };
+    if (n <= 50_000_000) return { rate: 15, deduction: 1_260_000, label: '5,000만원 이하' };
+    if (n <= 88_000_000) return { rate: 24, deduction: 5_760_000, label: '8,800만원 이하' };
+    if (n <= 150_000_000) return { rate: 35, deduction: 15_440_000, label: '1.5억원 이하' };
+    if (n <= 300_000_000) return { rate: 38, deduction: 19_940_000, label: '3억원 이하' };
+    if (n <= 500_000_000) return { rate: 40, deduction: 25_940_000, label: '5억원 이하' };
+    if (n <= 1_000_000_000) return { rate: 42, deduction: 35_940_000, label: '10억원 이하' };
+    return { rate: 45, deduction: 65_940_000, label: '10억원 초과' };
+  }
+
   function caseKey(report) {
     const court = clean(report?.court || report?.raw?.court || '');
     const caseNo = clean(report?.case || report?.caseNo || '');
@@ -84,7 +114,12 @@
     if (!trimmed) return normalizePlan();
     if (!trimmed.startsWith('{')) return normalizePlan({ plannedBid: trimmed });
     try {
-      return normalizePlan(JSON.parse(trimmed));
+      const parsed = JSON.parse(trimmed);
+      if (!Object.prototype.hasOwnProperty.call(parsed, 'rentDeposit')) {
+        if (clean(parsed.sellBrokerageFee) === '0') parsed.sellBrokerageFee = '';
+        if (clean(parsed.incomeTaxRate) === '0') parsed.incomeTaxRate = '';
+      }
+      return normalizePlan(parsed);
     } catch (_) {
       return normalizePlan({ plannedBid: trimmed });
     }
@@ -168,7 +203,7 @@
     const bidLoanCap = Math.round(plannedBid * bidLoanRate / 100);
     const loanCaps = [appraisalLoanCap, bidLoanCap].filter((value) => value > 0);
     const suggestedLoan = Math.max(0, (loanCaps.length ? Math.min(...loanCaps) : 0) - roomDeduction);
-    const hasManualLoan = clean(plan.loanAmount) !== '';
+    const hasManualLoan = manualValuePresent(plan.loanAmount);
     const loanAmount = hasManualLoan ? Math.round(numberValue(plan.loanAmount)) : suggestedLoan;
     const annualInterestRate = numberValue(plan.annualInterestRate);
     const holdingMonths = numberValue(plan.holdingMonths);
@@ -176,8 +211,10 @@
     const holdingInterest = Math.round(monthlyInterest * holdingMonths);
     const prepaymentPenaltyRate = numberValue(plan.prepaymentPenaltyRate);
     const prepaymentPenalty = Math.round(loanAmount * prepaymentPenaltyRate / 100);
-    const sellBrokerageFee = Math.round(numberValue(plan.sellBrokerageFee));
-    const incomeTaxRate = numberValue(plan.incomeTaxRate);
+    const hasManualBrokerageFee = manualValuePresent(plan.sellBrokerageFee);
+    const sellBrokerageFeeRate = brokerageRateForSale(expectedSalePrice);
+    const autoSellBrokerageFee = Math.round(expectedSalePrice * sellBrokerageFeeRate / 100);
+    const sellBrokerageFee = hasManualBrokerageFee ? Math.round(numberValue(plan.sellBrokerageFee)) : autoSellBrokerageFee;
     const localIncomeTaxRate = numberValue(plan.localIncomeTaxRate);
     const bidDeposit = Math.round(plannedBid * base.bidDepositRate / 100);
     const totalAcquisitionCost = plannedBid
@@ -202,13 +239,24 @@
       + prepaymentPenalty
       + sellBrokerageFee;
     const taxableBase = expectedSalePrice ? Math.max(0, preTaxProfit - deductibleCost) : 0;
-    const incomeTax = Math.round(taxableBase * incomeTaxRate / 100);
+    const taxBracket = taxBracketForBase(taxableBase);
+    const hasManualIncomeTaxRate = manualValuePresent(plan.incomeTaxRate);
+    const incomeTaxRate = hasManualIncomeTaxRate ? numberValue(plan.incomeTaxRate) : taxBracket.rate;
+    const incomeTaxDeduction = hasManualIncomeTaxRate ? 0 : taxBracket.deduction;
+    const incomeTaxBeforeDeduction = Math.round(taxableBase * incomeTaxRate / 100);
+    const incomeTax = Math.max(0, incomeTaxBeforeDeduction - incomeTaxDeduction);
     const localIncomeTax = Math.round(incomeTax * localIncomeTaxRate / 100);
     const totalTax = incomeTax + localIncomeTax;
     const totalCost = totalBurden + sellBrokerageFee + totalTax;
     const afterTaxProfit = expectedSalePrice ? expectedSalePrice - totalCost : 0;
     const breakEvenSalePrice = totalCost;
     const holdingMonthlyCost = holdingMonths ? Math.round((holdingInterest + unpaidManagementFee + repairCost) / holdingMonths) : 0;
+    const rentDeposit = Math.round(numberValue(plan.rentDeposit));
+    const monthlyRent = Math.round(numberValue(plan.monthlyRent));
+    const monthlyRentNet = monthlyRent ? Math.round(monthlyRent - monthlyInterest) : 0;
+    const annualRentNet = monthlyRent ? monthlyRentNet * 12 : 0;
+    const rentNetInvestment = Math.max(0, requiredCash - holdingInterest - rentDeposit);
+    const rentYield = rentNetInvestment && annualRentNet ? (annualRentNet / rentNetInvestment) * 100 : 0;
     const roi = requiredCash ? (afterTaxProfit / requiredCash) * 100 : 0;
     const minBidRate = base.minBid ? (plannedBid / base.minBid) * 100 : 0;
     const appraisedRate = base.appraisedValue ? (plannedBid / base.appraisedValue) * 100 : 0;
@@ -238,8 +286,15 @@
       holdingInterest,
       prepaymentPenaltyRate,
       prepaymentPenalty,
+      hasManualBrokerageFee,
+      sellBrokerageFeeRate,
+      autoSellBrokerageFee,
       sellBrokerageFee,
+      hasManualIncomeTaxRate,
       incomeTaxRate,
+      incomeTaxDeduction,
+      incomeTaxBeforeDeduction,
+      taxBracketLabel: taxBracket.label,
       localIncomeTaxRate,
       bidDeposit,
       totalAcquisitionCost,
@@ -255,6 +310,12 @@
       afterTaxProfit,
       breakEvenSalePrice,
       holdingMonthlyCost,
+      rentDeposit,
+      monthlyRent,
+      monthlyRentNet,
+      annualRentNet,
+      rentNetInvestment,
+      rentYield,
       roi,
       minBidRate,
       appraisedRate,
@@ -316,6 +377,10 @@
     setText(card, 'preTaxProfit', snapshot.expectedSalePrice ? won(snapshot.preTaxProfit) : '-');
     setText(card, 'deductibleCost', won(snapshot.deductibleCost));
     setText(card, 'sellBrokerageFee', won(snapshot.sellBrokerageFee));
+    setText(card, 'sellBrokerageFeeSource', snapshot.hasManualBrokerageFee ? '직접 입력' : `자동 ${percent(snapshot.sellBrokerageFeeRate)}`);
+    setText(card, 'incomeTaxRate', percent(snapshot.incomeTaxRate));
+    setText(card, 'incomeTaxDeduction', won(snapshot.incomeTaxDeduction));
+    setText(card, 'incomeTaxBracket', snapshot.hasManualIncomeTaxRate ? '직접 입력' : snapshot.taxBracketLabel);
     setText(card, 'incomeTax', won(snapshot.incomeTax));
     setText(card, 'localIncomeTax', won(snapshot.localIncomeTax));
     setText(card, 'totalTax', won(snapshot.totalTax));
@@ -323,6 +388,10 @@
     setText(card, 'afterTaxProfit', snapshot.expectedSalePrice ? won(snapshot.afterTaxProfit) : '-');
     setText(card, 'breakEvenSalePrice', snapshot.expectedSalePrice ? won(snapshot.breakEvenSalePrice) : '-');
     setText(card, 'holdingMonthlyCost', won(snapshot.holdingMonthlyCost));
+    setText(card, 'monthlyRentNet', snapshot.monthlyRent ? won(snapshot.monthlyRentNet) : '-');
+    setText(card, 'annualRentNet', snapshot.monthlyRent ? won(snapshot.annualRentNet) : '-');
+    setText(card, 'rentNetInvestment', snapshot.monthlyRent ? won(snapshot.rentNetInvestment) : '-');
+    setText(card, 'rentYield', snapshot.monthlyRent && snapshot.rentNetInvestment ? percent(snapshot.rentYield) : '-');
     setText(card, 'roi', snapshot.expectedSalePrice && snapshot.requiredCash ? percent(snapshot.roi) : '-');
     setText(card, 'message', snapshot.message);
 
@@ -383,9 +452,14 @@
         </div>
         <h4>매도·세금</h4>
         <div class="v2-input-grid">
-          ${inputHtml('sellBrokerageFee', '매도 중개수수료', '예: 3,000,000')}
-          ${inputHtml('incomeTaxRate', '양도세/소득세율(%)', '직접 입력')}
+          ${inputHtml('sellBrokerageFee', '매도 중개수수료', '비우면 매도가 기준 자동')}
+          ${inputHtml('incomeTaxRate', '양도세/소득세율(%)', '비우면 과세표준 구간 자동')}
           ${inputHtml('localIncomeTaxRate', '양도세 지방세율(%)', '예: 10')}
+        </div>
+        <h4>월세 셋팅</h4>
+        <div class="v2-input-grid">
+          ${inputHtml('rentDeposit', '보증금', '예: 20,000,000')}
+          ${inputHtml('monthlyRent', '월세', '예: 800,000')}
         </div>
       </details>
       <details class="v2-form-block v2-bid-detail-panel">
@@ -417,6 +491,12 @@
           <div class="v2-info-box"><span>매도 중개수수료</span><strong data-bid-plan="sellBrokerageFee">0원</strong></div>
         </div>
         <div class="v2-grid four">
+          <div class="v2-info-box"><span>중개수수료 산정</span><strong data-bid-plan="sellBrokerageFeeSource">-</strong></div>
+          <div class="v2-info-box"><span>소득세율</span><strong data-bid-plan="incomeTaxRate">-</strong></div>
+          <div class="v2-info-box"><span>누진공제</span><strong data-bid-plan="incomeTaxDeduction">0원</strong></div>
+          <div class="v2-info-box"><span>세율 구간</span><strong data-bid-plan="incomeTaxBracket">-</strong></div>
+        </div>
+        <div class="v2-grid four">
           <div class="v2-info-box"><span>감정가 기준 대출</span><strong data-bid-plan="appraisalLoanCap">0원</strong></div>
           <div class="v2-info-box"><span>낙찰가 기준 대출</span><strong data-bid-plan="bidLoanCap">0원</strong></div>
           <div class="v2-info-box"><span>방공제 금액</span><strong data-bid-plan="roomDeduction">0원</strong></div>
@@ -427,10 +507,20 @@
           <div class="v2-info-box"><span>양도세 지방세</span><strong data-bid-plan="localIncomeTax">0원</strong></div>
           <div class="v2-info-box"><span>총 비용(세금 포함)</span><strong data-bid-plan="totalCost">0원</strong></div>
         </div>
+        <div class="v2-form-block v2-bid-rent-block">
+          <h4>월세 셋팅 참고</h4>
+          <div class="v2-grid four">
+            <div class="v2-info-box"><span>월 순수익</span><strong data-bid-plan="monthlyRentNet">-</strong></div>
+            <div class="v2-info-box"><span>연 순수익</span><strong data-bid-plan="annualRentNet">-</strong></div>
+            <div class="v2-info-box"><span>순 투자금</span><strong data-bid-plan="rentNetInvestment">-</strong></div>
+            <div class="v2-info-box"><span>월세 수익률</span><strong data-bid-plan="rentYield">-</strong></div>
+          </div>
+        </div>
       </details>
       <ul class="v2-list">
         <li data-bid-plan="message">입찰가와 예상 매도가를 입력하면 필요 현금과 세후수익을 계산합니다.</li>
         <li>대출 가능 여부는 LTV, DSR, 지역 규제, 신용, 소득, 주택 수에 따라 달라집니다. 금융기관 확인이 필요합니다.</li>
+        <li>매도 중개수수료와 양도세/소득세율은 비워두면 참고 계산기 기준으로 자동 산정합니다.</li>
         <li>세금 계산은 참고용입니다. 실제 양도세·소득세·지방세는 세무 전문가 확인이 필요합니다.</li>
         <li>권리관계와 명도 가능성은 원본 서류와 현장 확인이 필요합니다.</li>
         <li>총 비용은 입찰가, 인수금액, 취득·보유·매도비용, 세금 참고액을 합산한 값입니다.</li>
@@ -495,6 +585,8 @@
     storageKey,
     loadPlan,
     savePlan,
+    brokerageRateForSale,
+    taxBracketForBase,
     computePlan,
     currentSnapshot,
   };

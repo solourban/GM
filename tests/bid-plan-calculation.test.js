@@ -81,6 +81,12 @@ assert.strictEqual(snapshot.totalAcquisitionCost, 568520002, 'total acquisition 
 assert.strictEqual(snapshot.totalBurden, 578520002, 'total burden should include inherited amount separately');
 assert.strictEqual(snapshot.requiredCash, 178520002, 'required cash should subtract the loan from total burden');
 assert.strictEqual(snapshot.taxableBase, 78479998, 'taxable base should subtract deductible costs from pre-tax profit');
+assert.strictEqual(snapshot.hasManualBrokerageFee, true, 'manual brokerage fee should be respected when entered');
+assert.strictEqual(snapshot.sellBrokerageFeeRate, 0.4, 'automatic brokerage reference rate should still be exposed');
+assert.strictEqual(snapshot.autoSellBrokerageFee, 2600000, 'automatic brokerage fee should be available for comparison');
+assert.strictEqual(snapshot.hasManualIncomeTaxRate, true, 'manual income tax rate should be respected when entered');
+assert.strictEqual(snapshot.incomeTaxBeforeDeduction, 15696000, 'manual tax mode should expose gross income tax');
+assert.strictEqual(snapshot.incomeTaxDeduction, 0, 'manual tax mode should not apply a progressive deduction');
 assert.strictEqual(snapshot.incomeTax, 15696000, 'income tax should use taxable base and income tax rate');
 assert.strictEqual(snapshot.localIncomeTax, 1569600, 'local income tax should use income tax and local tax rate');
 assert.strictEqual(snapshot.totalTax, 17265600, 'local income tax should be added to income tax');
@@ -98,8 +104,54 @@ const autoLoan = api.computePlan({
 assert.strictEqual(autoLoan.suggestedLoan, 361000000, 'blank loan amount should use min(appraisal 60%, bid 80%) minus room deduction');
 assert.strictEqual(autoLoan.loanAmount, 361000000, 'blank loan input should reflect the suggested reference loan amount');
 
+const spreadsheetReference = api.computePlan({
+  ...api.FIELD_DEFAULTS,
+  plannedBid: '180000000',
+  expectedSalePrice: '235000000',
+  registryCost: '360000',
+  legalFee: '800000',
+  repairCost: '10000000',
+  evictionCost: '1800000',
+  annualInterestRate: '4.7',
+  holdingMonths: '5',
+  prepaymentPenaltyRate: '0.5',
+  rentDeposit: '20000000',
+  monthlyRent: '800000',
+}, {
+  basic: {},
+  inherited: { total: 0 },
+  bidRec: { base: 234000000 },
+  risk: { level: 'ok' },
+});
+assert.strictEqual(spreadsheetReference.suggestedLoan, 140400000, 'spreadsheet reference should use appraised 60% auto loan cap');
+assert.strictEqual(spreadsheetReference.monthlyInterest, 549900, 'spreadsheet reference should calculate monthly interest from 4.7%');
+assert.strictEqual(spreadsheetReference.holdingInterest, 2749500, 'spreadsheet reference should carry holding interest for five months');
+assert.strictEqual(spreadsheetReference.prepaymentPenalty, 702000, 'spreadsheet reference should calculate 0.5% prepayment penalty');
+assert.strictEqual(spreadsheetReference.sellBrokerageFeeRate, 0.4, 'sale price around 235M should use 0.4% brokerage reference');
+assert.strictEqual(spreadsheetReference.sellBrokerageFee, 940000, 'blank brokerage fee should auto-calculate from expected sale price');
+assert.strictEqual(spreadsheetReference.taxableBase, 35668500, 'taxable base should include auto brokerage and deductible costs');
+assert.strictEqual(spreadsheetReference.incomeTaxRate, 15, 'blank income tax rate should use the spreadsheet bracket');
+assert.strictEqual(spreadsheetReference.incomeTaxDeduction, 1260000, 'blank income tax rate should apply progressive deduction');
+assert.strictEqual(spreadsheetReference.incomeTax, 4090275, 'auto income tax should subtract progressive deduction');
+assert.strictEqual(spreadsheetReference.localIncomeTax, 409028, 'local income tax should follow auto income tax');
+assert.strictEqual(spreadsheetReference.requiredCash, 57991500, 'required cash should include bid costs minus auto loan');
+assert.strictEqual(spreadsheetReference.afterTaxProfit, 31169197, 'after-tax profit should reflect auto fee and tax');
+assert.strictEqual(spreadsheetReference.monthlyRentNet, 250100, 'monthly rent net should subtract loan interest from monthly rent');
+assert.strictEqual(spreadsheetReference.annualRentNet, 3001200, 'annual rent net should annualize monthly rent net');
+assert.strictEqual(spreadsheetReference.rentNetInvestment, 35242000, 'rent net investment should subtract holding interest and deposit');
+assert(spreadsheetReference.rentYield > 8.51 && spreadsheetReference.rentYield < 8.52, 'rent yield should follow monthly rent spreadsheet structure');
+
 storage.set(api.storageKey(report), '520000000');
 assert.strictEqual(api.loadPlan(report).plannedBid, '520000000', 'old single-number storage must stay readable');
+
+storage.set(api.storageKey(report), JSON.stringify({
+  plannedBid: '520000000',
+  sellBrokerageFee: '0',
+  incomeTaxRate: '0',
+}));
+const migratedPlan = api.loadPlan(report);
+assert.strictEqual(migratedPlan.sellBrokerageFee, '', 'legacy zero brokerage default should migrate to blank auto mode');
+assert.strictEqual(migratedPlan.incomeTaxRate, '', 'legacy zero tax default should migrate to blank auto mode');
 
 api.savePlan(report, { ...api.FIELD_DEFAULTS, plannedBid: '530000000', repairCost: '10000000' });
 const stored = JSON.parse(storage.get(api.storageKey(report)));
@@ -134,11 +186,19 @@ const requiredBidPlanDisplayHooks = [
   '낙찰가 기준 대출',
   '방공제 금액',
   '중도상환수수료',
+  '중개수수료 산정',
+  '소득세율',
+  '누진공제',
   '양도세/소득세',
   '양도세 지방세',
+  '월세 셋팅',
+  '월세 셋팅 참고',
   '총 비용(세금 포함)',
   '권리관계와 명도 가능성',
+  'function brokerageRateForSale',
+  'function taxBracketForBase',
   'data-bid-plan="totalCost"',
+  'data-bid-plan="rentYield"',
 ];
 for (const needle of requiredBidPlanDisplayHooks) {
   assert(bidPlanSource.includes(needle), `bid plan display should include ${needle}`);
