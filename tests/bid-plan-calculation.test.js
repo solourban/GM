@@ -7,6 +7,7 @@ const ROOT = path.join(__dirname, '..');
 const bidPlanSource = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-bid-plan.js'), 'utf8');
 const copySummarySource = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-copy-summary.js'), 'utf8');
 const finalJudgmentSource = fs.readFileSync(path.join(ROOT, 'public', 'app-v2-final-judgment.js'), 'utf8');
+const styleSource = fs.readFileSync(path.join(ROOT, 'public', 'style.css'), 'utf8');
 
 const storage = new Map();
 const sandbox = {
@@ -178,8 +179,12 @@ const requiredBidPlanDisplayHooks = [
   '핵심 계산 결과',
   '상세 비용·대출·세금 입력',
   '상세 계산값 보기',
+  'v2-bid-entry-block',
   'v2-bid-summary-block',
   'v2-bid-advanced-inputs',
+  'v2-bid-toggle',
+  'v2-bid-detail-kpis',
+  'v2-bid-calculation-detail',
   '계산 상세',
   '취득세+지방세',
   '감정가 기준 대출',
@@ -202,6 +207,22 @@ const requiredBidPlanDisplayHooks = [
 ];
 for (const needle of requiredBidPlanDisplayHooks) {
   assert(bidPlanSource.includes(needle), `bid plan display should include ${needle}`);
+}
+
+const requiredBidPlanStyleHooks = [
+  '.v2-bid-plan-card {',
+  '.v2-bid-entry-block {',
+  '.v2-bid-summary-block {',
+  '.v2-bid-plan-card details.v2-form-block > summary::after',
+  'content: "열기";',
+  'content: "접기";',
+  '.v2-bid-calculation-detail,',
+  '.v2-bid-rent-block {',
+  'body .v2-bid-plan-card .v2-input-grid {\n    grid-template-columns: 1fr;',
+  'body .v2-bid-plan-card details.v2-form-block > summary {',
+];
+for (const needle of requiredBidPlanStyleHooks) {
+  assert(styleSource.includes(needle), `bid plan style should include ${needle}`);
 }
 
 const dataBindings = [...bidPlanSource.matchAll(/data-bid-plan="([^"]+)"/g)].map((match) => match[1]);

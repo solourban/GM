@@ -406,7 +406,7 @@
       <span class="v2-badge">입찰가 산정</span>
       <h3>입찰가·필요 현금 계산</h3>
       <p class="v2-note">입찰가, 대출, 보유비용, 매도비용을 넣어 필요 현금과 세후수익을 참고 계산합니다.</p>
-      <div class="v2-form-block">
+      <div class="v2-form-block v2-bid-entry-block">
         <h4>입찰가</h4>
         <div class="v2-input-grid">
           ${inputHtml('plannedBid', '입찰 예정가', '예: 520,000,000')}
@@ -429,8 +429,8 @@
         </div>
       </div>
       <details class="v2-form-block v2-bid-advanced-inputs">
-        <summary style="cursor:pointer;font-weight:900;">상세 비용·대출·세금 입력</summary>
-        <p class="v2-note" style="margin-top:8px;">기본값으로 먼저 계산하고, 실제 비용이나 대출 조건이 있으면 이 영역에서 조정하세요.</p>
+        <summary class="v2-bid-toggle">상세 비용·대출·세금 입력</summary>
+        <p class="v2-note">기본값으로 먼저 계산하고, 실제 비용이나 대출 조건이 있으면 이 영역에서 조정하세요.</p>
         <h4>취득·보유 비용</h4>
         <div class="v2-input-grid">
           ${inputHtml('acquisitionTaxRate', '취득세율+지방세율(%)', '예: 1.1')}
@@ -463,8 +463,8 @@
         </div>
       </details>
       <details class="v2-form-block v2-bid-detail-panel">
-        <summary style="cursor:pointer;font-weight:900;">상세 계산값 보기</summary>
-        <div class="v2-grid four" style="margin-top:12px;">
+        <summary class="v2-bid-toggle">상세 계산값 보기</summary>
+        <div class="v2-grid four v2-bid-detail-kpis">
         <div class="v2-info-box"><span>보유기간 이자</span><strong data-bid-plan="holdingInterest">0원</strong></div>
         <div class="v2-info-box"><span>최저가 / 감정가 대비</span><strong><span data-bid-plan="minRate">-</span> / <span data-bid-plan="appraisedRate">-</span></strong></div>
         <div class="v2-info-box"><span>과세표준 참고</span><strong data-bid-plan="taxableBase">0원</strong></div>
@@ -476,7 +476,7 @@
         <div class="v2-info-box"><span>손익분기 매도가</span><strong data-bid-plan="breakEvenSalePrice">-</strong></div>
         <div class="v2-info-box"><span>월평균 보유비용</span><strong data-bid-plan="holdingMonthlyCost">0원</strong></div>
       </div>
-      <div class="v2-form-block">
+      <div class="v2-bid-calculation-detail">
         <h4>계산 상세</h4>
         <div class="v2-grid four">
           <div class="v2-info-box"><span>취득세+지방세</span><strong data-bid-plan="acquisitionTax">0원</strong></div>
@@ -507,7 +507,7 @@
           <div class="v2-info-box"><span>양도세 지방세</span><strong data-bid-plan="localIncomeTax">0원</strong></div>
           <div class="v2-info-box"><span>총 비용(세금 포함)</span><strong data-bid-plan="totalCost">0원</strong></div>
         </div>
-        <div class="v2-form-block v2-bid-rent-block">
+        <div class="v2-bid-rent-block">
           <h4>월세 셋팅 참고</h4>
           <div class="v2-grid four">
             <div class="v2-info-box"><span>월 순수익</span><strong data-bid-plan="monthlyRentNet">-</strong></div>

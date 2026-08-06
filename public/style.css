@@ -691,6 +691,123 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   border-top: 1px solid var(--line);
   padding-top: 14px;
 }
+.v2-bid-plan-card {
+  display: grid;
+  gap: 14px;
+}
+.v2-bid-plan-card .v2-badge {
+  justify-self: start;
+}
+.v2-bid-plan-card > h3,
+.v2-bid-plan-card > .v2-note {
+  margin-bottom: 0;
+}
+.v2-bid-plan-card .v2-form-block {
+  margin-top: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+}
+.v2-bid-plan-card .v2-form-block h4,
+.v2-bid-calculation-detail h4,
+.v2-bid-rent-block h4 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.v2-bid-entry-block {
+  background: var(--bg);
+}
+.v2-bid-summary-block {
+  border-color: rgba(11,61,46,0.18);
+  background: #f7fbf8;
+}
+.v2-bid-summary-block .v2-grid:first-of-type .v2-info-box:first-child,
+.v2-bid-summary-block .v2-grid:first-of-type .v2-info-box:last-child {
+  border-color: rgba(11,61,46,0.22);
+  background: var(--accent-soft);
+}
+.v2-bid-summary-block .v2-grid:first-of-type .v2-info-box strong {
+  font-size: 18px;
+}
+.v2-bid-plan-card details.v2-form-block {
+  overflow: hidden;
+  padding: 0;
+}
+.v2-bid-plan-card details.v2-form-block > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 14px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.35;
+  list-style: none;
+}
+.v2-bid-plan-card details.v2-form-block > summary::-webkit-details-marker {
+  display: none;
+}
+.v2-bid-plan-card details.v2-form-block > summary::after {
+  content: "열기";
+  flex: 0 0 auto;
+  min-width: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink-2);
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+.v2-bid-plan-card details[open].v2-form-block > summary {
+  border-bottom: 1px solid var(--line);
+}
+.v2-bid-plan-card details[open].v2-form-block > summary::after {
+  content: "접기";
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.v2-bid-plan-card details.v2-form-block > .v2-note,
+.v2-bid-plan-card details.v2-form-block > h4,
+.v2-bid-plan-card details.v2-form-block > .v2-input-grid,
+.v2-bid-plan-card details.v2-form-block > .v2-grid,
+.v2-bid-plan-card details.v2-form-block > .v2-bid-calculation-detail,
+.v2-bid-plan-card details.v2-form-block > .v2-bid-rent-block {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+.v2-bid-plan-card details.v2-form-block > .v2-note {
+  margin-top: 12px;
+}
+.v2-bid-plan-card details.v2-form-block > h4,
+.v2-bid-calculation-detail,
+.v2-bid-rent-block {
+  margin-top: 14px;
+}
+.v2-bid-plan-card details.v2-form-block > .v2-input-grid:last-child,
+.v2-bid-plan-card details.v2-form-block > .v2-grid:last-child,
+.v2-bid-plan-card details.v2-form-block > .v2-bid-calculation-detail:last-child,
+.v2-bid-plan-card details.v2-form-block > .v2-bid-rent-block:last-child {
+  margin-bottom: 14px;
+}
+.v2-bid-detail-kpis {
+  margin-top: 14px;
+}
+.v2-bid-calculation-detail,
+.v2-bid-rent-block {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.v2-bid-plan-card .v2-list {
+  margin-top: 0;
+}
 
 @media (max-width: 640px) {
   .brand-logo img {
@@ -882,6 +999,46 @@ input, select, button { font-family: inherit; font-size: inherit; color: inherit
   }
   body .v2-input-grid {
     gap: 8px;
+  }
+  body .v2-bid-plan-card {
+    gap: 10px;
+  }
+  body .v2-bid-plan-card .v2-form-block {
+    border-radius: 12px;
+    padding: 12px;
+  }
+  body .v2-bid-plan-card details.v2-form-block {
+    padding: 0;
+  }
+  body .v2-bid-plan-card .v2-input-grid {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  body .v2-bid-plan-card details.v2-form-block > summary {
+    min-height: 40px;
+    padding: 10px 12px;
+    font-size: 13.5px;
+  }
+  body .v2-bid-plan-card details.v2-form-block > summary::after {
+    min-width: 40px;
+    padding: 3px 8px;
+    font-size: 10.5px;
+  }
+  body .v2-bid-plan-card details.v2-form-block > .v2-note,
+  body .v2-bid-plan-card details.v2-form-block > h4,
+  body .v2-bid-plan-card details.v2-form-block > .v2-input-grid,
+  body .v2-bid-plan-card details.v2-form-block > .v2-grid,
+  body .v2-bid-plan-card details.v2-form-block > .v2-bid-calculation-detail,
+  body .v2-bid-plan-card details.v2-form-block > .v2-bid-rent-block {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+  body .v2-bid-summary-block .v2-grid:first-of-type .v2-info-box strong {
+    font-size: 15px;
+  }
+  body .v2-bid-calculation-detail,
+  body .v2-bid-rent-block {
+    padding-top: 12px;
   }
   body .v2-cta-row {
     gap: 8px;
